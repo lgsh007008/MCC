@@ -11,8 +11,12 @@
     "build": "turbo run build",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
     "format": "prettier --write .",
-    "db:generate": "pnpm --filter @mcc/db run generate"
+    "db:generate": "pnpm --filter @mcc/db run generate",
+    "db:migrate:dev": "pnpm --filter @mcc/db run migrate:dev",
+    "db:migrate:deploy": "pnpm --filter @mcc/db run migrate:deploy",
+    "db:studio": "pnpm --filter @mcc/db run studio"
   },
   "devDependencies": {
     "prettier": "^3.0.0",
