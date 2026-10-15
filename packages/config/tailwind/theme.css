@@ -1,0 +1,11 @@
+/* Tailwind 预设：把设计令牌映射为 Tailwind 主题变量。
+   使用方需先引入 @mcc/tokens/src/tokens.css，再引入本文件。 */
+@theme {
+  --color-bg: var(--mcc-color-bg);
+  --color-fg: var(--mcc-color-fg);
+  --color-primary: var(--mcc-color-primary);
+  --color-border: var(--mcc-color-border);
+  --text-base: var(--mcc-font-size-base);
+  --radius-base: var(--mcc-radius-base);
+  --spacing: var(--mcc-space-unit);
+}

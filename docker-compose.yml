@@ -1,0 +1,21 @@
+# 开发环境：PostgreSQL + Redis（技术方案 §3.2、§10.1）
+# 注意：本机当前未安装 Docker，此文件仅备好；数据库接入阶段再启用。
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: mcc
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+
+volumes:
+  pgdata:

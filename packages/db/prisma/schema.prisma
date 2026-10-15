@@ -1,0 +1,13 @@
+// 表结构的唯一事实源。通用字段约定与模式约定见技术方案 §5。
+// 具体业务表随需求新增，每个领域只拥有自己的表（数据所有权）。
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// TODO: 首个业务需求到来时，在此按领域添加模型。

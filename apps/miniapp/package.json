@@ -1,0 +1,6 @@
+{
+  "name": "@mcc/miniapp",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Taro 小程序（技术方案 §2 技术栈选型）。脚手架依赖待小程序开发阶段接入，届时补齐 Taro 依赖与 config/、src/ 骨架。"
+}

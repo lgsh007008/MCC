@@ -1,0 +1,19 @@
+/* 设计令牌的原始变量定义（标准模式），关怀模式在下方覆盖。
+   取值均为脚手架阶段的占位值，待设计确定后替换。 */
+:root {
+  --mcc-color-bg: #ffffff;
+  --mcc-color-fg: #1a1a1a;
+  --mcc-color-primary: #16653c;
+  --mcc-color-border: #e5e7eb;
+  --mcc-font-size-base: 15px;
+  --mcc-space-unit: 4px;
+  --mcc-radius-base: 8px;
+  --mcc-touch-target: 44px;
+}
+
+[data-mode='care'] {
+  --mcc-font-size-base: 18px;
+  --mcc-touch-target: 52px;
+  --mcc-color-fg: #000000;
+  --mcc-color-border: #6b7280;
+}

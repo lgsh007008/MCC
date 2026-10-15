@@ -1,2 +1,23 @@
 # Obsidian 本地配置（不入库）
 .obsidian/
+
+# 依赖与构建产物
+node_modules/
+dist/
+build/
+.next/
+out/
+.turbo/
+*.tsbuildinfo
+
+# 环境变量：仅 .env.example 入库，真实 .env 一律忽略
+.env
+.env.*
+!.env.example
+
+# 日志与系统文件
+*.log
+npm-debug.log*
+pnpm-debug.log*
+.DS_Store
+Thumbs.db
