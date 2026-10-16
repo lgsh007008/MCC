@@ -10,7 +10,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// 主键算法已锁定（技术方案 §5.2）：不可推测的全局唯一 ID，取 uuid v4。
+// 主键算法已锁定（技术方案 §5.1）：不可推测的全局唯一 ID，取 uuid v4。
 // 新增模型一律以这四行为头（字段名、类型、映射均照此，禁止逐表另立写法）：
 //   id        String    @id @default(uuid()) @db.Uuid
 //   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
