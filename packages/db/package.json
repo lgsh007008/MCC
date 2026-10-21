@@ -12,9 +12,11 @@
     "migrate:dev": "prisma migrate dev",
     "migrate:deploy": "prisma migrate deploy",
     "studio": "prisma studio",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "eslint ."
   },
   "dependencies": {
+    "@mcc/config": "workspace:*",
     "@prisma/client": "^6.0.0"
   },
   "devDependencies": {

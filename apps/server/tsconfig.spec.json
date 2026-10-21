@@ -5,5 +5,5 @@
     "moduleResolution": "Bundler",
     "noEmit": true
   },
-  "include": ["src", "test", "vitest.config.ts"]
+  "include": ["src", "test", "vitest.config.mts"]
 }

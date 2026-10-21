@@ -1,0 +1,71 @@
+# CI 门禁（技术方案 §10：lint + 类型检查 + 单测 + 契约校验）
+# 当前覆盖：数据库迁移可应用 + 类型检查 + 单测/集成测试（server、shared、db）。
+# lint 与 eslint 边界规则（技术方案 §4.2）待 eslint 基建落地后补入本工作流。
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: mcc
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/mcc?schema=public
+      REDIS_URL: redis://localhost:6379
+      JWT_SECRET: ci-only-test-secret
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.11.2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: 安装依赖
+        run: pnpm install --frozen-lockfile
+
+      - name: 数据库迁移（packages/db）
+        working-directory: packages/db
+        run: pnpm prisma migrate deploy
+
+      - name: 契约校验（openapi.json 与实现同步，ADR-006）
+        run: |
+          pnpm --filter @mcc/server run gen:openapi
+          git diff --exit-code -- packages/shared/openapi.json
+
+      - name: Lint（含 §4.2 模块边界规则）
+        run: pnpm lint
+
+      - name: 类型检查（server / shared / db）
+        run: pnpm --filter @mcc/server --filter @mcc/shared --filter @mcc/db run typecheck
+
+      - name: 单测与集成测试（server / shared）
+        run: pnpm --filter @mcc/server --filter @mcc/shared run test

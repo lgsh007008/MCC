@@ -9,12 +9,17 @@
   },
   "scripts": {
     "test": "vitest run",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "gen:client": "openapi-typescript ./openapi.json -o ./src/gen/api.d.ts",
+    "lint": "eslint ."
   },
   "dependencies": {
+    "@mcc/config": "workspace:*",
+    "openapi-fetch": "^0.17.0",
     "zod": "^4.0.0"
   },
   "devDependencies": {
+    "openapi-typescript": "^7.13.0",
     "typescript": "^5.0.0",
     "vitest": "^3.2.7"
   }

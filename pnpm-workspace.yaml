@@ -2,10 +2,18 @@ packages:
   - "apps/*"
   - "packages/*"
 
+# 强制版本（见根 package.json 注释）：@swc/core 受本机权限/缓存限制锁定 1.7.42，
+# 因此把 @swc-node/core 降到与其兼容的 1.13.1（1.15.0 要求 @swc/core >= 1.13.3）。
+overrides:
+  "@swc-node/core": "1.13.1"
+
 # 允许这些依赖执行安装脚本（pnpm 10+ 默认拦截）
 allowBuilds:
   '@prisma/client': true
   '@prisma/engines': true
   '@swc/core': true
+  '@node-rs/argon2': true
+  '@scarf/scarf': true
   esbuild: true
   prisma: true
+  unrs-resolver: true

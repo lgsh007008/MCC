@@ -17,4 +17,77 @@ datasource db {
 //   updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
 //   deletedAt DateTime? @map("deleted_at")
 
-// TODO: 首个业务需求到来时，在此按领域添加模型。
+// ── 账号与权限领域（auth，design/账号与权限.md §2）────────────────
+// user / refresh_token 均归本领域，细节以本文件为准。
+
+enum UserRole {
+  // 单角色「销售」全权限（product/账号与权限.md R-账号与权限-001）；
+  // 新增角色随需求扩展，不预建角色表。
+  SALES
+
+  @@map("user_role")
+}
+
+model User {
+  id        String   @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at")
+
+  // 账号：按使用人一人一号，无自助注册（MVP 由初始化直接提供，见 design/账号与权限.md）。
+  username     String   @unique @map("username")
+  passwordHash String   @map("password_hash")
+  role         UserRole @default(SALES)
+
+  refreshTokens RefreshToken[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at")
+
+  // 服务端只存哈希（sha256），不存令牌原文（design/账号与权限.md §4）。
+  tokenHash String  @unique @map("token_hash")
+  userId    String  @db.Uuid @map("user_id")
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // 过期时间对应「记住登录」口径：勾选 30 天，不勾选会话级。
+  expiresAt DateTime @map("expires_at")
+  // 撤销即置位（登出 / 改密后旧会话撤销），记录保留供审计。
+  revokedAt DateTime? @map("revoked_at")
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+// ── 审计（server 全局基础设施，技术方案 §8.5 / §5.2 事件日志模式）────
+// 全量写操作的审计日志：主体、时间、对象、动作、结果；审计日志只增、不可篡改。
+// 归属：横切中间件（common/audit），不属任何业务模块（技术方案 §1.1）。
+
+model EventLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at")
+
+  // 操作主体（登录后写入 user id；匿名操作如登录失败为 null）
+  actorId       String? @map("actor_id")
+  actorUsername String? @map("actor_username")
+  // 领域 + 动作：由请求路径解析（如 /api/v1/auth/login → auth / login）
+  domain  String  @map("domain")
+  action  String  @map("action")
+  // 操作对象（如改密对象为账号 id）
+  objectType String? @map("object_type")
+  objectId   String? @map("object_id")
+  // 结果：ok / error / forbidden 等
+  result String @map("result")
+  // 附加上下文（不含敏感信息）
+  payload Json? @map("payload")
+
+  @@index([createdAt])
+  @@index([actorId])
+  @@map("event_logs")
+}

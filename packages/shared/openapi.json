@@ -1,0 +1,211 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/api/v1/auth/login": {
+      "post": {
+        "operationId": "AuthController_login",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "登录：校验账号密码，签发访问令牌 + 刷新令牌",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/refresh": {
+      "post": {
+        "operationId": "AuthController_refresh",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefreshResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "凭 httpOnly Cookie（或请求体）中的刷新令牌换新访问令牌",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "operationId": "AuthController_logout",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "撤销刷新令牌，登出",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/change-password": {
+      "post": {
+        "operationId": "AuthController_changePassword",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "登录态下修改密码；成功后撤销该账号全部刷新会话",
+        "tags": [
+          "auth"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "MCC 业务 API",
+    "description": "梅好木业数字化系统统一业务 API（ADR-002：人与 Agent 平级消费同一套接口）",
+    "version": "v1",
+    "contact": {}
+  },
+  "tags": [
+    {
+      "name": "auth",
+      "description": "账号与权限"
+    }
+  ],
+  "servers": [],
+  "components": {
+    "schemas": {
+      "LoginBodyDto": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "description": "账号，一人一号",
+            "example": "admin"
+          },
+          "password": {
+            "type": "string",
+            "description": "密码",
+            "example": "Mcc@2026"
+          },
+          "rememberMe": {
+            "type": "boolean",
+            "description": "记住登录：勾选 → 刷新令牌 30 天；不勾选 → 会话级",
+            "default": false
+          }
+        },
+        "required": [
+          "username",
+          "password",
+          "rememberMe"
+        ]
+      },
+      "LoginResponseDto": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string",
+            "description": "短期访问令牌，web 端存内存并以 Bearer 请求头携带"
+          },
+          "username": {
+            "type": "string",
+            "description": "账号名"
+          },
+          "role": {
+            "type": "string",
+            "description": "角色（当前恒为 SALES）"
+          }
+        },
+        "required": [
+          "accessToken",
+          "username",
+          "role"
+        ]
+      },
+      "RefreshRequestDto": {
+        "type": "object",
+        "properties": {
+          "refreshToken": {
+            "type": "string",
+            "description": "无 Cookie 端（如 miniapp）经请求体传递刷新令牌；web 走 Cookie 时无需此字段"
+          }
+        }
+      },
+      "RefreshResponseDto": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string",
+            "description": "新签发的访问令牌"
+          }
+        },
+        "required": [
+          "accessToken"
+        ]
+      },
+      "ChangePasswordBodyDto": {
+        "type": "object",
+        "properties": {
+          "oldPassword": {
+            "type": "string",
+            "description": "旧密码"
+          },
+          "newPassword": {
+            "type": "string",
+            "description": "新密码，至少 8 位"
+          }
+        },
+        "required": [
+          "oldPassword",
+          "newPassword"
+        ]
+      }
+    }
+  }
+}

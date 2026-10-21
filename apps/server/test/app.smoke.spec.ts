@@ -1,10 +1,10 @@
-import 'reflect-metadata';
+﻿import 'reflect-metadata';
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { describe, expect, it, afterAll, beforeAll } from 'vitest';
-import { AppModule } from '../src/app.module';
-import { API_PREFIX } from '../src/common/api-prefix';
+import { AppModule } from '../src/app.module.js';
+import { API_PREFIX } from '../src/common/api-prefix.js';
 
 // 脚手架自检用例：证明服务能装配、统一前缀生效（契约/集成层）。
 // 每个领域的接口用例随需求写入 test/，与实现同目录演进。

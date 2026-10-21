@@ -2,29 +2,48 @@
   "name": "@mcc/server",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
-    "dev": "tsx watch src/main.ts",
+    "dev": "node --watch --loader ./loader.mjs src/main.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/main.js",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit -p tsconfig.spec.json"
+    "typecheck": "tsc --noEmit -p tsconfig.spec.json",
+    "seed": "tsx scripts/seed.ts",
+    "gen:openapi": "node --loader ./loader.mjs scripts/gen-openapi.ts",
+    "lint": "eslint ."
   },
   "dependencies": {
+    "@mcc/config": "workspace:*",
+    "@mcc/db": "workspace:*",
+    "@mcc/shared": "workspace:*",
     "@nestjs/common": "^12.0.0",
     "@nestjs/core": "^12.0.0",
     "@nestjs/platform-express": "^12.0.0",
+    "@nestjs/swagger": "^12.0.2",
+    "@node-rs/argon2": "^2.2.2",
+    "cookie-parser": "^1.4.7",
+    "dotenv": "^18.0.8",
+    "ioredis": "^6.0.0",
+    "jsonwebtoken": "^9.0.3",
     "reflect-metadata": "^0.2.0",
-    "rxjs": "^7.8.0"
+    "rxjs": "^7.8.0",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@nestjs/testing": "^12.1.3",
+    "@swc-node/core": "1.13.1",
+    "@swc-node/register": "1.9.2",
     "@swc/core": "1.7.42",
+    "@types/cookie-parser": "^1.4.10",
+    "@types/express": "^5.0.6",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^22.0.0",
     "@types/supertest": "^6.0.3",
     "supertest": "^7.3.1",
     "tsx": "^4.0.0",
     "typescript": "^5.0.0",
-    "unplugin-swc": "^1.6.0",
+    "unplugin-swc": "^2.0.0",
     "vitest": "^3.2.7"
   }
 }
