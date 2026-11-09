@@ -1,3 +1,4 @@
+import path from 'node:path';
 import type { NextConfig } from 'next';
 
 // 同源部署形态（技术方案 §1.3：人类流量走统一业务 API）：
@@ -10,6 +11,9 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   // workspace 内的 TS 源码包（exports 指向 .ts）需列入转译清单
   transpilePackages: ['@mcc/shared'],
+  // 生产镜像只带 standalone 产物（技术方案 §9.5）；monorepo 下需把 trace 根指到仓库根
+  output: 'standalone',
+  outputFileTracingRoot: path.join(process.cwd(), '../../'),
   async rewrites() {
     return [{ source: '/api/v1/:path*', destination: `${API_INTERNAL_URL}/api/v1/:path*` }];
   },

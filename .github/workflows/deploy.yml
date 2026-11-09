@@ -42,17 +42,31 @@ jobs:
           username: ${{ secrets.ACR_USERNAME }}
           password: ${{ secrets.ACR_PASSWORD }}
 
+      - name: 设置 Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: 构建并推送 server
-        run: |
-          IMAGE="${{ secrets.ACR_REGISTRY }}/${{ secrets.ACR_NAMESPACE }}/server:${{ github.event.inputs.tag || github.ref_name }}"
-          docker build -f apps/server/Dockerfile -t "$IMAGE" .
-          docker push "$IMAGE"
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/server/Dockerfile
+          push: true
+          tags: ${{ secrets.ACR_REGISTRY }}/${{ secrets.ACR_NAMESPACE }}/server:${{ github.event.inputs.tag || github.ref_name }}
+          # 依赖层与源码层分离后，跨次构建复用缓存，只重建变更层
+          cache-from: type=gha,scope=server
+          cache-to: type=gha,mode=max,scope=server
 
       - name: 构建并推送 web
-        run: |
-          IMAGE="${{ secrets.ACR_REGISTRY }}/${{ secrets.ACR_NAMESPACE }}/web:${{ github.event.inputs.tag || github.ref_name }}"
-          docker build -f apps/web/Dockerfile --build-arg API_INTERNAL_URL=http://server:3001 -t "$IMAGE" .
-          docker push "$IMAGE"
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          push: true
+          build-args: |
+            API_INTERNAL_URL=http://server:3001
+          tags: ${{ secrets.ACR_REGISTRY }}/${{ secrets.ACR_NAMESPACE }}/web:${{ github.event.inputs.tag || github.ref_name }}
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web
 
   deploy:
     needs: build
