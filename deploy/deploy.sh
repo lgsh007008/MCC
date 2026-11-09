@@ -13,16 +13,24 @@ else
   printf 'IMAGE_TAG=%s\n' "$TAG" >> .env.prod
 fi
 
-# 先保证数据库在跑，再备份（首次部署时库是空的，备份同样无害）
+# 先保证数据库在跑，再备份（首次部署时库是空的，备份同样无害）。
+# 注意：compose ps 的 --status 不接受 healthy（返回空导致误判），健康状态须用 inspect 读。
 compose up -d postgres redis
+pg_ready() {
+  local cid
+  cid="$(compose ps -q postgres)"
+  [ -n "$cid" ] && [ "$(docker inspect -f '{{.State.Health.Status}}' "$cid" 2>/dev/null || true)" = "healthy" ]
+}
 for _ in $(seq 1 30); do
-  compose ps postgres --status healthy --quiet | grep -q . && break
+  pg_ready && break
   sleep 2
 done
-if compose ps postgres --status healthy --quiet | grep -q .; then
+if pg_ready; then
   ./deploy/backup.sh
 else
-  echo "postgres 未就绪，跳过备份" >&2
+  # 发布前备份是硬步骤（技术方案 §9.5）：数据库不就绪则中止，不带病发布
+  echo "postgres 未就绪，中止发布" >&2
+  exit 1
 fi
 
 compose pull
