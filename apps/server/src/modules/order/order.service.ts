@@ -12,6 +12,7 @@ import {
 } from '@mcc/shared';
 import { problem } from '../../common/http-problem.js';
 import { PrismaService } from '../../common/prisma.service.js';
+import { CustomerService } from '../customer/index.js';
 import type {
   SaleOrderDto,
   SaleOrderItemResponseDto,
@@ -93,6 +94,7 @@ interface ListRow {
   id: string;
   code: string;
   saleDate: Date;
+  customerId: string;
   customerName: string;
   totalVolume: Prisma.Decimal;
   subtotalAmount: Prisma.Decimal;
@@ -121,7 +123,10 @@ interface DetailOrder extends ListRow {
 
 @Injectable()
 export class OrderService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly customers: CustomerService,
+  ) {}
 
   // 编号：年月（取销售日期）+ 当月流水，如 202611-0001（design/order.md §4）。
   // 事务内取值 + 唯一约束兜底并发，P2002 冲突时重试。
@@ -144,6 +149,7 @@ export class OrderService {
       id: row.id,
       code: row.code,
       saleDate: isoDate(row.saleDate),
+      customerId: row.customerId,
       customerName: row.customerName,
       totalVolume: volume(row.totalVolume.toString()),
       subtotalAmount: money(row.subtotalAmount.toString()),
@@ -173,8 +179,8 @@ export class OrderService {
 
   async list(query: SaleOrderListQuery): Promise<SaleOrderListDto> {
     const where: Prisma.SaleOrderWhereInput = {};
-    if (query.customerName) {
-      where.customerName = { contains: query.customerName };
+    if (query.customerId) {
+      where.customerId = query.customerId;
     }
     if (query.dateFrom || query.dateTo) {
       where.saleDate = {};
@@ -206,6 +212,7 @@ export class OrderService {
           id: true,
           code: true,
           saleDate: true,
+          customerId: true,
           customerName: true,
           totalVolume: true,
           subtotalAmount: true,
@@ -247,10 +254,19 @@ export class OrderService {
     if (!order || order.deletedAt !== null) {
       throw problem(404, 'NOT_FOUND', '销售单不存在');
     }
-    return { ...this.toListItem(order), items: order.items.map((item) => this.toItemDto(order, item)) };
+    // 客户编号取自客户档案当前记录（经公开接口，不读 customer 表）；名称仍用单据上的快照。
+    const customer = await this.customers.findById(order.customerId);
+    return {
+      ...this.toListItem(order),
+      customerCode: customer?.code ?? null,
+      customerDeleted: customer?.deleted ?? false,
+      items: order.items.map((item) => this.toItemDto(order, item)),
+    };
   }
 
   async create(input: SaleOrderInput): Promise<SaleOrderDto> {
+    // 客户校验经 customer 公开接口（design/order.md §5）：存在且启用才可开单。
+    const customer = await this.customers.assertSelectable(input.customerId);
     const computed = input.items.map((item) => computeItem(item));
     const totals = calcOrderTotals(
       computed.map((item) => ({
@@ -269,7 +285,8 @@ export class OrderService {
             data: {
               code,
               saleDate: toDate(input.saleDate),
-              customerName: input.customerName,
+              customerId: customer.id,
+              customerName: customer.name,
               totalVolume: totals.totalVolume,
               subtotalAmount: totals.subtotalAmount,
               otherAmount: money(input.otherAmount),
@@ -314,11 +331,17 @@ export class OrderService {
     const existing = await this.prisma.client.saleOrder.findUnique({
       where: { id },
       // 租户扩展的 findUnique 钩子按 tenantId 校验归属，select 必须带出该列，否则异租户误判
-      select: { id: true, deletedAt: true, tenantId: true },
+      select: { id: true, deletedAt: true, tenantId: true, customerId: true, customerName: true },
     });
     if (!existing || existing.deletedAt !== null) {
       throw problem(404, 'NOT_FOUND', '销售单不存在');
     }
+
+    // 客户未变更时不校验启用态（历史单客户可能已停用，仍需可保存）；变更客户则要求启用并重取名称快照。
+    const customer =
+      existing.customerId === input.customerId
+        ? { id: existing.customerId, name: existing.customerName }
+        : await this.customers.assertSelectable(input.customerId);
 
     const computed = input.items.map((item) => computeItem(item));
     const totals = calcOrderTotals(
@@ -348,7 +371,8 @@ export class OrderService {
         where: { id },
         data: {
           saleDate: toDate(input.saleDate),
-          customerName: input.customerName,
+          customerId: customer.id,
+          customerName: customer.name,
           totalVolume: totals.totalVolume,
           subtotalAmount: totals.subtotalAmount,
           otherAmount: money(input.otherAmount),
@@ -390,6 +414,35 @@ export class OrderService {
     });
 
     return this.detail(id);
+  }
+
+  // 客户维度累计方量（product/customer.md 累计下单方量；design/order.md §5）：
+  // 未软删销售单按 customer_id 汇总；含「其他」类型（其他行无方量，贡献 0）。
+  // 用 findMany 后本地汇总而非 groupBy：租户条件由数据访问层统一附加，groupBy 不在扩展钩子内。
+  async customerVolumeSummary(customerIds: string[]): Promise<{
+    items: Array<{ customerId: string; totalVolume: string; orderCount: number }>;
+  }> {
+    const rows = await this.prisma.client.saleOrder.findMany({
+      where: { deletedAt: null, customerId: { in: customerIds } },
+      select: { customerId: true, totalVolume: true },
+    });
+    const buckets = new Map<string, { volumes: string[]; count: number }>();
+    for (const row of rows) {
+      const bucket = buckets.get(row.customerId) ?? { volumes: [], count: 0 };
+      bucket.volumes.push(row.totalVolume.toString());
+      bucket.count += 1;
+      buckets.set(row.customerId, bucket);
+    }
+    return {
+      items: customerIds.map((customerId) => {
+        const bucket = buckets.get(customerId);
+        return {
+          customerId,
+          totalVolume: sumVolumes(bucket?.volumes ?? []),
+          orderCount: bucket?.count ?? 0,
+        };
+      }),
+    };
   }
 
   // 删除 = 软删除（技术方案 §5.1）：编号不回收，列表默认不可见

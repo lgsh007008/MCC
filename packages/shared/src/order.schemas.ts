@@ -57,7 +57,7 @@ export type SaleOrderItemUpdateInput = z.infer<typeof saleOrderItemUpdateSchema>
 
 const saleOrderBaseFields = {
   saleDate: saleDateSchema,
-  customerName: z.string().trim().min(1, '客户名称必填').max(100),
+  customerId: z.string().uuid('请选择客户'),
   otherAmount: z.string().regex(decimal2Re).default('0'),
   note: z.string().trim().max(500).default(''),
 };
@@ -79,13 +79,28 @@ export const saleOrderSortFieldSchema = z.enum(['saleDate', 'totalVolume', 'tota
 export type SaleOrderSortField = z.infer<typeof saleOrderSortFieldSchema>;
 
 export const saleOrderListQuerySchema = paginationQuerySchema.extend({
-  customerName: z.string().trim().max(100).optional(),
+  customerId: z.string().uuid().optional(),
   dateFrom: saleDateSchema.optional(),
   dateTo: saleDateSchema.optional(),
   sortBy: saleOrderSortFieldSchema.optional(),
   sortOrder: z.enum(['asc', 'desc']).optional(),
 });
 export type SaleOrderListQuery = z.infer<typeof saleOrderListQuerySchema>;
+
+// 客户维度累计方量汇总（product/customer.md 只引用不重述）：
+// customerIds 为逗号分隔的客户 id，1~200 个。
+export const customerVolumeSummaryQuerySchema = z.object({
+  customerIds: z
+    .string()
+    .trim()
+    .min(1, '请提供客户 id')
+    .transform((value) => value.split(',').map((id) => id.trim()).filter(Boolean))
+    .refine((ids) => ids.length >= 1 && ids.length <= 200, { message: '客户 id 数量须为 1~200' })
+    .refine((ids) => ids.every((id) => z.string().uuid().safeParse(id).success), {
+      message: '客户 id 格式不合法',
+    }),
+});
+export type CustomerVolumeSummaryQuery = z.infer<typeof customerVolumeSummaryQuerySchema>;
 
 // 批量删除（页面模式规范：列表多选 + 批量操作）
 export const saleOrderBatchDeleteSchema = z.object({

@@ -1,9 +1,17 @@
-import { FileTextIcon, HomeIcon, ShoppingCartIcon, type LucideIcon } from 'lucide-react';
+import {
+  ContactIcon,
+  FileTextIcon,
+  HomeIcon,
+  ShoppingCartIcon,
+  UsersIcon,
+  type LucideIcon,
+} from 'lucide-react';
 
 // 侧边菜单的静态配置（design/平台布局.md §1.3）：
 // 菜单清单集中在此维护，随 `product/平台布局.md` R-平台布局-001 菜单表更新而更新。
 // 菜单只登记已建领域分组；未建领域分组不列入（登记规则见 product/平台布局.md 菜单结构与领域归属）。
 // 每项必须带图标（折叠为图标栏时只显示图标，见 product/平台布局.md 整体布局）。
+// 图标全局不重复：首页、各业务分组、各菜单项之间不得复用同一图标（分组与其子项尤其不能同图标）。
 
 export interface NavItem {
   title: string;
@@ -37,6 +45,12 @@ export const navGroups: NavGroup[] = [
     domain: 'order',
     icon: ShoppingCartIcon,
     items: [{ title: '销售单', icon: FileTextIcon, href: '/admin/sale-orders' }],
+  },
+  {
+    label: '客户',
+    domain: 'customer',
+    icon: ContactIcon,
+    items: [{ title: '客户档案', icon: UsersIcon, href: '/admin/customers' }],
   },
 ];
 

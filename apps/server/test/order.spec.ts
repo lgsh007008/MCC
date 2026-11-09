@@ -22,6 +22,7 @@ describe('订单接口（契约/集成）', () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let accessToken: string;
+  let customerId: string;
   const username = `it-order-user-${Date.now()}`;
   const password = 'Secret#12345';
   const customerName = `it-order-customer-${Date.now()}`;
@@ -30,7 +31,7 @@ describe('订单接口（契约/集成）', () => {
 
   const body = (): SaleOrderInput => ({
     saleDate: '2026-11-09',
-    customerName,
+    customerId,
     otherAmount: '0',
     note: '集成测试单',
     items: [
@@ -63,10 +64,17 @@ describe('订单接口（契约/集成）', () => {
       rememberMe: false,
     });
     accessToken = login.body.accessToken as string;
+    // 客户档案由 customer 接口创建（order 只接受客户外键）
+    const customer = await request(app.getHttpServer())
+      .post(`/${API_PREFIX}/customers`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ name: customerName, contact: '13800000000', note: '' });
+    customerId = customer.body.id as string;
   });
 
   afterAll(async () => {
-    await prisma.client.saleOrder.deleteMany({ where: { customerName: { startsWith: 'it-order-' } } });
+    await prisma.client.saleOrder.deleteMany({ where: { customerId } });
+    await prisma.client.customer.deleteMany({ where: { name: { startsWith: 'it-order-' } } });
     await prisma.client.user.deleteMany({ where: { username: { startsWith: 'it-order-user-' } } });
     await prisma.client.eventLog.deleteMany({ where: { actorUsername: username } });
     await app.close();
@@ -124,14 +132,14 @@ describe('订单接口（契约/集成）', () => {
     expect(second.body.code).toBe(first.body.code);
   });
 
-  it('列表：按客户名称筛选，响应含筛选全量汇总（合计行）', async () => {
+  it('列表：按客户筛选，响应含筛选全量汇总（合计行）', async () => {
     const res = await http()
       .get(`/${API_PREFIX}/sale-orders`)
       .set('Authorization', `Bearer ${accessToken}`)
-      .query({ customerName: customerName.slice(0, 10), page: 1, pageSize: 10 });
+      .query({ customerId, page: 1, pageSize: 10 });
     expect(res.status).toBe(200);
     expect(Number(res.body.total)).toBeGreaterThanOrEqual(1);
-    expect(res.body.items.every((item: { customerName: string }) => item.customerName === customerName)).toBe(true);
+    expect(res.body.items.every((item: { customerId: string }) => item.customerId === customerId)).toBe(true);
     // summary 为筛选全量汇总（排除分页），金额/方量为定长格式化字符串
     expect(res.body.summary).toMatchObject({
       totalVolume: expect.stringMatching(/^\d+\.\d{4}$/),
@@ -151,7 +159,7 @@ describe('订单接口（契约/集成）', () => {
       .set('Authorization', `Bearer ${accessToken}`)
       .send({
         saleDate: '2026-11-09',
-        customerName,
+        customerId,
         otherAmount: '10.00',
         note: '集成测试单（改）',
         items: [

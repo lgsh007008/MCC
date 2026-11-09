@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { CopyIcon, Trash2Icon } from 'lucide-react';
 import {
@@ -10,6 +10,7 @@ import {
   saleOrderUpdateSchema,
 } from '@mcc/shared';
 import { Button } from '@/components/ui/button';
+import { DatePicker } from '@/components/ui/date-picker';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
@@ -47,6 +48,7 @@ interface FormRow {
 export interface SaleOrderFormInitial {
   code: string;
   saleDate: string;
+  customerId: string;
   customerName: string;
   otherAmount: string;
   note: string;
@@ -71,6 +73,13 @@ const localToday = (): string => {
 };
 const decimalOk = (value: string, scale: number): boolean =>
   new RegExp(`^\\d+(\\.\\d{1,${scale}})?$`).test(value);
+
+interface CustomerOption {
+  id: string;
+  code: string;
+  name: string;
+  status: string;
+}
 
 const emptyBoardRow = (): FormRow => ({
   productType: 'board',
@@ -113,7 +122,8 @@ export function SaleOrderForm({
 }): React.ReactElement {
   const router = useRouter();
   const [saleDate, setSaleDate] = useState(initial?.saleDate ?? localToday());
-  const [customerName, setCustomerName] = useState(initial?.customerName ?? '');
+  const [customerId, setCustomerId] = useState(initial?.customerId ?? '');
+  const [customerOptions, setCustomerOptions] = useState<CustomerOption[]>([]);
   const [otherAmount, setOtherAmount] = useState(initial?.otherAmount ?? '0');
   const [note, setNote] = useState(initial?.note ?? '');
   const [items, setItems] = useState<FormRow[]>(() =>
@@ -135,6 +145,50 @@ export function SaleOrderForm({
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const detailScrollRef = useRef<HTMLDivElement>(null);
+
+  // 客户下拉（design/order.md §7）：只列启用客户；编辑历史单且其客户已停用时补入该客户，
+  // 否则单据无法保存。
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { data, response } = await api.GET('/api/v1/customers', {
+          params: { query: { page: 1, pageSize: 100, status: 'active' } },
+        });
+        let options: CustomerOption[] = response.ok && data ? data.items : [];
+        const currentId = initial?.customerId;
+        if (currentId && !options.some((option) => option.id === currentId)) {
+          const detail = await api.GET('/api/v1/customers/{id}', {
+            params: { path: { id: currentId } },
+          });
+          if (detail.response.ok && detail.data) {
+            options = [detail.data, ...options];
+          } else {
+            // 客户档案已删除：用单据快照补选项，保证历史单仍可保存（design/order.md §7）
+            options = [
+              {
+                id: currentId,
+                code: '',
+                name: initial?.customerName ?? '',
+                status: 'deleted',
+              },
+              ...options,
+            ];
+          }
+        }
+        if (!cancelled) {
+          setCustomerOptions(options);
+        }
+      } catch {
+        if (!cancelled) {
+          setCustomerOptions([]);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [initial?.customerId]);
 
   const scrollDetailToEnd = (): void => {
     requestAnimationFrame(() => {
@@ -202,7 +256,7 @@ export function SaleOrderForm({
     setError(null);
     const payload = {
       saleDate,
-      customerName,
+      customerId,
       otherAmount,
       note,
       items: items.map((row) => {
@@ -270,21 +324,29 @@ export function SaleOrderForm({
         <h2 className="text-sm font-semibold">销售单</h2>
         <div className="mt-3 grid gap-3 xl:grid-cols-2">
           <Field label="销售日期" htmlFor="saleDate">
-            <Input
+            <DatePicker
               id="saleDate"
-              type="date"
               value={saleDate}
-              onChange={(e) => setSaleDate(e.target.value)}
-              className="h-8 w-40"
+              onChange={setSaleDate}
+              className="w-40"
             />
           </Field>
-          <Field label="客户名称" htmlFor="customerName">
-            <Input
-              id="customerName"
-              value={customerName}
-              onChange={(e) => setCustomerName(e.target.value)}
-              placeholder="客户名称"
-              className="h-8 w-full max-w-72"
+          <Field label="客户" htmlFor="customerId">
+            <Select
+              id="customerId"
+              value={customerId}
+              onChange={setCustomerId}
+              options={[
+                { value: '', label: '请选择客户' },
+                ...customerOptions.map((option) => ({
+                  value: option.id,
+                  label:
+                    option.status === 'deleted'
+                      ? `${option.name}（已删除）`
+                      : `${option.code} ${option.name}${option.status === 'active' ? '' : '（已停用）'}`,
+                })),
+              ]}
+              className="w-full max-w-72"
             />
           </Field>
           <Field label="其他金额" htmlFor="otherAmount">
@@ -360,14 +422,13 @@ export function SaleOrderForm({
                     <TableCell>
                       <Select
                         value={row.productType}
-                        onChange={(e) =>
-                          patchRow(index, { productType: e.target.value as 'board' | 'other' })
-                        }
+                        onChange={(value) => patchRow(index, { productType: value as 'board' | 'other' })}
+                        options={[
+                          { value: 'board', label: '板材' },
+                          { value: 'other', label: '其他' },
+                        ]}
                         className="w-24"
-                      >
-                        <option value="board">板材</option>
-                        <option value="other">其他</option>
-                      </Select>
+                      />
                     </TableCell>
                     <TableCell>
                       <Input

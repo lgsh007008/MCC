@@ -19,13 +19,21 @@ const stateWith = (paths: string[], activePath?: string): TabsState => {
 };
 
 describe('deriveTabTitle', () => {
-  it('拼接面包屑各级标识', () => {
-    expect(deriveTabTitle(['SO-2026-001', '编辑'], '销售单')).toBe('SO-2026-001 / 编辑');
+  it('菜单名 + 面包屑各级标识拼接', () => {
+    expect(deriveTabTitle('销售单', ['SO-2026-001', '编辑'], '/x')).toBe(
+      '销售单 / SO-2026-001 / 编辑',
+    );
+    expect(deriveTabTitle('销售单', ['新建'], '/x')).toBe('销售单 / 新建');
+    expect(deriveTabTitle('销售单', ['SO-2026-001'], '/x')).toBe('销售单 / SO-2026-001');
   });
 
-  it('无页面标识时回退菜单名', () => {
-    expect(deriveTabTitle([], '销售单')).toBe('销售单');
-    expect(deriveTabTitle(['  '], '销售单')).toBe('销售单');
+  it('无页面标识时只显示菜单名', () => {
+    expect(deriveTabTitle('销售单', [], '/x')).toBe('销售单');
+  });
+
+  it('菜单名与标识都为空时回退路径', () => {
+    expect(deriveTabTitle('', [], '/admin/unknown')).toBe('/admin/unknown');
+    expect(deriveTabTitle('  ', ['  '], '/admin/unknown')).toBe('/admin/unknown');
   });
 });
 

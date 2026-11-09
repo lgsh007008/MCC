@@ -6,6 +6,7 @@ import { PrismaModule } from './common/prisma.module.js';
 import { RateLimitGuard } from './common/rate-limit.guard.js';
 import { RedisModule } from './common/redis.module.js';
 import { AuthModule } from './modules/auth/index.js';
+import { CustomerModule } from './modules/customer/index.js';
 import { OrderModule } from './modules/order/index.js';
 
 // 模块化单体的根模块。业务模块按领域在 src/modules/<domain>/ 下新增，
@@ -16,6 +17,7 @@ import { OrderModule } from './modules/order/index.js';
     PrismaModule,
     RedisModule,
     AuthModule,
+    CustomerModule,
     OrderModule,
   ],
   controllers: [],

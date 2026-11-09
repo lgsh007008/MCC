@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
 import { buttonVariants } from '@/components/ui/button';
 import { usePageCrumb } from '@/components/admin/page-breadcrumb';
 import {
@@ -37,7 +37,10 @@ interface SaleOrderDetail {
   id: string;
   code: string;
   saleDate: string;
+  customerId: string;
   customerName: string;
+  customerCode?: string | null;
+  customerDeleted?: boolean;
   totalVolume: string;
   subtotalAmount: string;
   otherAmount: string;
@@ -48,36 +51,23 @@ interface SaleOrderDetail {
 
 export default function SaleOrderDetailPage(): React.ReactElement {
   const params = useParams<{ id: string }>();
-  const [order, setOrder] = useState<SaleOrderDetail | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  // 查询带缓存（技术方案 §7.4）：切回标签先用缓存渲染，后台刷新，避免闪「加载中」
+  const { data: order, error: queryError } = useQuery({
+    queryKey: ['sale-order', params.id],
+    queryFn: async (): Promise<SaleOrderDetail> => {
+      const { data, response } = await api.GET('/api/v1/sale-orders/{id}', {
+        params: { path: { id: params.id } },
+      });
+      if (!response.ok || !data) {
+        throw new Error('销售单不存在或加载失败');
+      }
+      return data;
+    },
+  });
+  const error = queryError ? '销售单不存在或加载失败' : null;
 
   // 面包屑页面标识 = 销售单编号（product/order.md 详情页）
   usePageCrumb(order ? [{ title: order.code }] : []);
-
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const { data, response } = await api.GET('/api/v1/sale-orders/{id}', {
-          params: { path: { id: params.id } },
-        });
-        if (!cancelled) {
-          if (response.ok && data) {
-            setOrder(data);
-          } else {
-            setError('销售单不存在或加载失败');
-          }
-        }
-      } catch {
-        if (!cancelled) {
-          setError('加载失败，请稍后重试');
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [params.id]);
 
   if (error) {
     return <p className="text-sm text-destructive">{error}</p>;
@@ -98,6 +88,10 @@ export default function SaleOrderDetailPage(): React.ReactElement {
       <div className="flex flex-wrap gap-6 rounded-xl border border-border bg-card p-4 text-sm">
         <span>
           销售日期：<strong>{order.saleDate}</strong>
+        </span>
+        <span>
+          客户编号：<strong>{order.customerCode ?? '—'}</strong>
+          {order.customerDeleted ? '（已删除）' : ''}
         </span>
         <span>
           合计方量：<strong>{order.totalVolume}</strong> m³

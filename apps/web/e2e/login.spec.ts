@@ -5,6 +5,8 @@ import { expect, test } from '@playwright/test';
 // → 销售单列表 → 退出 → 未登录访问后台弹回登录页。
 // 账号：seed 初始化（apps/server/scripts/seed.ts）；密码错误锁定等负面用例见 server 集成测试（test/auth.spec.ts）。
 
+const customerName = `e2e-客户-${Date.now()}`;
+
 test('登录 → 首页 → 订单菜单 → 销售单列表 → 退出 → 未登录守卫', async ({ page }) => {
   await page.goto('/login');
   await expect(page.getByRole('heading', { name: '登录' })).toBeVisible();
@@ -18,8 +20,9 @@ test('登录 → 首页 → 订单菜单 → 销售单列表 → 退出 → 未�
   await expect(page.getByRole('heading', { name: '首页' })).toBeVisible();
   await expect(page.getByText('欢迎使用梅好木业数字化系统', { exact: false })).toBeVisible();
 
-  // 侧边菜单：首页 + 订单组（销售单），未建分组不再预置、无「待建」标注
+  // 侧边菜单：首页 + 订单组（销售单）+ 客户组（客户档案），未建分组不再预置、无「待建」标注
   await expect(page.getByRole('link', { name: '销售单', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: '客户档案', exact: true })).toBeVisible();
   await expect(page.getByText('待建', { exact: true })).toHaveCount(0);
 
   // 分组树状折叠：点组标题收起子项，再点展开
@@ -31,35 +34,48 @@ test('登录 → 首页 → 订单菜单 → 销售单列表 → 退出 → 未�
   // 边栏折叠后点击菜单不自动展开（sidebar_state cookie 保持 false）
   const sidebarState = async (): Promise<string | undefined> =>
     (await page.context().cookies()).find((cookie) => cookie.name === 'sidebar_state')?.value;
-  await page.getByRole('button', { name: 'Toggle Sidebar' }).click();
+  await page.getByRole('button', { name: '收起侧边栏' }).click();
   await expect.poll(sidebarState).toBe('false');
   await page.getByRole('link', { name: '销售单', exact: true }).click();
   await expect(page).toHaveURL(/\/admin\/sale-orders$/);
   await expect.poll(sidebarState).toBe('false');
   // 恢复展开，继续后续流程
-  await page.getByRole('button', { name: 'Toggle Sidebar' }).click();
+  await page.getByRole('button', { name: '展开侧边栏' }).click();
   await expect(page.getByRole('link', { name: '新建', exact: true })).toBeVisible();
   await expect(page.getByRole('columnheader', { name: '编号' })).toBeVisible();
   // 固定合计行（列表页表格底部，汇总标签在编号列）
   await expect(page.getByRole('cell', { name: '合计', exact: true })).toBeVisible();
 
+  // 新建客户：保存后进详情，面包屑 = 客户编号
+  await page.goto('/admin/customers/new');
+  await page.getByPlaceholder('客户名称').fill(customerName);
+  await page.getByRole('button', { name: '保存' }).click();
+  await expect(page).toHaveURL(/\/admin\/customers\/[0-9a-f-]{36}$/);
+  const breadcrumb = page.getByRole('navigation', { name: 'breadcrumb' });
+  await expect(breadcrumb.getByText(/^C\d{5,}$/)).toBeVisible();
+
   // 新建页：明细区行操作「复制行」可用（1 → 2 行）；面包屑页面标识 =「新建」
   await page.goto('/admin/sale-orders/new');
-  await expect(page.getByText('共 1 / 50 行')).toBeVisible();
+  await expect(page.getByText('共 1 / 200 行')).toBeVisible();
   await page.getByRole('button', { name: '复制行' }).first().click();
-  await expect(page.getByText('共 2 / 50 行')).toBeVisible();
-  const breadcrumb = page.getByRole('navigation', { name: 'breadcrumb' });
+  await expect(page.getByText('共 2 / 200 行')).toBeVisible();
   await expect(breadcrumb.getByText('新建', { exact: true })).toBeVisible();
 
   // 填写并保存 → 详情页面包屑 = 单号；编辑页面包屑 = 单号 / 编辑
   await page.getByRole('button', { name: '删除行' }).last().click();
-  await expect(page.getByText('共 1 / 50 行')).toBeVisible();
-  await page.getByPlaceholder('客户名称').fill('e2e-客户');
-  await page.getByPlaceholder('2.000').fill('2.000');
-  await page.getByPlaceholder('80.000').fill('80.000');
-  await page.getByPlaceholder('300.000').fill('300.000');
-  await page.getByPlaceholder('根数').fill('3');
-  await page.getByPlaceholder('550.25').fill('550.25');
+  await expect(page.getByText('共 1 / 200 行')).toBeVisible();
+  // 客户下拉：应用内下拉（非原生 select），点触发器后选上一步新建的客户
+  await page.getByLabel('客户', { exact: true }).click();
+  await page.getByRole('option', { name: customerName }).click();
+  // 明细行按单元格定位：厚度 / 宽度 / 长度 / 根数 / 单价
+  const row = page.locator('tbody tr').first();
+  const cellInput = (index: number): ReturnType<typeof row.locator> =>
+    row.locator('td').nth(index).locator('input');
+  await cellInput(1).fill('2.000');
+  await cellInput(2).fill('80.000');
+  await cellInput(3).fill('300.000');
+  await cellInput(4).fill('3');
+  await cellInput(6).fill('550.25');
   await page.getByRole('button', { name: '保存' }).click();
 
   await expect(page).toHaveURL(/\/admin\/sale-orders\/[0-9a-f-]{36}$/);
@@ -67,6 +83,30 @@ test('登录 → 首页 → 订单菜单 → 销售单列表 → 退出 → 未�
   await page.getByRole('link', { name: '编辑' }).click();
   await expect(page).toHaveURL(/\/edit$/);
   await expect(breadcrumb.getByText('编辑', { exact: true })).toBeVisible();
+
+  // 客户批量启停用：应用内确认弹窗（非浏览器原生）→ 状态变更 → 再批量启用恢复
+  await page.goto('/admin/customers');
+  const customerRow = page.getByRole('row').filter({ hasText: customerName });
+  const confirmDialog = page.getByRole('alertdialog');
+  await customerRow.getByRole('checkbox').check();
+  await page.getByRole('button', { name: '批量停用' }).click();
+  await expect(confirmDialog).toBeVisible();
+  await expect(confirmDialog.getByText(/1 个将停用/)).toBeVisible();
+  await confirmDialog.getByRole('button', { name: '停用', exact: true }).click();
+  await expect(customerRow.getByText('停用', { exact: true })).toBeVisible();
+
+  await customerRow.getByRole('checkbox').check();
+  await page.getByRole('button', { name: '批量启用' }).click();
+  await expect(confirmDialog).toBeVisible();
+  await confirmDialog.getByRole('button', { name: '启用', exact: true }).click();
+  await expect(customerRow.getByText('启用', { exact: true })).toBeVisible();
+
+  // 批量删除：确认文案含销售单数量，删除后行消失（历史订单不受影响）
+  await customerRow.getByRole('checkbox').check();
+  await page.getByRole('button', { name: '批量删除' }).click();
+  await expect(confirmDialog.getByText(/共 1 张销售单/)).toBeVisible();
+  await confirmDialog.getByRole('button', { name: '删除', exact: true }).click();
+  await expect(customerRow).toHaveCount(0);
 
   // 退出登录 → 回登录页
   await page.getByText('销', { exact: true }).click();

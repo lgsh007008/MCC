@@ -5,7 +5,9 @@ import Link from 'next/link';
 import { ArrowDownIcon, ArrowUpIcon, EyeIcon, PencilIcon, Trash2Icon } from 'lucide-react';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
+import { useConfirm } from '@/components/ui/confirm-dialog';
+import { DatePicker } from '@/components/ui/date-picker';
+import { Select } from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -49,11 +51,20 @@ const EMPTY_SUMMARY: OrderSummary = {
 type SortField = 'saleDate' | 'totalVolume' | 'totalAmount';
 type SortOrder = 'asc' | 'desc';
 
+interface CustomerOption {
+  id: string;
+  code: string;
+  name: string;
+  status: string;
+}
+
 const PAGE_SIZE = 20;
 
 export default function SaleOrdersPage(): React.ReactElement {
-  const [filters, setFilters] = useState({ customerName: '', dateFrom: '', dateTo: '' });
-  const [applied, setApplied] = useState({ customerName: '', dateFrom: '', dateTo: '' });
+  const confirm = useConfirm();
+  const [filters, setFilters] = useState({ customerId: '', dateFrom: '', dateTo: '' });
+  const [applied, setApplied] = useState({ customerId: '', dateFrom: '', dateTo: '' });
+  const [customerOptions, setCustomerOptions] = useState<CustomerOption[]>([]);
   const [sort, setSort] = useState<{ field: SortField; order: SortOrder }>({
     field: 'saleDate',
     order: 'desc',
@@ -80,7 +91,7 @@ export default function SaleOrdersPage(): React.ReactElement {
             query: {
               page,
               pageSize: PAGE_SIZE,
-              customerName: applied.customerName || undefined,
+              customerId: applied.customerId || undefined,
               dateFrom: applied.dateFrom || undefined,
               dateTo: applied.dateTo || undefined,
               sortBy: sort.field,
@@ -111,6 +122,28 @@ export default function SaleOrdersPage(): React.ReactElement {
     };
   }, [page, applied, sort]);
 
+  // 客户筛选下拉：含停用客户（便于查历史单），来源 customer 列表接口
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { data: res, response } = await api.GET('/api/v1/customers', {
+          params: { query: { page: 1, pageSize: 100 } },
+        });
+        if (!cancelled && response.ok && res) {
+          setCustomerOptions(res.items);
+        }
+      } catch {
+        if (!cancelled) {
+          setCustomerOptions([]);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   async function reload(): Promise<void> {
     if (data.items.length <= 1 && page > 1) {
       setPage(page - 1);
@@ -120,34 +153,54 @@ export default function SaleOrdersPage(): React.ReactElement {
   }
 
   async function handleDelete(order: OrderListItem): Promise<void> {
-    if (!window.confirm(`确定删除销售单 ${order.code}？删除后不可恢复，编号不回收。`)) {
-      return;
-    }
-    const { response } = await api.DELETE('/api/v1/sale-orders/{id}', {
-      params: { path: { id: order.id } },
-    });
-    if (!response.ok) {
+    try {
+      const ok = await confirm({
+        title: '删除销售单',
+        description: `将删除销售单 ${order.code}。删除后不可恢复，编号不回收。`,
+        confirmText: '删除',
+        tone: 'danger',
+        onConfirm: async () => {
+          const { response } = await api.DELETE('/api/v1/sale-orders/{id}', {
+            params: { path: { id: order.id } },
+          });
+          if (!response.ok) {
+            throw new Error('删除失败');
+          }
+        },
+      });
+      if (ok) {
+        await reload();
+      }
+    } catch {
       setError('删除失败，请稍后重试');
-      return;
     }
-    await reload();
   }
 
   async function handleBatchDelete(): Promise<void> {
     if (selected.size === 0) {
       return;
     }
-    if (!window.confirm(`确定删除选中的 ${selected.size} 张销售单？删除后不可恢复，编号不回收。`)) {
-      return;
-    }
-    const { response } = await api.POST('/api/v1/sale-orders/batch-delete', {
-      body: { ids: [...selected] },
-    });
-    if (!response.ok) {
+    try {
+      const ok = await confirm({
+        title: '批量删除销售单',
+        description: `将删除选中的 ${selected.size} 张销售单。删除后不可恢复，编号不回收。`,
+        confirmText: '删除',
+        tone: 'danger',
+        onConfirm: async () => {
+          const { response } = await api.POST('/api/v1/sale-orders/batch-delete', {
+            body: { ids: [...selected] },
+          });
+          if (!response.ok) {
+            throw new Error('批量删除失败');
+          }
+        },
+      });
+      if (ok) {
+        await reload();
+      }
+    } catch {
       setError('批量删除失败，请稍后重试');
-      return;
     }
-    await reload();
   }
 
   const toggleRow = (id: string, checked: boolean): void => {
@@ -207,7 +260,7 @@ export default function SaleOrdersPage(): React.ReactElement {
   const totalPages = Math.max(1, Math.ceil(data.total / PAGE_SIZE));
 
   return (
-    <div className="space-y-3">
+    <div className="flex h-full min-h-0 flex-col gap-3">
       <form
         className="flex flex-wrap items-center gap-3"
         onSubmit={(e) => {
@@ -217,30 +270,36 @@ export default function SaleOrdersPage(): React.ReactElement {
         }}
       >
         <div className="flex items-center gap-2">
-          <span className="shrink-0 whitespace-nowrap text-xs text-muted-foreground">客户名称</span>
-          <Input
-            value={filters.customerName}
-            onChange={(e) => setFilters({ ...filters, customerName: e.target.value })}
-            placeholder="客户名称"
-            className="h-8 w-40"
+          <span className="shrink-0 whitespace-nowrap text-xs text-muted-foreground">客户</span>
+          <Select
+            value={filters.customerId}
+            onChange={(value) => setFilters({ ...filters, customerId: value })}
+            options={[
+              { value: '', label: '全部' },
+              ...customerOptions.map((option) => ({
+                value: option.id,
+                label: `${option.code} ${option.name}${option.status === 'active' ? '' : '（已停用）'}`,
+              })),
+            ]}
+            className="w-44"
           />
         </div>
         <div className="flex items-center gap-2">
           <span className="shrink-0 whitespace-nowrap text-xs text-muted-foreground">日期从</span>
-          <Input
-            type="date"
+          <DatePicker
             value={filters.dateFrom}
-            onChange={(e) => setFilters({ ...filters, dateFrom: e.target.value })}
-            className="h-8 w-36"
+            onChange={(value) => setFilters({ ...filters, dateFrom: value })}
+            placeholder="开始日期"
+            className="w-36"
           />
         </div>
         <div className="flex items-center gap-2">
           <span className="shrink-0 whitespace-nowrap text-xs text-muted-foreground">日期至</span>
-          <Input
-            type="date"
+          <DatePicker
             value={filters.dateTo}
-            onChange={(e) => setFilters({ ...filters, dateTo: e.target.value })}
-            className="h-8 w-36"
+            onChange={(value) => setFilters({ ...filters, dateTo: value })}
+            placeholder="结束日期"
+            className="w-36"
           />
         </div>
         <Button type="submit" variant="secondary">
@@ -261,8 +320,8 @@ export default function SaleOrdersPage(): React.ReactElement {
 
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
-      <div className="rounded-xl border border-border bg-card">
-        <Table containerClassName="max-h-[60vh] overflow-y-auto">
+      <div className="min-h-60 flex-1 rounded-xl border border-border bg-card">
+        <Table containerClassName="h-full overflow-y-auto">
           <TableHeader className="sticky top-0 z-10 [&_th]:bg-card">
             <TableRow>
               <TableHead className="w-8">
@@ -303,9 +362,12 @@ export default function SaleOrdersPage(): React.ReactElement {
                     />
                   </TableCell>
                   <TableCell>
-                    <a href={`/admin/sale-orders/${order.id}`} className="text-primary hover:underline">
+                    <Link
+                      href={`/admin/sale-orders/${order.id}`}
+                      className="text-primary hover:underline"
+                    >
                       {order.code}
-                    </a>
+                    </Link>
                   </TableCell>
                   <TableCell>{order.saleDate}</TableCell>
                   <TableCell>{order.customerName}</TableCell>

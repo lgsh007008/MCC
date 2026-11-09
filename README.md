@@ -91,7 +91,7 @@ pnpm dev
 
 ## 已知坑（Windows 开发环境，改配置前先看这里）
 
-1. **server 的 dev 运行方式**：`apps/server` 是纯 ESM 项目（NestJS 12 仅 ESM 入口），dev 脚本用 `node --watch --loader ./loader.mjs`（自定义 loader：相对导入 .js↔.ts 映射 + workspace 包 TS 源编译 + SWC 产出装饰器元数据）。**不要改回 tsx**——tsx/esbuild 不产装饰器元数据，NestJS 依赖注入会静默失效（注入值为 undefined）。
+1. **server 的 dev 运行方式**：`apps/server` 是纯 ESM 项目（NestJS 12 仅 ESM 入口），dev 脚本用 `nodemon`（exec 仍走自定义 loader `./loader.mjs`：相对导入 .js↔.ts 映射 + workspace 包 TS 源编译 + SWC 产出装饰器元数据；监视范围为 src 与 workspace 包源码）。**不要改回 tsx**——tsx/esbuild 不产装饰器元数据，NestJS 依赖注入会静默失效（注入值为 undefined）。
 
 2. **@swc/core 版本锁定 1.7.42**：更新版（≥1.13）加载原生绑定时会做缓存目录安全检查，本机用户目录 ACL 不满足（报 ERR_SWC_NATIVE_CACHE），故锁定旧版，并由 `pnpm-workspace.yaml` 的 overrides 把 `@swc-node/core` 固定在兼容的 1.13.1。升级前先在目标机器验证 `node -e "require('@swc/core').version"`。
 
@@ -116,4 +116,4 @@ pnpm --filter @mcc/shared run gen:client    # openapi.json → 类型化 client 
 | --- | --- | --- |
 | `pnpm lint` | 静态门禁 | 全仓 eslint，含模块边界规则（§4.2：跨模块只许走 index） |
 | `pnpm test` | 单测/契约集成 | server（auth / 订单关键路径，需 PG/Redis 容器在跑）、shared 计算纯函数 |
-| `pnpm --filter @mcc/web run test:e2e` | E2E 冒烟 | Playwright 登录→首页→订单菜单→销售单列表→登出→守卫全链路；web 与 server 由 playwright 配置本机代起（已在跑则复用）；staging 落地后按 §10 接入 CI |
+| `pnpm --filter @mcc/web run test:e2e` | E2E 冒烟 | Playwright 登录→首页→订单菜单→销售单列表→登出→守卫全链路；web 与 server 由 playwright 配置本机代起（已在跑则复用）；已接入 PR CI（`.github/workflows/ci.yml`，步骤内先 seed 再跑用例） |

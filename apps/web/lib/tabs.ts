@@ -32,10 +32,10 @@ export function initialTabsState(): TabsState {
   };
 }
 
-/** 页面面包屑 → 标签标题：各级标识以「 / 」拼接（如「SO-2026-001 / 编辑」）；无标识时回退 */
-export function deriveTabTitle(crumbTitles: string[], fallback: string): string {
-  const titles = crumbTitles.map((title) => title.trim()).filter(Boolean);
-  return titles.length > 0 ? titles.join(' / ') : fallback;
+/** 标签标题：菜单项名 + 页面面包屑各级标识，以「 / 」拼接（如「销售单 / SO-2026-001 / 编辑」） */
+export function deriveTabTitle(menuTitle: string, crumbTitles: string[], fallback: string): string {
+  const parts = [menuTitle, ...crumbTitles].map((title) => title.trim()).filter(Boolean);
+  return parts.length > 0 ? parts.join(' / ') : fallback;
 }
 
 /** 关闭标签后的落点：右邻 → 左邻 → 首页（供壳层导航，纯函数便于单测） */

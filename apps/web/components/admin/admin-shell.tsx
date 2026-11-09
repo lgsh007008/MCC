@@ -1,9 +1,9 @@
-'use client';
+﻿'use client';
 
-import { Fragment, useEffect, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ChevronDownIcon } from 'lucide-react';
+import { ChevronDownIcon, PanelLeftCloseIcon, PanelLeftOpenIcon } from 'lucide-react';
 import { changePasswordSchema } from '@mcc/shared';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -38,6 +38,7 @@ import { Label } from '@/components/ui/label';
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupLabel,
   SidebarHeader,
@@ -46,12 +47,14 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
-  SidebarTrigger,
+  useSidebar,
 } from '@/components/ui/sidebar';
 import { api, refreshSession } from '@/lib/api';
 import { authSession } from '@/lib/auth/session';
 import { findNavByPath, homeItem, navGroups } from '@/lib/nav';
+import { ConfirmProvider } from '@/components/ui/confirm-dialog';
 import { PageBreadcrumbProvider, usePageBreadcrumb } from './page-breadcrumb';
+import { AppQueryProvider } from './query-provider';
 import { TabBar, TabsProvider, useTabs } from './tabs';
 
 // 后台布局壳（design/平台布局.md §1）：经典三区——侧边栏 / 顶栏 / 主内容区。
@@ -66,11 +69,39 @@ export function AdminShell({
   defaultSidebarOpen?: boolean;
 }): React.ReactElement {
   return (
-    <PageBreadcrumbProvider>
-      <TabsProvider>
-        <AdminShellInner defaultSidebarOpen={defaultSidebarOpen}>{children}</AdminShellInner>
-      </TabsProvider>
-    </PageBreadcrumbProvider>
+    <AppQueryProvider>
+      <PageBreadcrumbProvider>
+        <TabsProvider>
+          <ConfirmProvider>
+            <AdminShellInner defaultSidebarOpen={defaultSidebarOpen}>{children}</AdminShellInner>
+          </ConfirmProvider>
+        </TabsProvider>
+      </PageBreadcrumbProvider>
+    </AppQueryProvider>
+  );
+}
+
+// 侧边栏折叠开关（product/平台布局.md 整体布局）：置于侧边栏底部；展开态显示文字，折叠态只显示图标
+function SidebarCollapseButton(): React.ReactElement {
+  const { state, toggleSidebar } = useSidebar();
+  const open = state !== 'collapsed';
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      className="w-full justify-start gap-2 text-muted-foreground"
+      aria-label={open ? '收起侧边栏' : '展开侧边栏'}
+      aria-expanded={open}
+      title={open ? '收起侧边栏' : '展开侧边栏'}
+      onClick={toggleSidebar}
+    >
+      {open ? (
+        <PanelLeftCloseIcon className="size-4 shrink-0" />
+      ) : (
+        <PanelLeftOpenIcon className="size-4 shrink-0" />
+      )}
+      <span className="group-data-[collapsible=icon]:hidden">收起</span>
+    </Button>
   );
 }
 
@@ -83,6 +114,9 @@ function AdminShellInner({
 }): React.ReactElement {
   const pathname = usePathname();
   const { reset: resetTabs } = useTabs();
+  const mainRef = useRef<HTMLElement>(null);
+  // 每个标签记住主内容区滚动位置，切回时恢复（design/平台布局.md §1.6）
+  const scrollPositions = useRef(new Map<string, number>());
   const [pwdOpen, setPwdOpen] = useState(false);
   const [pwdError, setPwdError] = useState<string | null>(null);
   const [pwdSubmitting, setPwdSubmitting] = useState(false);
@@ -142,6 +176,31 @@ function AdminShellInner({
 
   const current = findNavByPath(pathname);
   const pageCrumbs = usePageBreadcrumb()?.crumbs ?? [];
+
+  // 滚动位置：路径变化后恢复该标签上次的位置；滚动时持续记录当前路径的位置
+  useEffect(() => {
+    const el = mainRef.current;
+    if (!el) {
+      return;
+    }
+    const target = scrollPositions.current.get(pathname) ?? 0;
+    const raf = requestAnimationFrame(() => {
+      el.scrollTop = target;
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [pathname]);
+
+  useEffect(() => {
+    const el = mainRef.current;
+    if (!el) {
+      return;
+    }
+    const onScroll = (): void => {
+      scrollPositions.current.set(pathname, el.scrollTop);
+    };
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => el.removeEventListener('scroll', onScroll);
+  }, [pathname]);
   // 分组树状折叠（design/平台布局.md §1.3）：默认全部展开
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const isGroupCollapsed = (label: string): boolean => collapsedGroups.has(label);
@@ -158,7 +217,7 @@ function AdminShellInner({
   };
 
   return (
-    <SidebarProvider defaultOpen={defaultSidebarOpen}>
+    <SidebarProvider defaultOpen={defaultSidebarOpen} className="h-svh overflow-hidden">
       <Sidebar collapsible="icon">
         <SidebarHeader className="border-b border-border">
           <span className="px-2 text-sm font-semibold">
@@ -214,7 +273,19 @@ function AdminShellInner({
                 {!collapsed ? (
                   <SidebarMenu>
                     {group.items.map((item) => (
-                      <SidebarMenuItem key={item.title}>
+                      <SidebarMenuItem
+                        key={item.title}
+                        className="relative group-data-[collapsible=icon]:pl-2"
+                      >
+                        {/* 折叠为图标栏时的树状结构线：上半竖线 + 横向支线，父级 = 分组图标 */}
+                        <span
+                          aria-hidden
+                          className="pointer-events-none absolute left-0 top-0 hidden h-1/2 w-px bg-sidebar-foreground/30 group-data-[collapsible=icon]:block"
+                        />
+                        <span
+                          aria-hidden
+                          className="pointer-events-none absolute left-0 top-1/2 hidden h-px w-2 bg-sidebar-foreground/30 group-data-[collapsible=icon]:block"
+                        />
                         {item.pending ? (
                           <span className="flex items-center justify-between rounded-md px-2 py-1.5 text-sm text-muted-foreground/60">
                             <span className="flex items-center gap-2">
@@ -249,89 +320,101 @@ function AdminShellInner({
             );
           })}
         </SidebarContent>
+        <SidebarFooter className="border-t border-border p-2">
+          <SidebarCollapseButton />
+        </SidebarFooter>
       </Sidebar>
 
       <SidebarInset>
-        <header className="shrink-0 border-b border-border">
+        <header className="min-w-0 w-full shrink-0 overflow-hidden border-b border-border">
           {/* 第一行：多标签页 + 账号头像（design/平台布局.md §1.6） */}
-          <div className="flex h-12 items-center justify-between gap-3 px-4">
+          <div className="flex h-12 min-w-0 items-center justify-between gap-3 px-4">
             <TabBar />
-            <DropdownMenu>
-              <DropdownMenuTrigger>
-                <Avatar className="size-8">
-                  <AvatarFallback>销</AvatarFallback>
-                </Avatar>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuGroup>
-                  <DropdownMenuLabel>账号</DropdownMenuLabel>
-                </DropdownMenuGroup>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => setPwdOpen(true)}>修改密码</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => void handleLogout()}>退出登录</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <div className="shrink-0">
+              <DropdownMenu>
+                <DropdownMenuTrigger>
+                  <Avatar className="size-8">
+                    <AvatarFallback>销</AvatarFallback>
+                  </Avatar>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuGroup>
+                    <DropdownMenuLabel>账号</DropdownMenuLabel>
+                  </DropdownMenuGroup>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setPwdOpen(true)}>修改密码</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => void handleLogout()}>退出登录</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
 
-          {/* 第二行：折叠开关 + 面包屑 */}
-          <div className="flex h-10 items-center gap-2 border-t border-border/60 px-3">
-            <SidebarTrigger />
+          {/* 第二行：面包屑（窄屏截断，不撑宽页面） */}
+          <div className="flex h-10 min-w-0 items-center gap-2 overflow-hidden border-t border-border/60 px-4 [&_li]:min-w-0 [&_li]:truncate [&_ol]:flex-nowrap [&_ol]:overflow-hidden">
             <Breadcrumb>
               <BreadcrumbList>
-                <BreadcrumbItem>
-                  <BreadcrumbLink render={<Link href="/admin" />}>梅好木业</BreadcrumbLink>
-                </BreadcrumbItem>
-                {current && current.groupLabel ? (
+                {pathname === homeItem.href ? (
+                  <BreadcrumbItem title="首页">
+                    <BreadcrumbPage>首页</BreadcrumbPage>
+                  </BreadcrumbItem>
+                ) : (
                   <>
-                    <BreadcrumbSeparator />
-                    <BreadcrumbItem>
-                      {current.itemTitle ? (
-                        current.groupLabel
-                      ) : (
-                        <BreadcrumbPage>{current.groupLabel}</BreadcrumbPage>
-                      )}
+                    <BreadcrumbItem title="首页">
+                      <BreadcrumbLink render={<Link href="/admin" />}>首页</BreadcrumbLink>
                     </BreadcrumbItem>
+                    {current && current.groupLabel ? (
+                      <>
+                        <BreadcrumbSeparator />
+                        <BreadcrumbItem title={current.groupLabel}>
+                          {current.itemTitle ? (
+                            current.groupLabel
+                          ) : (
+                            <BreadcrumbPage>{current.groupLabel}</BreadcrumbPage>
+                          )}
+                        </BreadcrumbItem>
+                      </>
+                    ) : null}
+                    {current && current.itemTitle ? (
+                      <>
+                        <BreadcrumbSeparator />
+                        <BreadcrumbItem title={current.itemTitle}>
+                          {pathname === current.itemHref ? (
+                            <BreadcrumbPage>{current.itemTitle}</BreadcrumbPage>
+                          ) : (
+                            <BreadcrumbLink render={<Link href={current.itemHref ?? '/admin'} />}>
+                              {current.itemTitle}
+                            </BreadcrumbLink>
+                          )}
+                        </BreadcrumbItem>
+                      </>
+                    ) : null}
+                    {pageCrumbs.map((crumb, index) => {
+                      const isLast = index === pageCrumbs.length - 1;
+                      return (
+                        <Fragment key={`${crumb.title}-${index}`}>
+                          <BreadcrumbSeparator />
+                          <BreadcrumbItem title={crumb.title}>
+                            {isLast ? (
+                              <BreadcrumbPage>{crumb.title}</BreadcrumbPage>
+                            ) : crumb.href ? (
+                              <BreadcrumbLink render={<Link href={crumb.href} />}>
+                                {crumb.title}
+                              </BreadcrumbLink>
+                            ) : (
+                              <span>{crumb.title}</span>
+                            )}
+                          </BreadcrumbItem>
+                        </Fragment>
+                      );
+                    })}
                   </>
-                ) : null}
-                {current && current.itemTitle ? (
-                  <>
-                    <BreadcrumbSeparator />
-                    <BreadcrumbItem>
-                      {pathname === current.itemHref ? (
-                        <BreadcrumbPage>{current.itemTitle}</BreadcrumbPage>
-                      ) : (
-                        <BreadcrumbLink render={<Link href={current.itemHref ?? '/admin'} />}>
-                          {current.itemTitle}
-                        </BreadcrumbLink>
-                      )}
-                    </BreadcrumbItem>
-                  </>
-                ) : null}
-                {pageCrumbs.map((crumb, index) => {
-                  const isLast = index === pageCrumbs.length - 1;
-                  return (
-                    <Fragment key={`${crumb.title}-${index}`}>
-                      <BreadcrumbSeparator />
-                      <BreadcrumbItem>
-                        {isLast ? (
-                          <BreadcrumbPage>{crumb.title}</BreadcrumbPage>
-                        ) : crumb.href ? (
-                          <BreadcrumbLink render={<Link href={crumb.href} />}>
-                            {crumb.title}
-                          </BreadcrumbLink>
-                        ) : (
-                          <span>{crumb.title}</span>
-                        )}
-                      </BreadcrumbItem>
-                    </Fragment>
-                  );
-                })}
+                )}
               </BreadcrumbList>
             </Breadcrumb>
           </div>
         </header>
 
-        <main className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-6">{children}</main>
+        <main ref={mainRef} className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-6">{children}</main>
       </SidebarInset>
 
       <Dialog open={pwdOpen} onOpenChange={setPwdOpen}>

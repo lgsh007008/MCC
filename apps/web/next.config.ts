@@ -9,6 +9,8 @@ const API_INTERNAL_URL = process.env.API_INTERNAL_URL ?? 'http://localhost:3001'
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // 关闭左下角开发指示器：它悬浮在侧边栏底部，会遮挡折叠按钮并拦截点击（仅 dev 生效）
+  devIndicators: false,
   // workspace 内的 TS 源码包（exports 指向 .ts）需列入转译清单
   transpilePackages: ['@mcc/shared'],
   // 生产镜像只带 standalone 产物（技术方案 §9.5）；monorepo 下需把 trace 根指到仓库根

@@ -14,10 +14,12 @@ import {
 import { ApiBody, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { createHash } from 'node:crypto';
 import {
+  customerVolumeSummaryQuerySchema,
   saleOrderBatchDeleteSchema,
   saleOrderInputSchema,
   saleOrderListQuerySchema,
   saleOrderUpdateSchema,
+  type CustomerVolumeSummaryQuery,
   type SaleOrderBatchDeleteInput,
   type SaleOrderInput,
   type SaleOrderListQuery,
@@ -28,6 +30,7 @@ import { problem } from '../../common/http-problem.js';
 import { RedisService } from '../../common/redis.service.js';
 import { ZodValidationPipe } from '../../common/zod-validation.pipe.js';
 import {
+  CustomerVolumeSummaryDto,
   SaleOrderBatchDeleteBodyDto,
   SaleOrderBatchDeleteResponseDto,
   SaleOrderBodyDto,
@@ -49,8 +52,8 @@ export class OrderController {
   ) {}
 
   @Get()
-  @ApiOperation({ summary: '销售单列表：筛选（销售日期区间、客户名称）+ 排序 + 分页' })
-  @ApiQuery({ name: 'customerName', required: false, type: String, description: '客户名称模糊' })
+  @ApiOperation({ summary: '销售单列表：筛选（销售日期区间、客户）+ 排序 + 分页' })
+  @ApiQuery({ name: 'customerId', required: false, type: String, description: '客户 id' })
   @ApiQuery({ name: 'dateFrom', required: false, type: String, description: '销售日期起（YYYY-MM-DD）' })
   @ApiQuery({ name: 'dateTo', required: false, type: String, description: '销售日期止（YYYY-MM-DD）' })
   @ApiQuery({ name: 'page', required: false, type: Number, description: '页码，默认 1' })
@@ -62,6 +65,18 @@ export class OrderController {
     @Query(new ZodValidationPipe(saleOrderListQuerySchema)) query: SaleOrderListQuery,
   ): Promise<SaleOrderListDto> {
     return this.orderService.list(query);
+  }
+
+  // 注意：具体路径须声明在 :id 之前，否则会被 ParseUUIDPipe 当作 id 校验。
+  @Get('customer-volume-summary')
+  @ApiOperation({ summary: '客户维度累计方量（未软删销售单合计，供客户列表/详情批量取数）' })
+  @ApiQuery({ name: 'customerIds', required: true, type: String, description: '客户 id，逗号分隔（1~200）' })
+  @ApiOkResponse({ type: CustomerVolumeSummaryDto })
+  customerVolumeSummary(
+    @Query(new ZodValidationPipe(customerVolumeSummaryQuerySchema))
+    query: CustomerVolumeSummaryQuery,
+  ): Promise<{ items: Array<{ customerId: string; totalVolume: string }> }> {
+    return this.orderService.customerVolumeSummary(query.customerIds);
   }
 
   @Get(':id')

@@ -72,6 +72,111 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/customers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 客户列表：筛选（名称模糊、状态）+ 分页 */
+        get: operations["CustomerController_list"];
+        put?: never;
+        /** 新建客户（编号自动生成；重名只提示不阻断） */
+        post: operations["CustomerController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers/name-check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 客户重名检查（只提示不阻断） */
+        get: operations["CustomerController_nameCheck"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 客户详情 */
+        get: operations["CustomerController_detail"];
+        /** 更新客户（名称、联系信息、备注） */
+        put: operations["CustomerController_update"];
+        post?: never;
+        /** 删除客户（软删除，编号不回收） */
+        delete: operations["CustomerController_remove"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers/{id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** 启用 / 停用客户 */
+        patch: operations["CustomerController_setStatus"];
+        trace?: never;
+    };
+    "/api/v1/customers/batch-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 批量启用 / 停用客户（已是目标状态或已删的跳过，返回实际变更条数） */
+        post: operations["CustomerController_setStatusMany"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers/batch-delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 批量删除客户（软删除；不存在 / 已删行静默跳过，返回删除条数） */
+        post: operations["CustomerController_removeMany"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/sale-orders": {
         parameters: {
             query?: never;
@@ -79,11 +184,28 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** 销售单列表：筛选（销售日期区间、客户名称）+ 排序 + 分页 */
+        /** 销售单列表：筛选（销售日期区间、客户）+ 排序 + 分页 */
         get: operations["OrderController_list"];
         put?: never;
         /** 新建销售单；重复提交防抖：请求头 Idempotency-Key */
         post: operations["OrderController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sale-orders/customer-volume-summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 客户维度累计方量（未软删销售单合计，供客户列表/详情批量取数） */
+        get: operations["OrderController_customerVolumeSummary"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -169,6 +291,76 @@ export interface components {
             /** @description 新密码，至少 8 位 */
             newPassword: string;
         };
+        CustomerDto: {
+            /** @description 客户 id */
+            id: string;
+            /** @description 客户编号（C + 5 位流水） */
+            code: string;
+            /** @description 客户名称 */
+            name: string;
+            /** @description 联系信息 */
+            contact: string;
+            /** @description 状态：active 启用 / inactive 停用 */
+            status: string;
+            /** @description 备注 */
+            note: string;
+            /** @description 创建日期（YYYY-MM-DD） */
+            createdAt: string;
+        };
+        CustomerListDto: {
+            /** @description 总数 */
+            total: number;
+            items: components["schemas"]["CustomerDto"][];
+        };
+        CustomerNameCheckDto: {
+            /** @description 是否存在同名客户（未软删） */
+            duplicate: boolean;
+        };
+        CustomerBodyDto: {
+            /**
+             * @description 客户名称
+             * @example 张三木材店
+             */
+            name: string;
+            /**
+             * @description 联系信息（电话等）
+             * @default
+             */
+            contact: string;
+            /**
+             * @description 备注
+             * @default
+             */
+            note: string;
+        };
+        CustomerStatusBodyDto: {
+            /**
+             * @description 状态：active 启用 / inactive 停用
+             * @enum {string}
+             */
+            status: "active" | "inactive";
+        };
+        CustomerBatchStatusBodyDto: {
+            /** @description 客户 id 列表（1~200） */
+            ids: string[];
+            /**
+             * @description 目标状态：active 启用 / inactive 停用
+             * @enum {string}
+             */
+            status: "active" | "inactive";
+        };
+        CustomerBatchStatusResponseDto: {
+            /** @description 实际变更条数（已软删或已处于目标状态的跳过） */
+            updated: number;
+        };
+        CustomerBatchDeleteBodyDto: {
+            /** @description 要删除的客户 id 列表（1~200） */
+            ids: string[];
+        };
+        CustomerBatchDeleteResponseDto: {
+            /** @description 实际删除（软删除）条数 */
+            deleted: number;
+        };
         SaleOrderSummaryDto: {
             /** @description 合计方量（筛选全量） */
             totalVolume: string;
@@ -184,6 +376,9 @@ export interface components {
             /** @description 销售单编号 */
             code: string;
             saleDate: string;
+            /** @description 客户 id */
+            customerId: string;
+            /** @description 客户名称快照（下单当时） */
             customerName: string;
             totalVolume: string;
             subtotalAmount: string;
@@ -197,6 +392,18 @@ export interface components {
             /** @description 筛选全量汇总（合计行） */
             summary: components["schemas"]["SaleOrderSummaryDto"];
             items: components["schemas"]["SaleOrderListItemDto"][];
+        };
+        CustomerVolumeSummaryItemDto: {
+            /** @description 客户 id */
+            customerId: string;
+            /** @description 累计下单方量（未软删销售单的合计方量，4 位小数） */
+            totalVolume: string;
+            /** @description 销售单数量（未软删） */
+            orderCount: number;
+        };
+        CustomerVolumeSummaryDto: {
+            /** @description 按请求的客户 id 顺序返回 */
+            items: components["schemas"]["CustomerVolumeSummaryItemDto"][];
         };
         SaleOrderItemResponseDto: {
             /** @description 明细行 id */
@@ -231,12 +438,19 @@ export interface components {
             /** @description 销售单编号 */
             code: string;
             saleDate: string;
+            /** @description 客户 id */
+            customerId: string;
+            /** @description 客户名称快照（下单当时） */
             customerName: string;
             totalVolume: string;
             subtotalAmount: string;
             otherAmount: string;
             totalAmount: string;
             note: string;
+            /** @description 客户编号（取自客户档案当前记录） */
+            customerCode?: string | null;
+            /** @description 客户档案是否已删除（历史单据仍可读） */
+            customerDeleted: boolean;
             /** @description 明细行 */
             items: components["schemas"]["SaleOrderItemResponseDto"][];
         };
@@ -293,11 +507,8 @@ export interface components {
              * @example 2026-11-09
              */
             saleDate: string;
-            /**
-             * @description 客户名称（文本）
-             * @example 张三木材店
-             */
-            customerName: string;
+            /** @description 客户 id（客户档案外键，须为启用态） */
+            customerId: string;
             /**
              * @description 主表其他金额（运费等），默认 0
              * @default 0
@@ -366,11 +577,8 @@ export interface components {
              * @example 2026-11-09
              */
             saleDate: string;
-            /**
-             * @description 客户名称（文本）
-             * @example 张三木材店
-             */
-            customerName: string;
+            /** @description 客户 id（客户档案外键；未变更时不校验启用态） */
+            customerId: string;
             /**
              * @description 主表其他金额（运费等），默认 0
              * @default 0
@@ -485,6 +693,219 @@ export interface operations {
             };
         };
     };
+    CustomerController_list: {
+        parameters: {
+            query?: {
+                /** @description 创建日期排序，默认 desc */
+                sortOrder?: "asc" | "desc";
+                /** @description 每页条数，默认 20（最大 100） */
+                pageSize?: number;
+                /** @description 页码，默认 1 */
+                page?: number;
+                /** @description 状态 */
+                status?: "active" | "inactive";
+                /** @description 客户名称模糊 */
+                name?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerListDto"];
+                };
+            };
+        };
+    };
+    CustomerController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerBodyDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerDto"];
+                };
+            };
+        };
+    };
+    CustomerController_nameCheck: {
+        parameters: {
+            query: {
+                /** @description 排除的客户 id（编辑时传自身） */
+                excludeId?: string;
+                /** @description 客户名称 */
+                name: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerNameCheckDto"];
+                };
+            };
+        };
+    };
+    CustomerController_detail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerDto"];
+                };
+            };
+        };
+    };
+    CustomerController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerBodyDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerDto"];
+                };
+            };
+        };
+    };
+    CustomerController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CustomerController_setStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerStatusBodyDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerDto"];
+                };
+            };
+        };
+    };
+    CustomerController_setStatusMany: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerBatchStatusBodyDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerBatchStatusResponseDto"];
+                };
+            };
+        };
+    };
+    CustomerController_removeMany: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerBatchDeleteBodyDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerBatchDeleteResponseDto"];
+                };
+            };
+        };
+    };
     OrderController_list: {
         parameters: {
             query?: {
@@ -500,8 +921,8 @@ export interface operations {
                 dateTo?: string;
                 /** @description 销售日期起（YYYY-MM-DD） */
                 dateFrom?: string;
-                /** @description 客户名称模糊 */
-                customerName?: string;
+                /** @description 客户 id */
+                customerId?: string;
             };
             header?: never;
             path?: never;
@@ -538,6 +959,28 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SaleOrderDto"];
+                };
+            };
+        };
+    };
+    OrderController_customerVolumeSummary: {
+        parameters: {
+            query: {
+                /** @description 客户 id，逗号分隔（1~200） */
+                customerIds: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerVolumeSummaryDto"];
                 };
             };
         };

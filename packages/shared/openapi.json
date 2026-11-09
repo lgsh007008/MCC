@@ -108,6 +108,350 @@
         ]
       }
     },
+    "/api/v1/customers": {
+      "get": {
+        "operationId": "CustomerController_list",
+        "parameters": [
+          {
+            "name": "sortOrder",
+            "required": false,
+            "in": "query",
+            "description": "创建日期排序，默认 desc",
+            "schema": {
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "description": "每页条数，默认 20（最大 100）",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "页码，默认 1",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "状态",
+            "schema": {
+              "enum": [
+                "active",
+                "inactive"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "name",
+            "required": false,
+            "in": "query",
+            "description": "客户名称模糊",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerListDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "客户列表：筛选（名称模糊、状态）+ 分页",
+        "tags": [
+          "customers"
+        ]
+      },
+      "post": {
+        "operationId": "CustomerController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "新建客户（编号自动生成；重名只提示不阻断）",
+        "tags": [
+          "customers"
+        ]
+      }
+    },
+    "/api/v1/customers/name-check": {
+      "get": {
+        "operationId": "CustomerController_nameCheck",
+        "parameters": [
+          {
+            "name": "excludeId",
+            "required": false,
+            "in": "query",
+            "description": "排除的客户 id（编辑时传自身）",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "name",
+            "required": true,
+            "in": "query",
+            "description": "客户名称",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerNameCheckDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "客户重名检查（只提示不阻断）",
+        "tags": [
+          "customers"
+        ]
+      }
+    },
+    "/api/v1/customers/{id}": {
+      "get": {
+        "operationId": "CustomerController_detail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "客户详情",
+        "tags": [
+          "customers"
+        ]
+      },
+      "put": {
+        "operationId": "CustomerController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "更新客户（名称、联系信息、备注）",
+        "tags": [
+          "customers"
+        ]
+      },
+      "delete": {
+        "operationId": "CustomerController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "删除客户（软删除，编号不回收）",
+        "tags": [
+          "customers"
+        ]
+      }
+    },
+    "/api/v1/customers/{id}/status": {
+      "patch": {
+        "operationId": "CustomerController_setStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerStatusBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "启用 / 停用客户",
+        "tags": [
+          "customers"
+        ]
+      }
+    },
+    "/api/v1/customers/batch-status": {
+      "post": {
+        "operationId": "CustomerController_setStatusMany",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerBatchStatusBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerBatchStatusResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "批量启用 / 停用客户（已是目标状态或已删的跳过，返回实际变更条数）",
+        "tags": [
+          "customers"
+        ]
+      }
+    },
+    "/api/v1/customers/batch-delete": {
+      "post": {
+        "operationId": "CustomerController_removeMany",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerBatchDeleteBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerBatchDeleteResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "批量删除客户（软删除；不存在 / 已删行静默跳过，返回删除条数）",
+        "tags": [
+          "customers"
+        ]
+      }
+    },
     "/api/v1/sale-orders": {
       "get": {
         "operationId": "OrderController_list",
@@ -176,10 +520,10 @@
             }
           },
           {
-            "name": "customerName",
+            "name": "customerId",
             "required": false,
             "in": "query",
-            "description": "客户名称模糊",
+            "description": "客户 id",
             "schema": {
               "type": "string"
             }
@@ -197,7 +541,7 @@
             }
           }
         },
-        "summary": "销售单列表：筛选（销售日期区间、客户名称）+ 排序 + 分页",
+        "summary": "销售单列表：筛选（销售日期区间、客户）+ 排序 + 分页",
         "tags": [
           "sale-orders"
         ]
@@ -228,6 +572,38 @@
           }
         },
         "summary": "新建销售单；重复提交防抖：请求头 Idempotency-Key",
+        "tags": [
+          "sale-orders"
+        ]
+      }
+    },
+    "/api/v1/sale-orders/customer-volume-summary": {
+      "get": {
+        "operationId": "OrderController_customerVolumeSummary",
+        "parameters": [
+          {
+            "name": "customerIds",
+            "required": true,
+            "in": "query",
+            "description": "客户 id，逗号分隔（1~200）",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerVolumeSummaryDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "客户维度累计方量（未软删销售单合计，供客户列表/详情批量取数）",
         "tags": [
           "sale-orders"
         ]
@@ -466,6 +842,181 @@
           "newPassword"
         ]
       },
+      "CustomerDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "客户 id"
+          },
+          "code": {
+            "type": "string",
+            "description": "客户编号（C + 5 位流水）"
+          },
+          "name": {
+            "type": "string",
+            "description": "客户名称"
+          },
+          "contact": {
+            "type": "string",
+            "description": "联系信息"
+          },
+          "status": {
+            "type": "string",
+            "description": "状态：active 启用 / inactive 停用"
+          },
+          "note": {
+            "type": "string",
+            "description": "备注"
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "创建日期（YYYY-MM-DD）"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "contact",
+          "status",
+          "note",
+          "createdAt"
+        ]
+      },
+      "CustomerListDto": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "number",
+            "description": "总数"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CustomerDto"
+            }
+          }
+        },
+        "required": [
+          "total",
+          "items"
+        ]
+      },
+      "CustomerNameCheckDto": {
+        "type": "object",
+        "properties": {
+          "duplicate": {
+            "type": "boolean",
+            "description": "是否存在同名客户（未软删）"
+          }
+        },
+        "required": [
+          "duplicate"
+        ]
+      },
+      "CustomerBodyDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "客户名称",
+            "example": "张三木材店"
+          },
+          "contact": {
+            "type": "string",
+            "description": "联系信息（电话等）",
+            "default": ""
+          },
+          "note": {
+            "type": "string",
+            "description": "备注",
+            "default": ""
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "CustomerStatusBodyDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "inactive"
+            ],
+            "description": "状态：active 启用 / inactive 停用"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "CustomerBatchStatusBodyDto": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "description": "客户 id 列表（1~200）",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "inactive"
+            ],
+            "description": "目标状态：active 启用 / inactive 停用"
+          }
+        },
+        "required": [
+          "ids",
+          "status"
+        ]
+      },
+      "CustomerBatchStatusResponseDto": {
+        "type": "object",
+        "properties": {
+          "updated": {
+            "type": "number",
+            "description": "实际变更条数（已软删或已处于目标状态的跳过）"
+          }
+        },
+        "required": [
+          "updated"
+        ]
+      },
+      "CustomerBatchDeleteBodyDto": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "description": "要删除的客户 id 列表（1~200）",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "ids"
+        ]
+      },
+      "CustomerBatchDeleteResponseDto": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "number",
+            "description": "实际删除（软删除）条数"
+          }
+        },
+        "required": [
+          "deleted"
+        ]
+      },
       "SaleOrderSummaryDto": {
         "type": "object",
         "properties": {
@@ -506,8 +1057,13 @@
           "saleDate": {
             "type": "string"
           },
+          "customerId": {
+            "type": "string",
+            "description": "客户 id"
+          },
           "customerName": {
-            "type": "string"
+            "type": "string",
+            "description": "客户名称快照（下单当时）"
           },
           "totalVolume": {
             "type": "string"
@@ -529,6 +1085,7 @@
           "id",
           "code",
           "saleDate",
+          "customerId",
           "customerName",
           "totalVolume",
           "subtotalAmount",
@@ -562,6 +1119,43 @@
         "required": [
           "total",
           "summary",
+          "items"
+        ]
+      },
+      "CustomerVolumeSummaryItemDto": {
+        "type": "object",
+        "properties": {
+          "customerId": {
+            "type": "string",
+            "description": "客户 id"
+          },
+          "totalVolume": {
+            "type": "string",
+            "description": "累计下单方量（未软删销售单的合计方量，4 位小数）"
+          },
+          "orderCount": {
+            "type": "number",
+            "description": "销售单数量（未软删）"
+          }
+        },
+        "required": [
+          "customerId",
+          "totalVolume",
+          "orderCount"
+        ]
+      },
+      "CustomerVolumeSummaryDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "description": "按请求的客户 id 顺序返回",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CustomerVolumeSummaryItemDto"
+            }
+          }
+        },
+        "required": [
           "items"
         ]
       },
@@ -650,8 +1244,13 @@
           "saleDate": {
             "type": "string"
           },
+          "customerId": {
+            "type": "string",
+            "description": "客户 id"
+          },
           "customerName": {
-            "type": "string"
+            "type": "string",
+            "description": "客户名称快照（下单当时）"
           },
           "totalVolume": {
             "type": "string"
@@ -668,6 +1267,15 @@
           "note": {
             "type": "string"
           },
+          "customerCode": {
+            "type": "string",
+            "nullable": true,
+            "description": "客户编号（取自客户档案当前记录）"
+          },
+          "customerDeleted": {
+            "type": "boolean",
+            "description": "客户档案是否已删除（历史单据仍可读）"
+          },
           "items": {
             "description": "明细行",
             "type": "array",
@@ -680,12 +1288,14 @@
           "id",
           "code",
           "saleDate",
+          "customerId",
           "customerName",
           "totalVolume",
           "subtotalAmount",
           "otherAmount",
           "totalAmount",
           "note",
+          "customerDeleted",
           "items"
         ]
       },
@@ -753,10 +1363,9 @@
             "description": "销售日期",
             "example": "2026-11-09"
           },
-          "customerName": {
+          "customerId": {
             "type": "string",
-            "description": "客户名称（文本）",
-            "example": "张三木材店"
+            "description": "客户 id（客户档案外键，须为启用态）"
           },
           "otherAmount": {
             "type": "string",
@@ -778,7 +1387,7 @@
         },
         "required": [
           "saleDate",
-          "customerName",
+          "customerId",
           "items"
         ]
       },
@@ -850,10 +1459,9 @@
             "description": "销售日期",
             "example": "2026-11-09"
           },
-          "customerName": {
+          "customerId": {
             "type": "string",
-            "description": "客户名称（文本）",
-            "example": "张三木材店"
+            "description": "客户 id（客户档案外键；未变更时不校验启用态）"
           },
           "otherAmount": {
             "type": "string",
@@ -875,7 +1483,7 @@
         },
         "required": [
           "saleDate",
-          "customerName",
+          "customerId",
           "items"
         ]
       },

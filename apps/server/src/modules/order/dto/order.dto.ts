@@ -44,8 +44,8 @@ export class SaleOrderBodyDto {
   @ApiProperty({ type: String, description: '销售日期', example: '2026-11-09' })
   saleDate!: string;
 
-  @ApiProperty({ type: String, description: '客户名称（文本）', example: '张三木材店' })
-  customerName!: string;
+  @ApiProperty({ type: String, description: '客户 id（客户档案外键，须为启用态）' })
+  customerId!: string;
 
   @ApiPropertyOptional({ type: String, description: '主表其他金额（运费等），默认 0', default: '0' })
   otherAmount?: string;
@@ -61,8 +61,8 @@ export class SaleOrderUpdateBodyDto {
   @ApiProperty({ type: String, description: '销售日期', example: '2026-11-09' })
   saleDate!: string;
 
-  @ApiProperty({ type: String, description: '客户名称（文本）', example: '张三木材店' })
-  customerName!: string;
+  @ApiProperty({ type: String, description: '客户 id（客户档案外键；未变更时不校验启用态）' })
+  customerId!: string;
 
   @ApiPropertyOptional({ type: String, description: '主表其他金额（运费等），默认 0', default: '0' })
   otherAmount?: string;
@@ -121,7 +121,8 @@ export class SaleOrderListItemDto {
   @ApiProperty({ type: String }) id!: string;
   @ApiProperty({ type: String, description: '销售单编号' }) code!: string;
   @ApiProperty({ type: String }) saleDate!: string;
-  @ApiProperty({ type: String }) customerName!: string;
+  @ApiProperty({ type: String, description: '客户 id' }) customerId!: string;
+  @ApiProperty({ type: String, description: '客户名称快照（下单当时）' }) customerName!: string;
   @ApiProperty({ type: String }) totalVolume!: string;
   @ApiProperty({ type: String }) subtotalAmount!: string;
   @ApiProperty({ type: String }) otherAmount!: string;
@@ -130,6 +131,12 @@ export class SaleOrderListItemDto {
 }
 
 export class SaleOrderDto extends SaleOrderListItemDto {
+  @ApiPropertyOptional({ type: String, nullable: true, description: '客户编号（取自客户档案当前记录）' })
+  customerCode!: string | null;
+
+  @ApiProperty({ type: Boolean, description: '客户档案是否已删除（历史单据仍可读）' })
+  customerDeleted!: boolean;
+
   @ApiProperty({ type: () => [SaleOrderItemResponseDto], description: '明细行' })
   items!: SaleOrderItemResponseDto[];
 }
@@ -167,4 +174,20 @@ export class SaleOrderBatchDeleteBodyDto {
 export class SaleOrderBatchDeleteResponseDto {
   @ApiProperty({ type: Number, description: '实际删除（软删除）条数' })
   deleted!: number;
+}
+
+export class CustomerVolumeSummaryItemDto {
+  @ApiProperty({ type: String, description: '客户 id' })
+  customerId!: string;
+
+  @ApiProperty({ type: String, description: '累计下单方量（未软删销售单的合计方量，4 位小数）' })
+  totalVolume!: string;
+
+  @ApiProperty({ type: Number, description: '销售单数量（未软删）' })
+  orderCount!: number;
+}
+
+export class CustomerVolumeSummaryDto {
+  @ApiProperty({ type: () => [CustomerVolumeSummaryItemDto], description: '按请求的客户 id 顺序返回' })
+  items!: CustomerVolumeSummaryItemDto[];
 }
