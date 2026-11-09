@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node --watch --loader ./loader.mjs src/main.ts",
+    "dev": "nodemon",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/main.js",
     "test": "vitest run",
@@ -41,6 +41,7 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^22.0.0",
     "@types/supertest": "^6.0.3",
+    "nodemon": "^3.1.14",
     "pino-pretty": "^13.2.0",
     "supertest": "^7.3.1",
     "tsx": "^4.0.0",

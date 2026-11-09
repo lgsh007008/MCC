@@ -42,10 +42,15 @@ function stripTenantMutation(args: Record<string, unknown>): void {
 }
 
 const hooks: Record<string, TenantHook> = {
-  // 读：统一附加当前租户条件（无 where 也生成过滤）
+  // findUnique/update/delete/upsert 的 where 是 WhereUniqueInput，不接受 AND 结构，
+  // 无法注入租户条件（注入会触发 Prisma 运行时校验错误）：
+  //   - findUnique：按唯一键定位后校验租户，异租户行返回 null（ID 为不可推测 UUID，命中即本租户）
+  //   - update/delete/upsert：直接抛错禁用——单行改删必须走 updateMany/deleteMany（WHERE 可复合租户条件），
+  //     保证「漏一处则改不到」，杜绝唯一键直指导致的跨租户写
   findUnique({ args, query }) {
-    withTenantWhere(args);
-    return query(args);
+    return (query(args) as Promise<{ tenantId?: string } | null>).then((row) =>
+      row !== null && row.tenantId !== currentTenantId() ? null : row,
+    );
   },
   findFirst({ args, query }) {
     withTenantWhere(args);
@@ -71,29 +76,27 @@ const hooks: Record<string, TenantHook> = {
     }
     return query(args);
   },
-  upsert({ args, query }) {
-    withTenantWhere(args);
-    const u = args as WritableDataArgs & {
-      create?: Record<string, unknown>;
-      update?: Record<string, unknown>;
-    };
-    u.create = { ...u.create, tenantId: currentTenantId() };
-    u.update = { ...u.update, tenantId: currentTenantId() };
-    return query(args);
+  // upsert / update / delete（单数）where 为唯一键，无法复合租户条件 → 一律禁用，
+  // 由 updateMany / deleteMany 承接（其 where 可带 AND 注入租户条件）
+  upsert() {
+    throw new Error(
+      '[prisma-tenant] upsert 已禁用：where 为唯一键无法附加租户条件；请改为 findFirst 校验后 create / updateMany',
+    );
   },
-  // 改 / 删：必须先命中当前租户行；禁止经数据层迁移租户归属
-  update({ args, query }) {
+  update() {
+    throw new Error(
+      '[prisma-tenant] 单数 update 已禁用：where 为唯一键无法附加租户条件；请改用 updateMany',
+    );
+  },
+  updateMany({ args, query }) {
     withTenantWhere(args);
     stripTenantMutation(args);
     return query(args);
   },
-  updateMany({ args, query }) {
-    withTenantWhere(args);
-    return query(args);
-  },
-  delete({ args, query }) {
-    withTenantWhere(args);
-    return query(args);
+  delete() {
+    throw new Error(
+      '[prisma-tenant] 单数 delete 已禁用：where 为唯一键无法附加租户条件；请改用 deleteMany',
+    );
   },
   deleteMany({ args, query }) {
     withTenantWhere(args);

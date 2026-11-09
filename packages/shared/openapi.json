@@ -107,6 +107,255 @@
           "auth"
         ]
       }
+    },
+    "/api/v1/sale-orders": {
+      "get": {
+        "operationId": "OrderController_list",
+        "parameters": [
+          {
+            "name": "sortOrder",
+            "required": false,
+            "in": "query",
+            "description": "排序方向，默认 desc",
+            "schema": {
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "description": "排序字段，默认 saleDate",
+            "schema": {
+              "enum": [
+                "saleDate",
+                "totalVolume",
+                "totalAmount"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "description": "每页条数，默认 20（最大 100）",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "页码，默认 1",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "dateTo",
+            "required": false,
+            "in": "query",
+            "description": "销售日期止（YYYY-MM-DD）",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateFrom",
+            "required": false,
+            "in": "query",
+            "description": "销售日期起（YYYY-MM-DD）",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "customerName",
+            "required": false,
+            "in": "query",
+            "description": "客户名称模糊",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaleOrderListDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "销售单列表：筛选（销售日期区间、客户名称）+ 排序 + 分页",
+        "tags": [
+          "sale-orders"
+        ]
+      },
+      "post": {
+        "operationId": "OrderController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaleOrderBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaleOrderDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "新建销售单；重复提交防抖：请求头 Idempotency-Key",
+        "tags": [
+          "sale-orders"
+        ]
+      }
+    },
+    "/api/v1/sale-orders/{id}": {
+      "get": {
+        "operationId": "OrderController_detail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaleOrderDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "销售单详情（含明细）",
+        "tags": [
+          "sale-orders"
+        ]
+      },
+      "put": {
+        "operationId": "OrderController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaleOrderUpdateBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaleOrderDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "更新销售单（整单提交：明细重算落账）",
+        "tags": [
+          "sale-orders"
+        ]
+      },
+      "delete": {
+        "operationId": "OrderController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "删除销售单（软删除，编号不回收）",
+        "tags": [
+          "sale-orders"
+        ]
+      }
+    },
+    "/api/v1/sale-orders/batch-delete": {
+      "post": {
+        "operationId": "OrderController_batchDelete",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaleOrderBatchDeleteBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaleOrderBatchDeleteResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "批量删除销售单（软删除；不存在/已删行静默跳过）",
+        "tags": [
+          "sale-orders"
+        ]
+      }
     }
   },
   "info": {
@@ -215,6 +464,446 @@
         "required": [
           "oldPassword",
           "newPassword"
+        ]
+      },
+      "SaleOrderSummaryDto": {
+        "type": "object",
+        "properties": {
+          "totalVolume": {
+            "type": "string",
+            "description": "合计方量（筛选全量）"
+          },
+          "subtotalAmount": {
+            "type": "string",
+            "description": "小计金额合计（筛选全量）"
+          },
+          "otherAmount": {
+            "type": "string",
+            "description": "其他金额合计（筛选全量）"
+          },
+          "totalAmount": {
+            "type": "string",
+            "description": "合计金额合计（筛选全量）"
+          }
+        },
+        "required": [
+          "totalVolume",
+          "subtotalAmount",
+          "otherAmount",
+          "totalAmount"
+        ]
+      },
+      "SaleOrderListItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "description": "销售单编号"
+          },
+          "saleDate": {
+            "type": "string"
+          },
+          "customerName": {
+            "type": "string"
+          },
+          "totalVolume": {
+            "type": "string"
+          },
+          "subtotalAmount": {
+            "type": "string"
+          },
+          "otherAmount": {
+            "type": "string"
+          },
+          "totalAmount": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "saleDate",
+          "customerName",
+          "totalVolume",
+          "subtotalAmount",
+          "otherAmount",
+          "totalAmount",
+          "note"
+        ]
+      },
+      "SaleOrderListDto": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "number",
+            "description": "总数"
+          },
+          "summary": {
+            "description": "筛选全量汇总（合计行）",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SaleOrderSummaryDto"
+              }
+            ]
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SaleOrderListItemDto"
+            }
+          }
+        },
+        "required": [
+          "total",
+          "summary",
+          "items"
+        ]
+      },
+      "SaleOrderItemResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "明细行 id"
+          },
+          "seq": {
+            "type": "number",
+            "description": "行序"
+          },
+          "code": {
+            "type": "string",
+            "description": "销售明细编码 = 主单编号-行序"
+          },
+          "productType": {
+            "type": "string",
+            "description": "产品类型"
+          },
+          "thicknessCm": {
+            "type": "string",
+            "nullable": true,
+            "description": "厚度（cm）"
+          },
+          "widthCm": {
+            "type": "string",
+            "nullable": true,
+            "description": "宽度（cm）"
+          },
+          "lengthCm": {
+            "type": "string",
+            "nullable": true,
+            "description": "长度（cm）"
+          },
+          "pieces": {
+            "type": "number",
+            "nullable": true,
+            "description": "根数"
+          },
+          "volumeM3": {
+            "type": "string",
+            "nullable": true,
+            "description": "方量（m³）"
+          },
+          "price": {
+            "type": "string",
+            "nullable": true,
+            "description": "单价（元/m³）"
+          },
+          "lineAmount": {
+            "type": "string",
+            "description": "行小计金额"
+          },
+          "otherAmount": {
+            "type": "string",
+            "description": "行其他金额"
+          },
+          "note": {
+            "type": "string",
+            "description": "行备注"
+          }
+        },
+        "required": [
+          "id",
+          "seq",
+          "code",
+          "productType",
+          "lineAmount",
+          "otherAmount",
+          "note"
+        ]
+      },
+      "SaleOrderDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "description": "销售单编号"
+          },
+          "saleDate": {
+            "type": "string"
+          },
+          "customerName": {
+            "type": "string"
+          },
+          "totalVolume": {
+            "type": "string"
+          },
+          "subtotalAmount": {
+            "type": "string"
+          },
+          "otherAmount": {
+            "type": "string"
+          },
+          "totalAmount": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "items": {
+            "description": "明细行",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SaleOrderItemResponseDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "saleDate",
+          "customerName",
+          "totalVolume",
+          "subtotalAmount",
+          "otherAmount",
+          "totalAmount",
+          "note",
+          "items"
+        ]
+      },
+      "SaleOrderItemBodyDto": {
+        "type": "object",
+        "properties": {
+          "productType": {
+            "type": "string",
+            "enum": [
+              "board",
+              "other"
+            ],
+            "description": "产品类型：board 板材 / other 其他"
+          },
+          "thicknessCm": {
+            "type": "string",
+            "description": "厚度（cm，3 位小数），板材必填",
+            "example": "2.000"
+          },
+          "widthCm": {
+            "type": "string",
+            "description": "宽度（cm，3 位小数），板材必填",
+            "example": "80.000"
+          },
+          "lengthCm": {
+            "type": "string",
+            "description": "长度（cm，3 位小数），板材必填",
+            "example": "300.000"
+          },
+          "pieces": {
+            "type": "number",
+            "description": "根数（整数），板材必填",
+            "example": 3
+          },
+          "price": {
+            "type": "string",
+            "description": "单价（元/m³，2 位小数），板材必填",
+            "example": "550.25"
+          },
+          "lineAmount": {
+            "type": "string",
+            "description": "行金额（其他类型手填，2 位小数）",
+            "example": "50.00"
+          },
+          "otherAmount": {
+            "type": "string",
+            "description": "行其他金额（两类型通用兜底），默认 0",
+            "default": "0"
+          },
+          "note": {
+            "type": "string",
+            "description": "行备注",
+            "default": ""
+          }
+        },
+        "required": [
+          "productType"
+        ]
+      },
+      "SaleOrderBodyDto": {
+        "type": "object",
+        "properties": {
+          "saleDate": {
+            "type": "string",
+            "description": "销售日期",
+            "example": "2026-11-09"
+          },
+          "customerName": {
+            "type": "string",
+            "description": "客户名称（文本）",
+            "example": "张三木材店"
+          },
+          "otherAmount": {
+            "type": "string",
+            "description": "主表其他金额（运费等），默认 0",
+            "default": "0"
+          },
+          "note": {
+            "type": "string",
+            "description": "备注",
+            "default": ""
+          },
+          "items": {
+            "description": "明细行（至少一行）",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SaleOrderItemBodyDto"
+            }
+          }
+        },
+        "required": [
+          "saleDate",
+          "customerName",
+          "items"
+        ]
+      },
+      "SaleOrderItemUpdateBodyDto": {
+        "type": "object",
+        "properties": {
+          "productType": {
+            "type": "string",
+            "enum": [
+              "board",
+              "other"
+            ],
+            "description": "产品类型：board 板材 / other 其他"
+          },
+          "thicknessCm": {
+            "type": "string",
+            "description": "厚度（cm，3 位小数），板材必填",
+            "example": "2.000"
+          },
+          "widthCm": {
+            "type": "string",
+            "description": "宽度（cm，3 位小数），板材必填",
+            "example": "80.000"
+          },
+          "lengthCm": {
+            "type": "string",
+            "description": "长度（cm，3 位小数），板材必填",
+            "example": "300.000"
+          },
+          "pieces": {
+            "type": "number",
+            "description": "根数（整数），板材必填",
+            "example": 3
+          },
+          "price": {
+            "type": "string",
+            "description": "单价（元/m³，2 位小数），板材必填",
+            "example": "550.25"
+          },
+          "lineAmount": {
+            "type": "string",
+            "description": "行金额（其他类型手填，2 位小数）",
+            "example": "50.00"
+          },
+          "otherAmount": {
+            "type": "string",
+            "description": "行其他金额（两类型通用兜底），默认 0",
+            "default": "0"
+          },
+          "note": {
+            "type": "string",
+            "description": "行备注",
+            "default": ""
+          },
+          "id": {
+            "type": "string",
+            "description": "已有明细行 id（编辑时携带，新建行为空）"
+          }
+        },
+        "required": [
+          "productType"
+        ]
+      },
+      "SaleOrderUpdateBodyDto": {
+        "type": "object",
+        "properties": {
+          "saleDate": {
+            "type": "string",
+            "description": "销售日期",
+            "example": "2026-11-09"
+          },
+          "customerName": {
+            "type": "string",
+            "description": "客户名称（文本）",
+            "example": "张三木材店"
+          },
+          "otherAmount": {
+            "type": "string",
+            "description": "主表其他金额（运费等），默认 0",
+            "default": "0"
+          },
+          "note": {
+            "type": "string",
+            "description": "备注",
+            "default": ""
+          },
+          "items": {
+            "description": "明细行（至少一行；已有行带 id）",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SaleOrderItemUpdateBodyDto"
+            }
+          }
+        },
+        "required": [
+          "saleDate",
+          "customerName",
+          "items"
+        ]
+      },
+      "SaleOrderBatchDeleteBodyDto": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "description": "要删除的销售单 id 列表（1~200）",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "ids"
+        ]
+      },
+      "SaleOrderBatchDeleteResponseDto": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "number",
+            "description": "实际删除（软删除）条数"
+          }
+        },
+        "required": [
+          "deleted"
         ]
       }
     }

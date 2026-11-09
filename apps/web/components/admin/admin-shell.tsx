@@ -1,14 +1,19 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { ChevronDownIcon } from 'lucide-react';
 import { changePasswordSchema } from '@mcc/shared';
+import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
   Breadcrumb,
   BreadcrumbItem,
+  BreadcrumbLink,
   BreadcrumbList,
+  BreadcrumbPage,
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
 import {
@@ -41,14 +46,37 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
+  SidebarTrigger,
 } from '@/components/ui/sidebar';
 import { api, refreshSession } from '@/lib/api';
 import { authSession } from '@/lib/auth/session';
-import { findNavByPath, navGroups } from '@/lib/nav';
+import { findNavByPath, homeItem, navGroups } from '@/lib/nav';
+import { PageBreadcrumbProvider, usePageBreadcrumb } from './page-breadcrumb';
 
 // 后台布局壳（design/平台布局.md §1）：经典三区——侧边栏 / 顶栏 / 主内容区。
 // 业务页面只实现主内容区（children），不各自拼壳；路由与守卫结构见同文档 §1.2。
-export function AdminShell({ children }: { children: React.ReactNode }): React.ReactElement {
+// 面包屑最后一层次（页面标识）由页面经 usePageCrumb 注入（design/平台布局.md §1.5）。
+export function AdminShell({
+  children,
+  defaultSidebarOpen = true,
+}: {
+  children: React.ReactNode;
+  defaultSidebarOpen?: boolean;
+}): React.ReactElement {
+  return (
+    <PageBreadcrumbProvider>
+      <AdminShellInner defaultSidebarOpen={defaultSidebarOpen}>{children}</AdminShellInner>
+    </PageBreadcrumbProvider>
+  );
+}
+
+function AdminShellInner({
+  children,
+  defaultSidebarOpen,
+}: {
+  children: React.ReactNode;
+  defaultSidebarOpen: boolean;
+}): React.ReactElement {
   const pathname = usePathname();
   const [pwdOpen, setPwdOpen] = useState(false);
   const [pwdError, setPwdError] = useState<string | null>(null);
@@ -105,60 +133,173 @@ export function AdminShell({ children }: { children: React.ReactNode }): React.R
   }
 
   const current = findNavByPath(pathname);
+  const pageCrumbs = usePageBreadcrumb()?.crumbs ?? [];
+  // 分组树状折叠（design/平台布局.md §1.3）：默认全部展开
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const isGroupCollapsed = (label: string): boolean => collapsedGroups.has(label);
+  const toggleGroup = (label: string): void => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(label)) {
+        next.delete(label);
+      } else {
+        next.add(label);
+      }
+      return next;
+    });
+  };
 
   return (
-    <SidebarProvider>
+    <SidebarProvider defaultOpen={defaultSidebarOpen}>
       <Sidebar collapsible="icon">
         <SidebarHeader className="border-b border-border">
-          <span className="px-2 text-sm font-semibold">梅好木业</span>
+          <span className="px-2 text-sm font-semibold">
+            <span className="group-data-[collapsible=icon]:hidden">梅好木业</span>
+            <span className="hidden group-data-[collapsible=icon]:inline">木</span>
+          </span>
         </SidebarHeader>
         <SidebarContent>
-          {navGroups.map((group) => (
-            <SidebarGroup key={group.label}>
-              <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
-              <SidebarMenu>
-                {group.items.map((item) => (
-                  <SidebarMenuItem key={item.title}>
-                    {item.pending ? (
-                      <span className="flex items-center justify-between rounded-md px-2 py-1.5 text-sm text-muted-foreground/60">
-                        {item.title}
-                        {item.pendingBadge === false ? null : (
-                          <span className="ml-2 shrink-0 rounded border border-border px-1 text-xs">
-                            待建
-                          </span>
-                        )}
-                      </span>
-                    ) : (
-                      <SidebarMenuButton
-                        isActive={pathname === item.href}
-                        render={<a href={item.href} />}
-                      >
-                        {item.title}
-                      </SidebarMenuButton>
-                    )}
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                isActive={pathname === homeItem.href}
+                title={homeItem.title}
+                render={<Link href={homeItem.href ?? '#'} aria-label={homeItem.title} />}
+              >
+                <homeItem.icon />
+                <span className="group-data-[collapsible=icon]:hidden">{homeItem.title}</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+          {navGroups.map((group) => {
+            const collapsed = isGroupCollapsed(group.label);
+            return (
+              <SidebarGroup key={group.label}>
+                <SidebarGroupLabel
+                  render={
+                    <button
+                      type="button"
+                      aria-expanded={!collapsed}
+                      className="flex h-8 w-full items-center gap-2 rounded-md px-2 text-xs font-medium text-sidebar-foreground/70 transition-colors hover:text-sidebar-foreground"
+                      onClick={() => toggleGroup(group.label)}
+                    >
+                      <group.icon className="size-4 shrink-0" />
+                      <span className="flex-1 truncate text-left">{group.label}</span>
+                      <ChevronDownIcon
+                        className={cn('size-3.5 shrink-0 transition-transform', collapsed && '-rotate-90')}
+                      />
+                    </button>
+                  }
+                />
+                {/* 图标态：组图标按钮（展开态隐藏），点击折叠/展开该组 */}
+                <SidebarMenu className="hidden group-data-[collapsible=icon]:flex">
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      title={group.label}
+                      aria-expanded={!collapsed}
+                      onClick={() => toggleGroup(group.label)}
+                    >
+                      <group.icon />
+                    </SidebarMenuButton>
                   </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroup>
-          ))}
+                </SidebarMenu>
+                {!collapsed ? (
+                  <SidebarMenu>
+                    {group.items.map((item) => (
+                      <SidebarMenuItem key={item.title}>
+                        {item.pending ? (
+                          <span className="flex items-center justify-between rounded-md px-2 py-1.5 text-sm text-muted-foreground/60">
+                            <span className="flex items-center gap-2">
+                              <item.icon className="size-4" />
+                              <span className="group-data-[collapsible=icon]:hidden">{item.title}</span>
+                            </span>
+                            {item.pendingBadge === false ? null : (
+                              <span className="ml-2 shrink-0 rounded border border-border px-1 text-xs group-data-[collapsible=icon]:hidden">
+                                待建
+                              </span>
+                            )}
+                          </span>
+                        ) : (
+                          <SidebarMenuButton
+                            isActive={
+                              item.href
+                                ? pathname === item.href || pathname.startsWith(`${item.href}/`)
+                                : false
+                            }
+                            title={item.title}
+                            render={<Link href={item.href ?? '#'} aria-label={item.title} />}
+                          >
+                            <item.icon />
+                            <span className="group-data-[collapsible=icon]:hidden">{item.title}</span>
+                          </SidebarMenuButton>
+                        )}
+                      </SidebarMenuItem>
+                    ))}
+                  </SidebarMenu>
+                ) : null}
+              </SidebarGroup>
+            );
+          })}
         </SidebarContent>
       </Sidebar>
 
       <SidebarInset>
-        <header className="flex h-14 shrink-0 items-center justify-between border-b border-border px-6">
-          <Breadcrumb>
-            <BreadcrumbList>
-              <BreadcrumbItem>梅好木业</BreadcrumbItem>
-              {current ? (
-                <>
-                  <BreadcrumbSeparator />
-                  <BreadcrumbItem>{current.groupLabel}</BreadcrumbItem>
-                  <BreadcrumbSeparator />
-                  <BreadcrumbItem>{current.itemTitle}</BreadcrumbItem>
-                </>
-              ) : null}
-            </BreadcrumbList>
-          </Breadcrumb>
+        <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-border px-4">
+          <div className="flex min-w-0 items-center gap-2">
+            <SidebarTrigger />
+            <Breadcrumb>
+              <BreadcrumbList>
+                <BreadcrumbItem>
+                  <BreadcrumbLink render={<Link href="/admin" />}>梅好木业</BreadcrumbLink>
+                </BreadcrumbItem>
+                {current && current.groupLabel ? (
+                  <>
+                    <BreadcrumbSeparator />
+                    <BreadcrumbItem>
+                      {current.itemTitle ? (
+                        current.groupLabel
+                      ) : (
+                        <BreadcrumbPage>{current.groupLabel}</BreadcrumbPage>
+                      )}
+                    </BreadcrumbItem>
+                  </>
+                ) : null}
+                {current && current.itemTitle ? (
+                  <>
+                    <BreadcrumbSeparator />
+                    <BreadcrumbItem>
+                      {pathname === current.itemHref ? (
+                        <BreadcrumbPage>{current.itemTitle}</BreadcrumbPage>
+                      ) : (
+                        <BreadcrumbLink render={<Link href={current.itemHref ?? '/admin'} />}>
+                          {current.itemTitle}
+                        </BreadcrumbLink>
+                      )}
+                    </BreadcrumbItem>
+                  </>
+                ) : null}
+                {pageCrumbs.map((crumb, index) => {
+                  const isLast = index === pageCrumbs.length - 1;
+                  return (
+                    <Fragment key={`${crumb.title}-${index}`}>
+                      <BreadcrumbSeparator />
+                      <BreadcrumbItem>
+                        {isLast ? (
+                          <BreadcrumbPage>{crumb.title}</BreadcrumbPage>
+                        ) : crumb.href ? (
+                          <BreadcrumbLink render={<Link href={crumb.href} />}>
+                            {crumb.title}
+                          </BreadcrumbLink>
+                        ) : (
+                          <span>{crumb.title}</span>
+                        )}
+                      </BreadcrumbItem>
+                    </Fragment>
+                  );
+                })}
+              </BreadcrumbList>
+            </Breadcrumb>
+          </div>
 
           <DropdownMenu>
             <DropdownMenuTrigger>
@@ -177,7 +318,7 @@ export function AdminShell({ children }: { children: React.ReactNode }): React.R
           </DropdownMenu>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-6">{children}</main>
+        <main className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-6">{children}</main>
       </SidebarInset>
 
       <Dialog open={pwdOpen} onOpenChange={setPwdOpen}>

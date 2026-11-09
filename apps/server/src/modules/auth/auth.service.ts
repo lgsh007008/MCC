@@ -122,7 +122,8 @@ export class AuthService {
     if (!passwordOk) {
       throw problem(401, 'INVALID_CREDENTIALS', '旧密码不正确');
     }
-    await this.prisma.client.user.update({
+    // 单数 update 无法附加租户条件（where 为唯一键），统一走 updateMany（数据层自动注入租户条件）
+    await this.prisma.client.user.updateMany({
       where: { id: userId },
       data: { passwordHash: await hashPassword(input.newPassword) },
     });

@@ -115,5 +115,5 @@ pnpm --filter @mcc/shared run gen:client    # openapi.json → 类型化 client 
 | 命令 | 层次 | 说明 |
 | --- | --- | --- |
 | `pnpm lint` | 静态门禁 | 全仓 eslint，含模块边界规则（§4.2：跨模块只许走 index） |
-| `pnpm test` | 单测/契约集成 | server（auth 关键路径，需 PG/Redis 容器在跑）、shared |
-| `pnpm --filter @mcc/web run test:e2e` | E2E 冒烟 | Playwright 登录→工作台→登出→守卫全链路；web dev（3000）需在跑，server 由配置代起；staging 落地后按 §10 接入 CI |
+| `pnpm test` | 单测/契约集成 | server（auth / 订单关键路径，需 PG/Redis 容器在跑）、shared 计算纯函数 |
+| `pnpm --filter @mcc/web run test:e2e` | E2E 冒烟 | Playwright 登录→首页→订单菜单→销售单列表→登出→守卫全链路；web 与 server 由 playwright 配置本机代起（已在跑则复用）；staging 落地后按 §10 接入 CI |

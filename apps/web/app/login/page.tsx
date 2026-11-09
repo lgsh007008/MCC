@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { loginSchema } from '@mcc/shared';
+import { Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -9,11 +10,12 @@ import { Label } from '@/components/ui/label';
 import { authSession } from '@/lib/auth/session';
 import { api } from '@/lib/api';
 
-// 登录页（product/账号与权限.md R-账号与权限-001）：账号、密码、登录按钮、记住登录。
+// 登录页（product/账号与权限.md R-账号与权限-001）：账号、密码（显示/隐藏切换）、登录按钮、记住登录。
 // 纯组件拼装，不单列页面设计；页面归属账号与权限领域。
 export default function LoginPage(): React.ReactElement {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -62,14 +64,29 @@ export default function LoginPage(): React.ReactElement {
           </div>
           <div className="space-y-2">
             <Label htmlFor="password">密码</Label>
-            <Input
-              id="password"
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="请输入密码"
-            />
+            <div className="relative">
+              <Input
+                id="password"
+                type={showPassword ? 'text' : 'password'}
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="请输入密码"
+                className="pr-10"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                className="absolute inset-y-0 right-1 my-auto text-muted-foreground"
+                aria-label={showPassword ? '隐藏密码' : '显示密码'}
+                aria-pressed={showPassword}
+                title={showPassword ? '隐藏密码' : '显示密码'}
+                onClick={() => setShowPassword((v) => !v)}
+              >
+                {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+              </Button>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <Checkbox

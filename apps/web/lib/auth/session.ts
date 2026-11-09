@@ -14,3 +14,17 @@ export const authSession = {
     accessToken = null;
   },
 };
+
+// 从访问令牌载荷读取当前登录用户名（JWT 载荷含 username）；
+// 令牌仅存内存，页面刷新后经 refresh 静默恢复。
+export function currentUsername(): string | null {
+  if (!accessToken) {
+    return null;
+  }
+  try {
+    const payload = JSON.parse(atob(accessToken.split('.')[1] ?? '')) as { username?: string };
+    return payload.username ?? null;
+  } catch {
+    return null;
+  }
+}

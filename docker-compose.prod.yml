@@ -1,0 +1,88 @@
+# 生产编排（单人阶段：单机单环境，技术方案 §9.5）。
+# 应用镜像来自 ACR，PG/Redis 用官方镜像 + 数据卷。
+# 用法：docker compose --env-file .env.prod -f docker-compose.prod.yml up -d
+name: mcc
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-mcc}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?请先在 .env.prod 设置 POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-mcc}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mcc} -d ${POSTGRES_DB:-mcc}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redisdata:/data
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    restart: unless-stopped
+
+  server:
+    image: ${ACR_REGISTRY:?请先在 .env.prod 设置 ACR_REGISTRY}/${ACR_NAMESPACE:?请先在 .env.prod 设置 ACR_NAMESPACE}/server:${IMAGE_TAG:?请先在 .env.prod 设置 IMAGE_TAG}
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile
+    environment:
+      NODE_ENV: production
+      PORT: "3001"
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      JWT_SECRET: ${JWT_SECRET:?请先在 .env.prod 设置 JWT_SECRET}
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-mcc}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-mcc}?schema=public"
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    expose:
+      - "3001"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    restart: unless-stopped
+
+  web:
+    image: ${ACR_REGISTRY:?请先在 .env.prod 设置 ACR_REGISTRY}/${ACR_NAMESPACE:?请先在 .env.prod 设置 ACR_NAMESPACE}/web:${IMAGE_TAG:?请先在 .env.prod 设置 IMAGE_TAG}
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        API_INTERNAL_URL: http://server:3001
+    environment:
+      NODE_ENV: production
+      API_INTERNAL_URL: http://server:3001
+    ports:
+      - "${WEB_PORT:-80}:3000"
+    depends_on:
+      - server
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  redisdata:

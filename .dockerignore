@@ -1,0 +1,22 @@
+# 镜像构建上下文裁剪（技术方案 §9.5）：只保留构建所需，减小传输与镜像体积
+node_modules
+**/node_modules
+.next
+**/.next
+dist
+**/dist
+.turbo
+**/.turbo
+.git
+.github
+.AAAdocs
+.战略与经营
+backups
+*.log
+*.md
+.env
+**/.env
+.env.*
+**/.env.*
+playwright-report
+test-results

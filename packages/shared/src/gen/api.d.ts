@@ -72,6 +72,60 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sale-orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 销售单列表：筛选（销售日期区间、客户名称）+ 排序 + 分页 */
+        get: operations["OrderController_list"];
+        put?: never;
+        /** 新建销售单；重复提交防抖：请求头 Idempotency-Key */
+        post: operations["OrderController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sale-orders/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 销售单详情（含明细） */
+        get: operations["OrderController_detail"];
+        /** 更新销售单（整单提交：明细重算落账） */
+        put: operations["OrderController_update"];
+        post?: never;
+        /** 删除销售单（软删除，编号不回收） */
+        delete: operations["OrderController_remove"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sale-orders/batch-delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 批量删除销售单（软删除；不存在/已删行静默跳过） */
+        post: operations["OrderController_batchDelete"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -114,6 +168,229 @@ export interface components {
             oldPassword: string;
             /** @description 新密码，至少 8 位 */
             newPassword: string;
+        };
+        SaleOrderSummaryDto: {
+            /** @description 合计方量（筛选全量） */
+            totalVolume: string;
+            /** @description 小计金额合计（筛选全量） */
+            subtotalAmount: string;
+            /** @description 其他金额合计（筛选全量） */
+            otherAmount: string;
+            /** @description 合计金额合计（筛选全量） */
+            totalAmount: string;
+        };
+        SaleOrderListItemDto: {
+            id: string;
+            /** @description 销售单编号 */
+            code: string;
+            saleDate: string;
+            customerName: string;
+            totalVolume: string;
+            subtotalAmount: string;
+            otherAmount: string;
+            totalAmount: string;
+            note: string;
+        };
+        SaleOrderListDto: {
+            /** @description 总数 */
+            total: number;
+            /** @description 筛选全量汇总（合计行） */
+            summary: components["schemas"]["SaleOrderSummaryDto"];
+            items: components["schemas"]["SaleOrderListItemDto"][];
+        };
+        SaleOrderItemResponseDto: {
+            /** @description 明细行 id */
+            id: string;
+            /** @description 行序 */
+            seq: number;
+            /** @description 销售明细编码 = 主单编号-行序 */
+            code: string;
+            /** @description 产品类型 */
+            productType: string;
+            /** @description 厚度（cm） */
+            thicknessCm?: string | null;
+            /** @description 宽度（cm） */
+            widthCm?: string | null;
+            /** @description 长度（cm） */
+            lengthCm?: string | null;
+            /** @description 根数 */
+            pieces?: number | null;
+            /** @description 方量（m³） */
+            volumeM3?: string | null;
+            /** @description 单价（元/m³） */
+            price?: string | null;
+            /** @description 行小计金额 */
+            lineAmount: string;
+            /** @description 行其他金额 */
+            otherAmount: string;
+            /** @description 行备注 */
+            note: string;
+        };
+        SaleOrderDto: {
+            id: string;
+            /** @description 销售单编号 */
+            code: string;
+            saleDate: string;
+            customerName: string;
+            totalVolume: string;
+            subtotalAmount: string;
+            otherAmount: string;
+            totalAmount: string;
+            note: string;
+            /** @description 明细行 */
+            items: components["schemas"]["SaleOrderItemResponseDto"][];
+        };
+        SaleOrderItemBodyDto: {
+            /**
+             * @description 产品类型：board 板材 / other 其他
+             * @enum {string}
+             */
+            productType: "board" | "other";
+            /**
+             * @description 厚度（cm，3 位小数），板材必填
+             * @example 2.000
+             */
+            thicknessCm?: string;
+            /**
+             * @description 宽度（cm，3 位小数），板材必填
+             * @example 80.000
+             */
+            widthCm?: string;
+            /**
+             * @description 长度（cm，3 位小数），板材必填
+             * @example 300.000
+             */
+            lengthCm?: string;
+            /**
+             * @description 根数（整数），板材必填
+             * @example 3
+             */
+            pieces?: number;
+            /**
+             * @description 单价（元/m³，2 位小数），板材必填
+             * @example 550.25
+             */
+            price?: string;
+            /**
+             * @description 行金额（其他类型手填，2 位小数）
+             * @example 50.00
+             */
+            lineAmount?: string;
+            /**
+             * @description 行其他金额（两类型通用兜底），默认 0
+             * @default 0
+             */
+            otherAmount: string;
+            /**
+             * @description 行备注
+             * @default
+             */
+            note: string;
+        };
+        SaleOrderBodyDto: {
+            /**
+             * @description 销售日期
+             * @example 2026-11-09
+             */
+            saleDate: string;
+            /**
+             * @description 客户名称（文本）
+             * @example 张三木材店
+             */
+            customerName: string;
+            /**
+             * @description 主表其他金额（运费等），默认 0
+             * @default 0
+             */
+            otherAmount: string;
+            /**
+             * @description 备注
+             * @default
+             */
+            note: string;
+            /** @description 明细行（至少一行） */
+            items: components["schemas"]["SaleOrderItemBodyDto"][];
+        };
+        SaleOrderItemUpdateBodyDto: {
+            /**
+             * @description 产品类型：board 板材 / other 其他
+             * @enum {string}
+             */
+            productType: "board" | "other";
+            /**
+             * @description 厚度（cm，3 位小数），板材必填
+             * @example 2.000
+             */
+            thicknessCm?: string;
+            /**
+             * @description 宽度（cm，3 位小数），板材必填
+             * @example 80.000
+             */
+            widthCm?: string;
+            /**
+             * @description 长度（cm，3 位小数），板材必填
+             * @example 300.000
+             */
+            lengthCm?: string;
+            /**
+             * @description 根数（整数），板材必填
+             * @example 3
+             */
+            pieces?: number;
+            /**
+             * @description 单价（元/m³，2 位小数），板材必填
+             * @example 550.25
+             */
+            price?: string;
+            /**
+             * @description 行金额（其他类型手填，2 位小数）
+             * @example 50.00
+             */
+            lineAmount?: string;
+            /**
+             * @description 行其他金额（两类型通用兜底），默认 0
+             * @default 0
+             */
+            otherAmount: string;
+            /**
+             * @description 行备注
+             * @default
+             */
+            note: string;
+            /** @description 已有明细行 id（编辑时携带，新建行为空） */
+            id?: string;
+        };
+        SaleOrderUpdateBodyDto: {
+            /**
+             * @description 销售日期
+             * @example 2026-11-09
+             */
+            saleDate: string;
+            /**
+             * @description 客户名称（文本）
+             * @example 张三木材店
+             */
+            customerName: string;
+            /**
+             * @description 主表其他金额（运费等），默认 0
+             * @default 0
+             */
+            otherAmount: string;
+            /**
+             * @description 备注
+             * @default
+             */
+            note: string;
+            /** @description 明细行（至少一行；已有行带 id） */
+            items: components["schemas"]["SaleOrderItemUpdateBodyDto"][];
+        };
+        SaleOrderBatchDeleteBodyDto: {
+            /** @description 要删除的销售单 id 列表（1~200） */
+            ids: string[];
+        };
+        SaleOrderBatchDeleteResponseDto: {
+            /** @description 实际删除（软删除）条数 */
+            deleted: number;
         };
     };
     responses: never;
@@ -205,6 +482,151 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    OrderController_list: {
+        parameters: {
+            query?: {
+                /** @description 排序方向，默认 desc */
+                sortOrder?: "asc" | "desc";
+                /** @description 排序字段，默认 saleDate */
+                sortBy?: "saleDate" | "totalVolume" | "totalAmount";
+                /** @description 每页条数，默认 20（最大 100） */
+                pageSize?: number;
+                /** @description 页码，默认 1 */
+                page?: number;
+                /** @description 销售日期止（YYYY-MM-DD） */
+                dateTo?: string;
+                /** @description 销售日期起（YYYY-MM-DD） */
+                dateFrom?: string;
+                /** @description 客户名称模糊 */
+                customerName?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SaleOrderListDto"];
+                };
+            };
+        };
+    };
+    OrderController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaleOrderBodyDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SaleOrderDto"];
+                };
+            };
+        };
+    };
+    OrderController_detail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SaleOrderDto"];
+                };
+            };
+        };
+    };
+    OrderController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaleOrderUpdateBodyDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SaleOrderDto"];
+                };
+            };
+        };
+    };
+    OrderController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    OrderController_batchDelete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaleOrderBatchDeleteBodyDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SaleOrderBatchDeleteResponseDto"];
+                };
             };
         };
     };

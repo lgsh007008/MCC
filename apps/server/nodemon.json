@@ -1,0 +1,5 @@
+{
+  "watch": ["src", "../../packages/shared/src", "../../packages/db/src"],
+  "ext": "ts,json",
+  "exec": "node --loader ./loader.mjs src/main.ts"
+}

@@ -100,3 +100,73 @@ model EventLog {
   @@index([actorId])
   @@map("event_logs")
 }
+
+// ── 订单领域（order，design/order.md §2）────────────────
+// sale_order / sale_order_item 均归本领域；客户为纯文本（customer 域建成后回迁外键）。
+// 收款与欠款不属本领域（finance 建成后另立需求，见 product/order.md 待补注记）。
+
+enum SaleOrderItemType {
+  // 产品类型两值（product/order.md R-订单-001）：板材按方量计费，其他非方量手填金额。
+  BOARD
+  OTHER
+
+  @@map("sale_order_item_type")
+}
+
+model SaleOrder {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @default("default") @map("tenant_id")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at")
+
+  // 主单编号：年月+当月流水（如 202611-0001），自动生成、只读、永不复用（design/order.md §4）
+  code     String   @map("code")
+  saleDate DateTime @map("sale_date") @db.Date
+  // 客户名称为纯文本；customer 域建成后回迁外键（design/order.md §2）
+  customerName String @map("customer_name")
+  // 合计/金额均为保存时按明细重算的落账快照，不手填（design/order.md §3）
+  totalVolume    Decimal @map("total_volume") @db.Decimal(18, 4)
+  subtotalAmount Decimal @map("subtotal_amount") @db.Decimal(18, 2)
+  otherAmount    Decimal @default(0) @map("other_amount") @db.Decimal(18, 2)
+  totalAmount    Decimal @map("total_amount") @db.Decimal(18, 2)
+  note           String  @default("") @map("note")
+
+  items SaleOrderItem[]
+
+  @@unique([tenantId, code])
+  @@index([saleDate])
+  @@map("sale_orders")
+}
+
+model SaleOrderItem {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @default("default") @map("tenant_id")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at")
+
+  orderId String    @map("order_id") @db.Uuid
+  order   SaleOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  // 行序：明细编码 = 主单编号-行序；行序在行创建时分配、软删后作废、不回改不重排（design/order.md §4）
+  seq Int @map("seq")
+
+  productType SaleOrderItemType @map("product_type")
+
+  // 板材行：长宽厚（cm，3 位小数）、根数、方量、单价；「其他」行以上字段为 null
+  thicknessCm Decimal? @map("thickness_cm") @db.Decimal(10, 3)
+  widthCm     Decimal? @map("width_cm") @db.Decimal(10, 3)
+  lengthCm    Decimal? @map("length_cm") @db.Decimal(10, 3)
+  pieces      Int?     @map("pieces")
+  volumeM3    Decimal? @map("volume_m3") @db.Decimal(18, 4)
+  price       Decimal? @map("price") @db.Decimal(18, 2)
+
+  // 行金额：板材自动 = 方量×单价；其他手填；其他金额两类型通用兜底（product/order.md R-订单-001）
+  lineAmount  Decimal @map("line_amount") @db.Decimal(18, 2)
+  otherAmount Decimal @default(0) @map("other_amount") @db.Decimal(18, 2)
+  note        String  @default("") @map("note")
+
+  @@unique([orderId, seq])
+  @@index([orderId])
+  @@map("sale_order_items")
+}
