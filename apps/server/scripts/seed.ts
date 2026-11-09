@@ -11,7 +11,7 @@ async function main(): Promise<void> {
   const prisma = new PrismaClient();
   try {
     for (const account of INITIAL_ACCOUNTS) {
-      const existing = await prisma.user.findUnique({ where: { username: account.username } });
+      const existing = await prisma.user.findFirst({ where: { username: account.username } });
       if (existing) {
         console.log(`账号 ${account.username} 已存在，跳过`);
         continue;

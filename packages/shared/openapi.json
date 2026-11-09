@@ -27,6 +27,7 @@
             }
           }
         },
+        "security": [],
         "summary": "登录：校验账号密码，签发访问令牌 + 刷新令牌",
         "tags": [
           "auth"
@@ -59,6 +60,7 @@
             }
           }
         },
+        "security": [],
         "summary": "凭 httpOnly Cookie（或请求体）中的刷新令牌换新访问令牌",
         "tags": [
           "auth"
@@ -74,6 +76,7 @@
             "description": ""
           }
         },
+        "security": [],
         "summary": "撤销刷新令牌，登出",
         "tags": [
           "auth"
@@ -120,6 +123,14 @@
   ],
   "servers": [],
   "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "type": "http",
+        "description": "登录/刷新接口返回的 accessToken"
+      }
+    },
     "schemas": {
       "LoginBodyDto": {
         "type": "object",
@@ -207,5 +218,10 @@
         ]
       }
     }
-  }
+  },
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ]
 }

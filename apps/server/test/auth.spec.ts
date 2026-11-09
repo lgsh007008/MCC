@@ -37,14 +37,14 @@ describe('账号与权限接口（契约/集成）', () => {
     if (rateKeys.length > 0) {
       await redis.del(...rateKeys);
     }
-    await prisma.user.create({
+    await prisma.client.user.create({
       data: { username, passwordHash: await hash(password), role: 'SALES' },
     });
   });
 
   afterAll(async () => {
-    await prisma.user.deleteMany({ where: { username: { startsWith: 'it-' } } });
-    await prisma.eventLog.deleteMany({ where: { actorUsername: username } });
+    await prisma.client.user.deleteMany({ where: { username: { startsWith: 'it-' } } });
+    await prisma.client.eventLog.deleteMany({ where: { actorUsername: username } });
     await app.close();
   });
 
@@ -164,7 +164,7 @@ describe('账号与权限接口（契约/集成）', () => {
     await login(agent, { username, password });
     await login(agent, { username, password: 'definitely-wrong' });
 
-    const logs = await prisma.eventLog.findMany({
+    const logs = await prisma.client.eventLog.findMany({
       where: { domain: 'auth', action: 'login' },
       orderBy: { createdAt: 'asc' },
     });
@@ -175,10 +175,10 @@ describe('账号与权限接口（契约/集成）', () => {
   });
 
   it('无 Cookie 端：刷新令牌经请求体传递同样换新访问令牌', async () => {
-    const user = await prisma.user.findUnique({ where: { username } });
+    const user = await prisma.client.user.findFirst({ where: { username } });
     expect(user).not.toBeNull();
     const rawToken = 'body-refresh-token-test';
-    await prisma.refreshToken.create({
+    await prisma.client.refreshToken.create({
       data: {
         tokenHash: createHash('sha256').update(rawToken).digest('hex'),
         userId: String(user?.id),

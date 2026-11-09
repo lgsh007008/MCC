@@ -12,7 +12,7 @@ let refreshPromise: Promise<boolean> | null = null;
 export async function refreshSession(): Promise<boolean> {
   refreshPromise ??= (async () => {
     try {
-      const { data, response } = await api.POST('/api/v1/auth/refresh', {});
+      const { data, response } = await api.POST('/api/v1/auth/refresh', { body: {} });
       if (response.ok && data) {
         authSession.set(data.accessToken);
         return true;

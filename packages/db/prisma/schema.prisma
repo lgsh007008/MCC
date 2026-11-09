@@ -11,11 +11,14 @@ datasource db {
 }
 
 // 主键算法已锁定（技术方案 §5.1）：不可推测的全局唯一 ID，取 uuid v4。
-// 新增模型一律以这四行为头（字段名、类型、映射均照此，禁止逐表另立写法）：
+// 新增模型一律以这五行为头（字段名、类型、映射均照此，禁止逐表另立写法）：
 //   id        String    @id @default(uuid()) @db.Uuid
+//   tenantId  String    @default("default") @map("tenant_id")
 //   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
 //   updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
 //   deletedAt DateTime? @map("deleted_at")
+// tenant_id 全表预留（ADR-005，2026-11-09 复活）：当前单租户恒为 default；
+// 租户条件由 server 数据访问层（common/prisma-tenant.extension.ts）统一附加，禁止业务层手写。
 
 // ── 账号与权限领域（auth，design/账号与权限.md §2）────────────────
 // user / refresh_token 均归本领域，细节以本文件为准。
@@ -30,28 +33,32 @@ enum UserRole {
 
 model User {
   id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @default("default") @map("tenant_id")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
   deletedAt DateTime? @map("deleted_at")
 
   // 账号：按使用人一人一号，无自助注册（MVP 由初始化直接提供，见 design/账号与权限.md）。
-  username     String   @unique @map("username")
+  // 唯一性按租户隔离（ADR-005）：不同租户可重名/重令牌，故用复合唯一而非全局唯一。
+  username     String   @map("username")
   passwordHash String   @map("password_hash")
   role         UserRole @default(SALES)
 
   refreshTokens RefreshToken[]
 
+  @@unique([tenantId, username])
   @@map("users")
 }
 
 model RefreshToken {
   id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @default("default") @map("tenant_id")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
   deletedAt DateTime? @map("deleted_at")
 
   // 服务端只存哈希（sha256），不存令牌原文（design/账号与权限.md §4）。
-  tokenHash String  @unique @map("token_hash")
+  tokenHash String  @map("token_hash")
   userId    String  @db.Uuid @map("user_id")
   user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   // 过期时间对应「记住登录」口径：勾选 30 天，不勾选会话级。
@@ -59,6 +66,7 @@ model RefreshToken {
   // 撤销即置位（登出 / 改密后旧会话撤销），记录保留供审计。
   revokedAt DateTime? @map("revoked_at")
 
+  @@unique([tenantId, tokenHash])
   @@index([userId])
   @@map("refresh_tokens")
 }
@@ -69,6 +77,7 @@ model RefreshToken {
 
 model EventLog {
   id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @default("default") @map("tenant_id")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
   deletedAt DateTime? @map("deleted_at")

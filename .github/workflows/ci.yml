@@ -1,6 +1,7 @@
-# CI 门禁（技术方案 §10：lint + 类型检查 + 单测 + 契约校验）
-# 当前覆盖：数据库迁移可应用 + 类型检查 + 单测/集成测试（server、shared、db）。
-# lint 与 eslint 边界规则（技术方案 §4.2）待 eslint 基建落地后补入本工作流。
+# CI 门禁（技术方案 §10：lint + 类型检查 + 构建 + 单测 + 契约校验 + E2E 冒烟）
+# 覆盖：数据库迁移与 Prisma Client 生成、OpenAPI 契约校验、全仓 lint（含 §4.2 模块边界规则）、
+# 类型检查（server / shared / db）、全仓构建（server 的 NodeNext 编译问题只能由构建暴露）、
+# 单测与集成测试（server / shared）、E2E 冒烟（web + server 由 Playwright 本机拉起）。
 
 name: CI
 
@@ -52,9 +53,11 @@ jobs:
       - name: 安装依赖
         run: pnpm install --frozen-lockfile
 
-      - name: 数据库迁移（packages/db）
+      - name: 数据库迁移 + Prisma Client 生成（packages/db）
         working-directory: packages/db
-        run: pnpm prisma migrate deploy
+        run: |
+          pnpm prisma migrate deploy
+          pnpm prisma generate
 
       - name: 契约校验（openapi.json 与实现同步，ADR-006）
         run: |
@@ -67,5 +70,14 @@ jobs:
       - name: 类型检查（server / shared / db）
         run: pnpm --filter @mcc/server --filter @mcc/shared --filter @mcc/db run typecheck
 
+      - name: 构建（全仓）
+        run: pnpm build
+
       - name: 单测与集成测试（server / shared）
         run: pnpm --filter @mcc/server --filter @mcc/shared run test
+
+      - name: E2E 冒烟（Playwright：web + server 本机拉起）
+        run: |
+          pnpm --filter @mcc/web exec playwright install --with-deps chromium
+          pnpm --filter @mcc/server run seed
+          pnpm --filter @mcc/web run test:e2e

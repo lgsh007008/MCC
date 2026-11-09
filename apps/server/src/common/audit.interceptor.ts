@@ -44,7 +44,7 @@ export class AuditInterceptor implements NestInterceptor {
     result: string,
   ): Promise<void> {
     try {
-      await this.prisma.eventLog.create({
+      await this.prisma.client.eventLog.create({
         data: {
           actorId: request.user?.userId ?? null,
           actorUsername: request.user?.username ?? null,

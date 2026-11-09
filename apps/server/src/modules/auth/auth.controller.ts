@@ -43,7 +43,7 @@ export class AuthController {
   @RateLimit(30, 60_000)
   @Post('login')
   @HttpCode(200)
-  @ApiOperation({ summary: '登录：校验账号密码，签发访问令牌 + 刷新令牌' })
+  @ApiOperation({ summary: '登录：校验账号密码，签发访问令牌 + 刷新令牌', security: [] })
   @ApiBody({ type: LoginBodyDto })
   @ApiOkResponse({ type: LoginResponseDto })
   async login(
@@ -67,7 +67,7 @@ export class AuthController {
   @RateLimit(30, 60_000)
   @Post('refresh')
   @HttpCode(200)
-  @ApiOperation({ summary: '凭 httpOnly Cookie（或请求体）中的刷新令牌换新访问令牌' })
+  @ApiOperation({ summary: '凭 httpOnly Cookie（或请求体）中的刷新令牌换新访问令牌', security: [] })
   @ApiBody({ type: RefreshRequestDto })
   @ApiOkResponse({ type: RefreshResponseDto })
   async refresh(
@@ -81,7 +81,7 @@ export class AuthController {
   @Public()
   @Post('logout')
   @HttpCode(204)
-  @ApiOperation({ summary: '撤销刷新令牌，登出' })
+  @ApiOperation({ summary: '撤销刷新令牌，登出', security: [] })
   async logout(
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,

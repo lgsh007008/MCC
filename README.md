@@ -51,7 +51,7 @@ pnpm dev
 2. 启动数据库（容器常驻，镜像已下载过会很快）：
 
 ```
-cd d:\MCC
+cd d:\0000MCC
 docker compose up -d
 ```
 

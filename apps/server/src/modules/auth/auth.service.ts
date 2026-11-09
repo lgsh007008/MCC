@@ -46,7 +46,7 @@ export class AuthService {
       });
     }
 
-    const user = await this.prisma.user.findFirst({
+    const user = await this.prisma.client.user.findFirst({
       where: { username: input.username, deletedAt: null },
     });
     const passwordOk = user ? await verifyPassword(user.passwordHash, input.password) : false;
@@ -64,7 +64,7 @@ export class AuthService {
     const rememberMe = input.rememberMe;
     const ttlDays = rememberMe ? REFRESH_REMEMBER_TTL_DAYS : REFRESH_SESSION_TTL_DAYS;
     const refreshToken = randomBytes(32).toString('base64url');
-    await this.prisma.refreshToken.create({
+    await this.prisma.client.refreshToken.create({
       data: {
         tokenHash: sha256(refreshToken),
         userId: user.id,
@@ -86,7 +86,7 @@ export class AuthService {
     if (!refreshToken) {
       throw problem(401, 'TOKEN_MISSING', '缺少刷新令牌');
     }
-    const record = await this.prisma.refreshToken.findUnique({
+    const record = await this.prisma.client.refreshToken.findFirst({
       where: { tokenHash: sha256(refreshToken) },
       include: { user: true },
     });
@@ -106,7 +106,7 @@ export class AuthService {
     if (!refreshToken) {
       return;
     }
-    await this.prisma.refreshToken.updateMany({
+    await this.prisma.client.refreshToken.updateMany({
       where: { tokenHash: sha256(refreshToken), revokedAt: null },
       data: { revokedAt: new Date() },
     });
@@ -114,7 +114,7 @@ export class AuthService {
 
   // 修改密码：校验旧密码 → 更新哈希 → 撤销该账号全部刷新会话（其他端需重新登录）。
   async changePassword(userId: string, input: ChangePasswordInput): Promise<void> {
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    const user = await this.prisma.client.user.findUnique({ where: { id: userId } });
     if (!user || user.deletedAt !== null) {
       throw problem(401, 'UNAUTHORIZED', '登录态无效');
     }
@@ -122,11 +122,11 @@ export class AuthService {
     if (!passwordOk) {
       throw problem(401, 'INVALID_CREDENTIALS', '旧密码不正确');
     }
-    await this.prisma.user.update({
+    await this.prisma.client.user.update({
       where: { id: userId },
       data: { passwordHash: await hashPassword(input.newPassword) },
     });
-    await this.prisma.refreshToken.updateMany({
+    await this.prisma.client.refreshToken.updateMany({
       where: { userId, revokedAt: null },
       data: { revokedAt: new Date() },
     });
