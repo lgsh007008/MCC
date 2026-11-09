@@ -73,8 +73,8 @@ jobs:
       - name: 构建（全仓）
         run: pnpm build
 
-      - name: 单测与集成测试（server / shared）
-        run: pnpm --filter @mcc/server --filter @mcc/shared run test
+      - name: 单测与集成测试（server / shared / web）
+        run: pnpm --filter @mcc/server --filter @mcc/shared --filter @mcc/web run test
 
       - name: E2E 冒烟（Playwright：web + server 本机拉起）
         run: |

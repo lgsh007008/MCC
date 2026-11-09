@@ -52,10 +52,12 @@ import { api, refreshSession } from '@/lib/api';
 import { authSession } from '@/lib/auth/session';
 import { findNavByPath, homeItem, navGroups } from '@/lib/nav';
 import { PageBreadcrumbProvider, usePageBreadcrumb } from './page-breadcrumb';
+import { TabBar, TabsProvider, useTabs } from './tabs';
 
 // 后台布局壳（design/平台布局.md §1）：经典三区——侧边栏 / 顶栏 / 主内容区。
 // 业务页面只实现主内容区（children），不各自拼壳；路由与守卫结构见同文档 §1.2。
-// 面包屑最后一层次（页面标识）由页面经 usePageCrumb 注入（design/平台布局.md §1.5）。
+// 顶栏两行：第一行多标签页 + 头像（design/平台布局.md §1.6），第二行折叠开关 + 面包屑；
+// 面包屑最后一层（页面标识）由页面经 usePageCrumb 注入（design/平台布局.md §1.5）。
 export function AdminShell({
   children,
   defaultSidebarOpen = true,
@@ -65,7 +67,9 @@ export function AdminShell({
 }): React.ReactElement {
   return (
     <PageBreadcrumbProvider>
-      <AdminShellInner defaultSidebarOpen={defaultSidebarOpen}>{children}</AdminShellInner>
+      <TabsProvider>
+        <AdminShellInner defaultSidebarOpen={defaultSidebarOpen}>{children}</AdminShellInner>
+      </TabsProvider>
     </PageBreadcrumbProvider>
   );
 }
@@ -78,6 +82,7 @@ function AdminShellInner({
   defaultSidebarOpen: boolean;
 }): React.ReactElement {
   const pathname = usePathname();
+  const { reset: resetTabs } = useTabs();
   const [pwdOpen, setPwdOpen] = useState(false);
   const [pwdError, setPwdError] = useState<string | null>(null);
   const [pwdSubmitting, setPwdSubmitting] = useState(false);
@@ -105,6 +110,8 @@ function AdminShellInner({
   async function handleLogout(): Promise<void> {
     await api.POST('/api/v1/auth/logout', {});
     authSession.clear();
+    // 标签随会话清空（product/平台布局.md 多标签页）
+    resetTabs();
     window.location.assign('/login');
   }
 
@@ -122,6 +129,7 @@ function AdminShellInner({
       if (response.ok) {
         // 改密成功后该账号全部会话已被撤销，需重新登录
         authSession.clear();
+        resetTabs();
         window.location.assign('/login');
         return;
       }
@@ -180,7 +188,7 @@ function AdminShellInner({
                     <button
                       type="button"
                       aria-expanded={!collapsed}
-                      className="flex h-8 w-full items-center gap-2 rounded-md px-2 text-xs font-medium text-sidebar-foreground/70 transition-colors hover:text-sidebar-foreground"
+                      className="flex h-8 w-full items-center gap-2 rounded-md px-2 text-xs font-medium text-sidebar-foreground/70 transition-colors hover:text-sidebar-foreground group-data-[collapsible=icon]:pointer-events-none"
                       onClick={() => toggleGroup(group.label)}
                     >
                       <group.icon className="size-4 shrink-0" />
@@ -244,8 +252,29 @@ function AdminShellInner({
       </Sidebar>
 
       <SidebarInset>
-        <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-border px-4">
-          <div className="flex min-w-0 items-center gap-2">
+        <header className="shrink-0 border-b border-border">
+          {/* 第一行：多标签页 + 账号头像（design/平台布局.md §1.6） */}
+          <div className="flex h-12 items-center justify-between gap-3 px-4">
+            <TabBar />
+            <DropdownMenu>
+              <DropdownMenuTrigger>
+                <Avatar className="size-8">
+                  <AvatarFallback>销</AvatarFallback>
+                </Avatar>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel>账号</DropdownMenuLabel>
+                </DropdownMenuGroup>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setPwdOpen(true)}>修改密码</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => void handleLogout()}>退出登录</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
+          {/* 第二行：折叠开关 + 面包屑 */}
+          <div className="flex h-10 items-center gap-2 border-t border-border/60 px-3">
             <SidebarTrigger />
             <Breadcrumb>
               <BreadcrumbList>
@@ -300,22 +329,6 @@ function AdminShellInner({
               </BreadcrumbList>
             </Breadcrumb>
           </div>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger>
-              <Avatar className="size-8">
-                <AvatarFallback>销</AvatarFallback>
-              </Avatar>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuGroup>
-                <DropdownMenuLabel>账号</DropdownMenuLabel>
-              </DropdownMenuGroup>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setPwdOpen(true)}>修改密码</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => void handleLogout()}>退出登录</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
         </header>
 
         <main className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-6">{children}</main>

@@ -10,6 +10,9 @@ export default defineConfig({
   testDir: './e2e',
   timeout: 30_000,
   retries: 0,
+  // 串行执行：本地 web 用 next dev，按需编译；并行用例会互相拖慢首屏 hydration，
+  // 出现点击先于事件绑定导致的不稳定（用例仅数条，串行成本可忽略）
+  workers: 1,
   use: {
     baseURL: 'http://localhost:3000',
     trace: 'retain-on-failure',
