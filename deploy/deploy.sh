@@ -6,6 +6,12 @@ cd /opt/mcc
 TAG="${1:?用法: deploy.sh <tag>}"
 compose() { docker compose --env-file .env.prod -f docker-compose.prod.yml "$@"; }
 
+# 分阶段计时（排查发布耗时）：写入 deploy/last-deploy.log，便于事后定位瓶颈
+T0=$(date +%s)
+mark() { printf '[deploy %s] %s 累计=%ss\n' "$(date +%H:%M:%S)" "$1" "$(( $(date +%s) - T0 ))" | tee -a deploy/last-deploy.log; }
+: > deploy/last-deploy.log
+mark "开始（tag=$TAG）"
+
 # 记录当前版本，保证后续手动 compose 命令与本次发布一致
 if grep -q '^IMAGE_TAG=' .env.prod; then
   sed -i "s|^IMAGE_TAG=.*|IMAGE_TAG=${TAG}|" .env.prod
@@ -27,6 +33,7 @@ for _ in $(seq 1 30); do
 done
 if pg_ready; then
   ./deploy/backup.sh
+  mark "备份完成"
 else
   # 发布前备份是硬步骤（技术方案 §9.5）：数据库不就绪则中止，不带病发布
   echo "postgres 未就绪，中止发布" >&2
@@ -34,9 +41,12 @@ else
 fi
 
 compose pull
+mark "镜像拉取完成"
 # 迁移只向前（技术方案 §9.4）；失败即中止，不进入 rebuild
 compose run --rm --no-deps server pnpm --filter @mcc/db exec prisma migrate deploy
+mark "迁移完成"
 compose up -d --remove-orphans
+mark "容器重建完成"
 
 # 清掉 7 天前的未使用镜像，避免 40G 系统盘被历史版本占满
 docker image prune -af --filter "until=168h" >/dev/null

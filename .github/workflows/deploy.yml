@@ -26,15 +26,8 @@ jobs:
         with:
           ref: ${{ github.event.inputs.tag || github.ref }}
 
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 12.11.2
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: pnpm
-
+      # 构建完全在 Docker 内完成（镜像内自行安装依赖），CI 侧不需要 Node/pnpm，
+      # 省掉 pnpm 安装与缓存恢复的几十秒
       - name: 登录 ACR
         uses: docker/login-action@v3
         with:
