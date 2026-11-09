@@ -29,7 +29,7 @@ import { cn } from '@/lib/utils';
 // 新建与编辑共用。Label 与控件左右并排；明细按钮组在标题下方左侧；明细限制行数与高度、
 // 超出在明细区内滚动（页面级禁止横向滚动）。实时计算与落账同源（design/order.md §7）。
 
-const MAX_ROWS = 50;
+const MAX_ROWS = 200;
 
 interface FormRow {
   id?: string;
@@ -374,8 +374,7 @@ export function SaleOrderForm({
                         disabled={disableSpec}
                         value={row.thicknessCm}
                         onChange={(e) => patchRow(index, { thicknessCm: e.target.value })}
-                        placeholder="2.000"
-                        className={cn('h-8 w-20', disableSpec && 'opacity-50')}
+                        className={cn('h-8 w-20 text-right tabular-nums', disableSpec && 'opacity-50')}
                       />
                     </TableCell>
                     <TableCell>
@@ -383,8 +382,7 @@ export function SaleOrderForm({
                         disabled={disableSpec}
                         value={row.widthCm}
                         onChange={(e) => patchRow(index, { widthCm: e.target.value })}
-                        placeholder="80.000"
-                        className={cn('h-8 w-20', disableSpec && 'opacity-50')}
+                        className={cn('h-8 w-20 text-right tabular-nums', disableSpec && 'opacity-50')}
                       />
                     </TableCell>
                     <TableCell>
@@ -392,8 +390,7 @@ export function SaleOrderForm({
                         disabled={disableSpec}
                         value={row.lengthCm}
                         onChange={(e) => patchRow(index, { lengthCm: e.target.value })}
-                        placeholder="300.000"
-                        className={cn('h-8 w-20', disableSpec && 'opacity-50')}
+                        className={cn('h-8 w-20 text-right tabular-nums', disableSpec && 'opacity-50')}
                       />
                     </TableCell>
                     <TableCell>
@@ -402,8 +399,7 @@ export function SaleOrderForm({
                         inputMode="numeric"
                         value={row.pieces}
                         onChange={(e) => patchRow(index, { pieces: e.target.value })}
-                        placeholder="根数"
-                        className={cn('h-8 w-20', disableSpec && 'opacity-50')}
+                        className={cn('h-8 w-20 text-right tabular-nums', disableSpec && 'opacity-50')}
                       />
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
@@ -414,8 +410,7 @@ export function SaleOrderForm({
                         disabled={disableSpec}
                         value={row.price}
                         onChange={(e) => patchRow(index, { price: e.target.value })}
-                        placeholder="550.25"
-                        className={cn('h-8 w-20', disableSpec && 'opacity-50')}
+                        className={cn('h-8 w-20 text-right tabular-nums', disableSpec && 'opacity-50')}
                       />
                     </TableCell>
                     <TableCell className="text-right">
@@ -423,8 +418,7 @@ export function SaleOrderForm({
                         <Input
                           value={row.lineAmount}
                           onChange={(e) => patchRow(index, { lineAmount: e.target.value })}
-                          placeholder="行金额"
-                          className="h-8 w-20"
+                          className="h-8 w-20 text-right tabular-nums"
                         />
                       ) : (
                         <span className="inline-block w-20 tabular-nums">{line ?? '—'}</span>
@@ -434,15 +428,13 @@ export function SaleOrderForm({
                       <Input
                         value={row.otherAmount}
                         onChange={(e) => patchRow(index, { otherAmount: e.target.value })}
-                        placeholder="0"
-                        className="h-8 w-20"
+                        className="h-8 w-20 text-right tabular-nums"
                       />
                     </TableCell>
                     <TableCell>
                       <Input
                         value={row.note}
                         onChange={(e) => patchRow(index, { note: e.target.value })}
-                        placeholder="备注"
                         className="h-8 w-32"
                       />
                     </TableCell>
