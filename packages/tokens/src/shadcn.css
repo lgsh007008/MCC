@@ -80,6 +80,14 @@
     --sidebar-ring: oklch(0.708 0 0);
 }
 
+/* 移动 Web 适老化基线（ADR-011）：加深次要文字、提高控件与边框对比度。
+   由 MobileShell 根节点 data-mode="mobile" 挂载作用域，PC 后台不受影响。 */
+[data-mode='mobile'] {
+    --muted-foreground: oklch(0.44 0 0);
+    --border: oklch(0.82 0 0);
+    --input: oklch(0.66 0 0);
+}
+
 .dark {
     --background: oklch(0.145 0 0);
     --foreground: oklch(0.985 0 0);

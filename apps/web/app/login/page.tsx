@@ -35,7 +35,9 @@ export default function LoginPage(): React.ReactElement {
       const { data, response } = await api.POST('/api/v1/auth/login', { body: parsed.data });
       if (response.ok && data) {
         authSession.set(data.accessToken);
-        window.location.assign('/admin');
+        // 两端共用登录页：窄屏进移动 Web 入口，宽屏进 PC 后台（product/平台布局.md 使用端）
+        const narrow = window.matchMedia('(max-width: 767px)').matches;
+        window.location.assign(narrow ? '/m' : '/admin');
         return;
       }
       const body = (await response.json().catch(() => null)) as { message?: string } | null;

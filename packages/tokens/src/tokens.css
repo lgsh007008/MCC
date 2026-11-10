@@ -1,4 +1,4 @@
-/* 设计令牌的原始变量定义（标准模式），关怀模式在下方覆盖。
+/* 设计令牌的原始变量定义（PC 后台为标准模式，移动 Web 为适老化基线）。
    取值均为脚手架阶段的占位值，待设计确定后替换。 */
 :root {
   --mcc-color-bg: #ffffff;
@@ -11,7 +11,8 @@
   --mcc-touch-target: 44px;
 }
 
-[data-mode='care'] {
+/* 移动 Web 适老化基线（ADR-011）：按端生效，不是用户可切换的模式 */
+[data-mode='mobile'] {
   --mcc-font-size-base: 18px;
   --mcc-touch-target: 52px;
   --mcc-color-fg: #000000;

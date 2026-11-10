@@ -38,6 +38,7 @@ export function DatePicker({
   placeholder = '选择日期',
   disabled,
   className,
+  size = 'default',
 }: {
   id?: string;
   value: string;
@@ -45,6 +46,8 @@ export function DatePicker({
   placeholder?: string;
   disabled?: boolean;
   className?: string;
+  /** touch：移动 Web 适老化基线（ADR-011），触发区与日历单元放大到 44px 以上 */
+  size?: 'default' | 'touch';
 }): React.ReactElement {
   const selected = parseValue(value);
   const [open, setOpen] = React.useState(false);
@@ -85,6 +88,7 @@ export function DatePicker({
         className={cn(
           'flex h-8 items-center justify-between gap-2 rounded-md border border-input bg-background px-2 text-sm outline-none',
           'focus-visible:border-ring disabled:cursor-not-allowed disabled:opacity-50',
+          size === 'touch' && 'h-12 px-3 text-base',
           className,
         )}
       >
@@ -100,7 +104,10 @@ export function DatePicker({
               <button
                 type="button"
                 aria-label="上个月"
-                className="inline-flex size-7 items-center justify-center rounded-md hover:bg-muted"
+                className={cn(
+                  'inline-flex size-7 items-center justify-center rounded-md hover:bg-muted',
+                  size === 'touch' && 'size-11',
+                )}
                 onClick={() => shiftMonth(-1)}
               >
                 <ChevronLeftIcon className="size-4" />
@@ -111,7 +118,10 @@ export function DatePicker({
               <button
                 type="button"
                 aria-label="下个月"
-                className="inline-flex size-7 items-center justify-center rounded-md hover:bg-muted"
+                className={cn(
+                  'inline-flex size-7 items-center justify-center rounded-md hover:bg-muted',
+                  size === 'touch' && 'size-11',
+                )}
                 onClick={() => shiftMonth(1)}
               >
                 <ChevronRightIcon className="size-4" />
@@ -142,6 +152,7 @@ export function DatePicker({
                     aria-pressed={isSelected}
                     className={cn(
                       'inline-flex h-8 w-8 items-center justify-center rounded-md text-sm tabular-nums hover:bg-muted',
+                      size === 'touch' && 'h-11 w-11 text-base',
                       isSelected && 'bg-primary text-primary-foreground hover:bg-primary',
                       !isSelected && isToday && 'border border-border',
                     )}
@@ -159,7 +170,10 @@ export function DatePicker({
             <div className="mt-2 flex items-center justify-between border-t border-border pt-2 text-xs">
               <button
                 type="button"
-                className="rounded-sm px-1 py-0.5 text-muted-foreground hover:text-foreground"
+                className={cn(
+                  'rounded-sm px-1 py-0.5 text-muted-foreground hover:text-foreground',
+                  size === 'touch' && 'px-3 py-2 text-sm',
+                )}
                 onClick={() => {
                   const now = todayParts();
                   onChange(formatValue(now.y, now.m, now.d));
@@ -170,7 +184,10 @@ export function DatePicker({
               </button>
               <button
                 type="button"
-                className="rounded-sm px-1 py-0.5 text-muted-foreground hover:text-foreground"
+                className={cn(
+                  'rounded-sm px-1 py-0.5 text-muted-foreground hover:text-foreground',
+                  size === 'touch' && 'px-3 py-2 text-sm',
+                )}
                 onClick={() => {
                   onChange('');
                   setOpen(false);
