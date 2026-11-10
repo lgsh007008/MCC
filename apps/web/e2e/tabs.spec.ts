@@ -11,6 +11,22 @@ async function login(page: import('@playwright/test').Page): Promise<void> {
   await expect(page).toHaveURL(/\/admin$/);
 }
 
+// 隐藏 Next 开发工具的悬浮层，避免它遮挡侧栏底部控件（仅 dev 存在）
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    const inject = (): void => {
+      const style = document.createElement('style');
+      style.textContent = 'nextjs-portal{display:none!important}';
+      document.head.appendChild(style);
+    };
+    if (document.head) {
+      inject();
+    } else {
+      document.addEventListener('DOMContentLoaded', inject);
+    }
+  });
+});
+
 test('多标签页：生成 / 切换 / 关闭 / 刷新保留 / 登出清空', async ({ page }) => {
   await login(page);
 

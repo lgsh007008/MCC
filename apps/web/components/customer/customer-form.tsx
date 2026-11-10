@@ -108,7 +108,7 @@ export function CustomerForm({
 
   return (
     <form className="space-y-6" onSubmit={handleSubmit}>
-      <section className="rounded-xl border border-border bg-card p-4">
+      <section className="rounded-lg border border-border bg-card p-4">
         <h2 className="text-sm font-semibold">客户</h2>
         <div className="mt-3 grid gap-3 xl:grid-cols-2">
           <Field label="客户编号" htmlFor="customerCode">

@@ -18,3 +18,39 @@
     @apply font-sans;
     }
 }
+
+/*
+ * 内部滚动容器：细滚动条，默认很淡、悬停或聚焦时加深（product/平台布局.md 视觉基线）。
+ * 只作用于显式加 .scroll-area 的容器，不影响标签栏（其滚动条按规则隐藏）。
+ */
+@supports selector(::-webkit-scrollbar) {
+  .scroll-area::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  .scroll-area::-webkit-scrollbar-track,
+  .scroll-area::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+  .scroll-area::-webkit-scrollbar-thumb {
+    background-color: color-mix(in oklab, var(--foreground) 15%, transparent);
+    border: 3px solid transparent;
+    border-radius: 999px;
+    background-clip: padding-box;
+  }
+  .scroll-area:hover::-webkit-scrollbar-thumb,
+  .scroll-area:focus-within::-webkit-scrollbar-thumb {
+    background-color: color-mix(in oklab, var(--foreground) 28%, transparent);
+  }
+  .scroll-area::-webkit-scrollbar-thumb:hover {
+    background-color: color-mix(in oklab, var(--foreground) 38%, transparent);
+  }
+}
+
+/* Firefox：只支持细滚动条与双色，无悬停态，保持默认档 */
+@supports not selector(::-webkit-scrollbar) {
+  .scroll-area {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in oklab, var(--foreground) 20%, transparent) transparent;
+  }
+}

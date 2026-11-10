@@ -320,7 +320,7 @@ export function SaleOrderForm({
 
   return (
     <form className="space-y-6" onSubmit={handleSubmit}>
-      <section className="rounded-xl border border-border bg-card p-4">
+      <section className="rounded-lg border border-border bg-card p-4">
         <h2 className="text-sm font-semibold">销售单</h2>
         <div className="mt-3 grid gap-3 xl:grid-cols-2">
           <Field label="销售日期" htmlFor="saleDate">
@@ -369,7 +369,7 @@ export function SaleOrderForm({
         </div>
       </section>
 
-      <section className="rounded-xl border border-border bg-card p-4">
+      <section className="rounded-lg border border-border bg-card p-4">
         <h2 className="text-sm font-semibold">明细</h2>
 
         <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -398,7 +398,7 @@ export function SaleOrderForm({
 
         <div className="mt-3 rounded-md border border-border/60">
           <Table containerRef={detailScrollRef} containerClassName="max-h-[420px] overflow-y-auto">
-            <TableHeader className="sticky top-0 z-10 [&_th]:bg-card">
+            <TableHeader className="sticky top-0 z-10 [&_th]:bg-muted">
               <TableRow>
                 <TableHead>类型</TableHead>
                 <TableHead>厚度(cm)</TableHead>

@@ -1,0 +1,545 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>后台视觉对照 · 现状 vs 纯白强结构</title>
+<style>
+  :root {
+    --font-sans: "Inter", "SF Pro Text", -apple-system, BlinkMacSystemFont,
+      "Segoe UI", "PingFang SC", "HarmonyOS Sans SC", "MiSans",
+      "Microsoft YaHei", sans-serif;
+    --page-bg: #f2f2f2;
+    --page-ink: #0a0a0a;
+    --page-soft: #6b6b6b;
+    --page-line: #dedede;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--page-bg);
+    color: var(--page-ink);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .toolbar {
+    position: sticky; top: 0; z-index: 50;
+    background: rgba(242, 242, 242, .92);
+    backdrop-filter: saturate(180%) blur(8px);
+    border-bottom: 1px solid var(--page-line);
+  }
+  .toolbar-inner {
+    max-width: 1440px; margin: 0 auto;
+    padding: 14px 28px;
+    display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+  }
+  .tb-title { font-size: 13px; font-weight: 600; letter-spacing: -0.01em; }
+  .tb-sub { font-size: 12px; color: var(--page-soft); }
+  .seg {
+    display: inline-flex; padding: 2px; gap: 2px;
+    background: #e8e8e8; border-radius: 7px;
+  }
+  .seg button {
+    appearance: none; border: 0; background: transparent;
+    font: inherit; font-size: 12px; color: #555;
+    padding: 5px 12px; border-radius: 5px; cursor: pointer;
+  }
+  .seg button[aria-pressed="true"] {
+    background: #fff; color: #0a0a0a; font-weight: 500;
+    box-shadow: 0 1px 1px rgba(0,0,0,.04), 0 1px 2px rgba(0,0,0,.06);
+  }
+  .switch {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-size: 12px; color: #555; cursor: pointer; user-select: none;
+  }
+  .switch input { accent-color: #0a0a0a; width: 13px; height: 13px; }
+  .spacer { margin-left: auto; }
+
+  .stage {
+    max-width: 1440px; margin: 0 auto;
+    padding: 28px;
+  }
+  .frame {
+    border: 1px solid var(--page-line);
+    border-radius: 14px;
+    overflow: hidden;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(0,0,0,.03);
+  }
+
+  /* ===================== 应用外壳 ===================== */
+  .app {
+    display: flex;
+    min-height: 720px;
+    background: var(--canvas);
+    color: var(--ink);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  /* 侧栏 */
+  .app aside {
+    width: var(--side-w); flex: none;
+    background: var(--side);
+    border-right: 1px solid var(--line);
+    display: flex; flex-direction: column;
+  }
+  .brand {
+    height: 56px; flex: none;
+    display: flex; align-items: center; gap: 8px;
+    padding: 0 16px;
+    font-size: 13px; font-weight: 600; letter-spacing: -0.01em;
+    border-bottom: 1px solid var(--line);
+  }
+  .brand .mark {
+    width: 20px; height: 20px; border-radius: 5px;
+    background: #0a0a0a; color: #fff;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 700;
+  }
+  .nav { padding: 12px 8px; flex: 1; }
+  .nav-group {
+    margin: 14px 8px 6px;
+    font-size: 11px; letter-spacing: .02em;
+    color: var(--nav-group); font-weight: 500;
+  }
+  .nav-group:first-child { margin-top: 0; }
+  .nav-item {
+    height: 34px; display: flex; align-items: center;
+    padding: 0 10px; border-radius: var(--radius-sm);
+    color: var(--nav-ink); font-size: 13px;
+    cursor: default;
+  }
+  .nav-item.active {
+    background: var(--nav-active-bg);
+    color: var(--ink); font-weight: 500;
+  }
+  .side-foot {
+    border-top: 1px solid var(--line);
+    height: 44px; display: flex; align-items: center;
+    padding: 0 16px; font-size: 12px; color: var(--muted);
+  }
+
+  /* 主区 */
+  .app main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .tabbar {
+    height: 38px; flex: none;
+    display: flex; align-items: stretch; gap: 2px;
+    padding: 0 10px;
+    background: var(--chrome);
+    border-bottom: 1px solid var(--line);
+    overflow: hidden;
+  }
+  .tab {
+    display: inline-flex; align-items: center;
+    padding: 0 10px; font-size: 12px;
+    color: var(--muted); white-space: nowrap;
+  }
+  .tab.active {
+    color: var(--ink); font-weight: 500;
+    box-shadow: inset 0 -2px 0 #0a0a0a;
+  }
+  .crumb {
+    height: 44px; flex: none;
+    display: flex; align-items: center; gap: 8px;
+    padding: 0 var(--pad);
+    border-bottom: 1px solid var(--line);
+    font-size: 12px; color: var(--muted);
+    overflow: hidden;
+  }
+  .crumb .sep { color: var(--crumb-sep); }
+  .crumb .now { color: var(--ink); }
+  .avatar {
+    margin-left: auto; flex: none;
+    width: 24px; height: 24px; border-radius: 999px;
+    background: var(--avatar-bg); color: var(--ink);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 600;
+  }
+
+  .content {
+    flex: 1; min-height: 0;
+    display: flex; flex-direction: column;
+    gap: var(--gap);
+    padding: var(--pad);
+  }
+
+  /* 筛选区：内联，不做卡片 */
+  .filters {
+    display: flex; align-items: center; gap: 16px;
+    flex-wrap: nowrap; overflow: hidden;
+  }
+  .field { display: inline-flex; align-items: center; gap: 8px; flex: none; }
+  .field > label { font-size: var(--label-fs); color: var(--muted); }
+  .input {
+    height: 32px; display: inline-flex; align-items: center;
+    padding: 0 10px; min-width: 120px;
+    border: 1px solid var(--input-line);
+    border-radius: var(--radius-sm);
+    background: #fff; color: var(--placeholder);
+    font-size: 13px;
+  }
+  .input .chev { margin-left: 10px; color: var(--muted); font-size: 9px; }
+  .btn {
+    height: 32px; padding: 0 12px;
+    border-radius: var(--radius-sm);
+    font-size: 13px; font-weight: 500;
+    border: 1px solid transparent;
+    display: inline-flex; align-items: center; justify-content: center;
+    cursor: default; white-space: nowrap;
+    font-family: inherit;
+  }
+  .btn.primary { background: var(--primary); color: var(--primary-ink); }
+  .btn.secondary { background: #fff; color: var(--ink); border-color: var(--input-line); }
+
+  .toolbar-row {
+    display: flex; align-items: center; gap: 12px;
+    flex: none;
+  }
+  .hint { font-size: 12px; color: var(--muted); }
+
+  /* 表格卡片：唯一容器 */
+  .card {
+    flex: 1; min-height: 0;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+  }
+  table { width: 100%; border-collapse: collapse; }
+  thead th {
+    height: 40px;
+    padding: 0 14px;
+    text-align: left; white-space: nowrap;
+    font-size: 12px; font-weight: 500;
+    color: var(--muted);
+    background: var(--thead-bg);
+    border-bottom: 1px solid var(--line);
+  }
+  tbody td {
+    height: var(--row-h);
+    padding: 0 14px;
+    border-bottom: 1px solid var(--row-line);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    font-size: 13px;
+  }
+  tbody tr:last-child td { border-bottom: 0; }
+  tbody tr:hover td { background: var(--row-hover); }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .code { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .dot {
+    display: inline-block; width: 6px; height: 6px; border-radius: 999px;
+    margin-right: 6px; vertical-align: 1px; background: #12b76a;
+  }
+  .dot.off { background: #b0b0b0; }
+  .ops { display: inline-flex; gap: 12px; }
+  .op {
+    font-size: 12px; color: var(--muted);
+    cursor: default;
+  }
+  .op.danger { color: var(--danger); }
+
+  .pager {
+    flex: none; display: flex; align-items: center; gap: 16px;
+    font-size: 12px; color: var(--muted);
+  }
+  .pager .right { margin-left: auto; }
+
+  /* ===================== 主题：现状 ===================== */
+  .t-current {
+    --canvas: #ffffff;
+    --side: #fbfbfb;
+    --chrome: #ffffff;
+    --line: #e5e5e5;
+    --row-line: #efefef;
+    --thead-bg: #ffffff;
+    --row-hover: #fafafa;
+    --input-line: #e5e5e5;
+    --ink: #171717;
+    --muted: #737373;
+    --placeholder: #9a9a9a;
+    --nav-ink: #525252;
+    --nav-group: #8a8a8a;
+    --nav-active-bg: #f4f4f5;
+    --avatar-bg: #f4f4f5;
+    --crumb-sep: #c9c9c9;
+    --primary: #262626;
+    --primary-ink: #fafafa;
+    --danger: #dc2626;
+    --side-w: 220px;
+    --pad: 20px;
+    --gap: 12px;
+    --row-h: 40px;
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --label-fs: 13px;
+  }
+
+  /* ===================== 主题：纯白 + 强结构 ===================== */
+  .t-premium {
+    --canvas: #ffffff;
+    --side: #ffffff;
+    --chrome: #ffffff;
+    --line: #e8e8e8;
+    --row-line: #f2f2f2;
+    --thead-bg: #ffffff;
+    --row-hover: #fafafa;
+    --input-line: #e0e0e0;
+    --ink: #0a0a0a;
+    --muted: #666666;
+    --placeholder: #9e9e9e;
+    --nav-ink: #4a4a4a;
+    --nav-group: #969696;
+    --nav-active-bg: #f5f5f5;
+    --avatar-bg: #f2f2f2;
+    --crumb-sep: #c4c4c4;
+    --primary: #0a0a0a;
+    --primary-ink: #ffffff;
+    --danger: #d92d20;
+    --side-w: 224px;
+    --pad: 28px;
+    --gap: 18px;
+    --row-h: 44px;
+    --radius-sm: 6px;
+    --radius-md: 8px;
+    --label-fs: 12px;
+  }
+  /* 可选：浅灰骨架（侧栏 / 表头） */
+  .tint .t-premium,
+  .t-premium.tint {
+    --side: #fafafa;
+    --thead-bg: #fafafa;
+  }
+
+  /* ===================== 说明区 ===================== */
+  .notes {
+    max-width: 1440px; margin: 0 auto; padding: 0 28px 48px;
+    display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px;
+  }
+  @media (max-width: 980px) {
+    .notes { grid-template-columns: minmax(0, 1fr); }
+  }
+  .note {
+    background: #fff; border: 1px solid var(--page-line);
+    border-radius: 10px; padding: 16px 18px;
+  }
+  .note h3 { margin: 0 0 8px; font-size: 13px; font-weight: 600; }
+  .note p, .note li { font-size: 12px; color: var(--page-soft); line-height: 1.6; }
+  .note ul { margin: 0; padding-left: 16px; }
+  .note li { margin: 3px 0; }
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <div class="toolbar-inner">
+    <div>
+      <div class="tb-title">后台视觉对照</div>
+      <div class="tb-sub">同一套布局与数据，只切换视觉规则</div>
+    </div>
+    <div class="seg" role="group" aria-label="视觉方案">
+      <button type="button" data-theme-btn="current" aria-pressed="false">现状</button>
+      <button type="button" data-theme-btn="premium" aria-pressed="true">纯白 + 强结构</button>
+    </div>
+    <label class="switch">
+      <input type="checkbox" id="tintToggle" />
+      浅灰骨架（侧栏 / 表头）
+    </label>
+    <span class="spacer"></span>
+    <span class="tb-sub">按 1440px 真实尺寸渲染</span>
+  </div>
+</div>
+
+<div class="stage">
+  <div class="frame">
+    <div class="app t-premium" id="app">
+      <aside>
+        <div class="brand"><span class="mark">梅</span>梅好木业</div>
+        <nav class="nav">
+          <div class="nav-item">首页</div>
+          <div class="nav-group">订单</div>
+          <div class="nav-item">销售单</div>
+          <div class="nav-group">客户</div>
+          <div class="nav-item active">客户档案</div>
+        </nav>
+        <div class="side-foot">收起侧栏</div>
+      </aside>
+
+      <main>
+        <div class="tabbar">
+          <span class="tab">首页</span>
+          <span class="tab">销售单</span>
+          <span class="tab active">客户档案</span>
+        </div>
+
+        <div class="crumb">
+          <span>首页</span><span class="sep">/</span>
+          <span>客户</span><span class="sep">/</span>
+          <span class="now">客户档案</span>
+          <span class="avatar">李</span>
+        </div>
+
+        <div class="content">
+          <div class="filters">
+            <span class="field">
+              <label>客户名称</label>
+              <span class="input">输入名称</span>
+            </span>
+            <span class="field">
+              <label>状态</label>
+              <span class="input">全部 <span class="chev">▼</span></span>
+            </span>
+            <button class="btn primary">查询</button>
+            <button class="btn secondary">重置</button>
+          </div>
+
+          <div class="toolbar-row">
+            <button class="btn primary">新建客户</button>
+            <span class="hint">共 128 位客户</span>
+          </div>
+
+          <div class="card">
+            <table>
+              <thead>
+                <tr>
+                  <th style="width:88px">编号</th>
+                  <th style="width:200px">客户名称</th>
+                  <th style="width:96px">状态</th>
+                  <th style="width:150px" class="num">累计方量 (m³)</th>
+                  <th style="width:120px">创建日期</th>
+                  <th>备注</th>
+                  <th style="width:110px">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="code">C00001</td>
+                  <td>韩建国</td>
+                  <td><span class="dot"></span>启用</td>
+                  <td class="num">1,519.0000</td>
+                  <td class="code">2026-10-21</td>
+                  <td style="color:var(--muted)">—</td>
+                  <td><span class="ops"><span class="op">停用</span><span class="op danger">删除</span></span></td>
+                </tr>
+                <tr>
+                  <td class="code">C00002</td>
+                  <td>李记木作</td>
+                  <td><span class="dot"></span>启用</td>
+                  <td class="num">862.4000</td>
+                  <td class="code">2026-10-28</td>
+                  <td style="color:var(--muted)">长期合作</td>
+                  <td><span class="ops"><span class="op">停用</span><span class="op danger">删除</span></span></td>
+                </tr>
+                <tr>
+                  <td class="code">C00003</td>
+                  <td>王师傅</td>
+                  <td><span class="dot off"></span>停用</td>
+                  <td class="num">314.7500</td>
+                  <td class="code">2026-11-02</td>
+                  <td style="color:var(--muted)">已停止合作</td>
+                  <td><span class="ops"><span class="op">启用</span><span class="op danger">删除</span></span></td>
+                </tr>
+                <tr>
+                  <td class="code">C00004</td>
+                  <td>陈氏板材</td>
+                  <td><span class="dot"></span>启用</td>
+                  <td class="num">95.2000</td>
+                  <td class="code">2026-11-06</td>
+                  <td style="color:var(--muted)">—</td>
+                  <td><span class="ops"><span class="op">停用</span><span class="op danger">删除</span></span></td>
+                </tr>
+                <tr>
+                  <td class="code">C00005</td>
+                  <td>赵家木器厂</td>
+                  <td><span class="dot"></span>启用</td>
+                  <td class="num">2,043.6800</td>
+                  <td class="code">2026-11-07</td>
+                  <td style="color:var(--muted)">月结</td>
+                  <td><span class="ops"><span class="op">停用</span><span class="op danger">删除</span></span></td>
+                </tr>
+                <tr>
+                  <td class="code">C00006</td>
+                  <td>刘木匠</td>
+                  <td><span class="dot"></span>启用</td>
+                  <td class="num">0.0000</td>
+                  <td class="code">2026-11-08</td>
+                  <td style="color:var(--muted)">—</td>
+                  <td><span class="ops"><span class="op">停用</span><span class="op danger">删除</span></span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="pager">
+            <span>上一页</span>
+            <span>下一页</span>
+            <span class="right">第 1 / 7 页 · 共 128 条</span>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+</div>
+
+<div class="notes">
+  <div class="note">
+    <h3>「高级感」到底来自哪里</h3>
+    <ul>
+      <li>更大的留白：内容边距 20 → 28px，区块间距 12 → 18px</li>
+      <li>更高的行：表格行 40 → 44px，呼吸感来自行高而不是加阴影</li>
+      <li>更小的圆角：12 → 8px，按钮 8 → 6px，大圆角会显“软”</li>
+      <li>唯一的纯黑主按钮，其余按钮全部描边</li>
+      <li>没有阴影：层级只用 1px 发丝线表达</li>
+    </ul>
+  </div>
+  <div class="note">
+    <h3>字体与数字</h3>
+    <ul>
+      <li>字号只保留三档：13 正文 / 12 辅助 / 11 分组标签</li>
+      <li>次要文字从 <code>#737373</code> 收紧到 <code>#666666</code>，在白底上更“实”</li>
+      <li>方量、编号、日期统一等宽数字，小数点成列</li>
+      <li>标签从 13px 降到 12px，控件与标签的层级才分得开</li>
+    </ul>
+  </div>
+  <div class="note">
+    <h3>怎么判断像不像</h3>
+    <ul>
+      <li>看表格：像“一张有秩序的清单”，而不是“一堆有边框的格子”</li>
+      <li>看空白：内容区四周与行间是否有节奏，而不是挤满</li>
+      <li>看黑色：全页只有主按钮是纯黑，其余都退到灰阶</li>
+      <li>如果还是不对，多半是字体——Windows 下可换用 Inter / HarmonyOS Sans 再试</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+  (function () {
+    var app = document.getElementById('app');
+    var buttons = document.querySelectorAll('[data-theme-btn]');
+    var tint = document.getElementById('tintToggle');
+
+    function setTheme(name) {
+      app.classList.toggle('t-current', name === 'current');
+      app.classList.toggle('t-premium', name === 'premium');
+      buttons.forEach(function (btn) {
+        btn.setAttribute('aria-pressed', String(btn.getAttribute('data-theme-btn') === name));
+      });
+    }
+
+    buttons.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        setTheme(btn.getAttribute('data-theme-btn'));
+      });
+    });
+
+    tint.addEventListener('change', function () {
+      app.classList.toggle('tint', tint.checked);
+    });
+
+    setTheme('premium');
+  })();
+</script>
+</body>
+</html>

@@ -476,9 +476,9 @@ export default function CustomersPage(): React.ReactElement {
 
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
-      <div className="min-h-60 flex-1 rounded-xl border border-border bg-card">
+      <div className="min-h-60 flex-1 rounded-lg border border-border bg-card">
         <Table containerClassName="h-full overflow-y-auto">
-          <TableHeader className="sticky top-0 z-10 [&_th]:bg-card">
+          <TableHeader className="sticky top-0 z-10 [&_th]:bg-muted">
             <TableRow>
               <TableHead className="w-8">
                 <Checkbox

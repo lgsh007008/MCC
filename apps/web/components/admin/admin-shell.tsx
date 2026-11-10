@@ -414,7 +414,7 @@ function AdminShellInner({
           </div>
         </header>
 
-        <main ref={mainRef} className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-6">{children}</main>
+        <main ref={mainRef} className="scroll-area min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-7">{children}</main>
       </SidebarInset>
 
       <Dialog open={pwdOpen} onOpenChange={setPwdOpen}>

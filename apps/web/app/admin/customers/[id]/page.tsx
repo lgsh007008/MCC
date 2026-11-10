@@ -89,7 +89,7 @@ export default function CustomerDetailPage(): React.ReactElement {
         <span className="ml-3 text-sm font-normal text-muted-foreground">（{customer.code}）</span>
       </h1>
 
-      <div className="flex flex-wrap gap-6 rounded-xl border border-border bg-card p-4 text-sm">
+      <div className="flex flex-wrap gap-6 rounded-lg border border-border bg-card p-4 text-sm">
         <span>
           客户编号：<strong>{customer.code}</strong>
         </span>
@@ -104,7 +104,7 @@ export default function CustomerDetailPage(): React.ReactElement {
         </span>
       </div>
 
-      <div className="space-y-3 rounded-xl border border-border bg-card p-4 text-sm">
+      <div className="space-y-3 rounded-lg border border-border bg-card p-4 text-sm">
         <div>
           <span className="text-muted-foreground">联系信息：</span>
           <span className="whitespace-pre-wrap">{customer.contact || '—'}</span>

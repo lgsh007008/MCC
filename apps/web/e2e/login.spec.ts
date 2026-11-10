@@ -7,6 +7,22 @@ import { expect, test } from '@playwright/test';
 
 const customerName = `e2e-客户-${Date.now()}`;
 
+// 隐藏 Next 开发工具的悬浮层：nextjs-portal 固定在左下角，会遮挡侧栏底部的折叠按钮并拦截点击（仅 dev 存在）
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    const inject = (): void => {
+      const style = document.createElement('style');
+      style.textContent = 'nextjs-portal{display:none!important}';
+      document.head.appendChild(style);
+    };
+    if (document.head) {
+      inject();
+    } else {
+      document.addEventListener('DOMContentLoaded', inject);
+    }
+  });
+});
+
 test('登录 → 首页 → 订单菜单 → 销售单列表 → 退出 → 未登录守卫', async ({ page }) => {
   await page.goto('/login');
   await expect(page.getByRole('heading', { name: '登录' })).toBeVisible();
@@ -107,6 +123,18 @@ test('登录 → 首页 → 订单菜单 → 销售单列表 → 退出 → 未�
   await expect(confirmDialog.getByText(/共 1 张销售单/)).toBeVisible();
   await confirmDialog.getByRole('button', { name: '删除', exact: true }).click();
   await expect(customerRow).toHaveCount(0);
+
+  // 页面级无横向滚动：1440 与 1024 两档宽度（全站硬约束）
+  for (const width of [1440, 1024]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+        ),
+      )
+      .toBe(true);
+  }
 
   // 退出登录 → 回登录页
   await page.getByText('销', { exact: true }).click();

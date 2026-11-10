@@ -85,7 +85,7 @@ export default function SaleOrderDetailPage(): React.ReactElement {
         </h1>
       </div>
 
-      <div className="flex flex-wrap gap-6 rounded-xl border border-border bg-card p-4 text-sm">
+      <div className="flex flex-wrap gap-6 rounded-lg border border-border bg-card p-4 text-sm">
         <span>
           销售日期：<strong>{order.saleDate}</strong>
         </span>
@@ -108,7 +108,7 @@ export default function SaleOrderDetailPage(): React.ReactElement {
         {order.note ? <span>备注：{order.note}</span> : null}
       </div>
 
-      <div className="rounded-xl border border-border bg-card">
+      <div className="rounded-lg border border-border bg-card">
         <Table>
           <TableHeader>
             <TableRow>
