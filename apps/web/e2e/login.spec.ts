@@ -96,6 +96,21 @@ test('登录 → 首页 → 订单菜单 → 销售单列表 → 退出 → 未�
 
   await expect(page).toHaveURL(/\/admin\/sale-orders\/[0-9a-f-]{36}$/);
   await expect(breadcrumb.getByText(/^\d{6}-\d{4}$/)).toBeVisible();
+
+  // 打印预览：弹窗打开、A4 模板内容可见、ESC 关闭（product/order.md R-订单-002）
+  await page.getByRole('button', { name: '打印', exact: true }).click();
+  const printDialog = page.getByTestId('print-preview-dialog');
+  await expect(printDialog).toBeVisible();
+  await expect(printDialog.getByTestId('sale-order-print')).toBeVisible();
+  await expect(printDialog.getByText('成品销售单')).toBeVisible();
+  await expect(printDialog.getByText(customerName)).toBeVisible();
+  await expect(printDialog.getByText(/合计金额/)).toBeVisible();
+  await expect(printDialog.getByTestId('sale-order-signature')).toContainText('客户');
+  await expect(printDialog.getByText('制单')).toHaveCount(0);
+  await expect(printDialog.getByText('司机')).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await expect(printDialog).toHaveCount(0);
+
   await page.getByRole('link', { name: '编辑' }).click();
   await expect(page).toHaveURL(/\/edit$/);
   await expect(breadcrumb.getByText('编辑', { exact: true })).toBeVisible();

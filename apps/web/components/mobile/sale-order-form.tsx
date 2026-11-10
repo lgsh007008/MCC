@@ -46,6 +46,9 @@ interface CustomerOption {
 }
 
 const pad = (n: number): string => String(n).padStart(2, '0');
+
+// 其他金额允许留空，提交前按 0 处理（避免空字符串触发金额正则校验）
+const normalizeMoney = (value: string): string => (value.trim() === '' ? '0' : value.trim());
 const localToday = (): string => {
   const now = new Date();
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
@@ -217,7 +220,7 @@ export function MobileSaleOrderForm({
     const payload = {
       saleDate,
       customerId,
-      otherAmount,
+      otherAmount: normalizeMoney(otherAmount),
       note,
       items: items.map((row) => ({
         id: row.id,
@@ -226,8 +229,8 @@ export function MobileSaleOrderForm({
         heightMm: row.heightMm,
         pieces: row.pieces === '' ? undefined : Number(row.pieces),
         pricingMode: row.pricingMode,
-        price: row.price,
-        otherAmount: row.otherAmount,
+        price: row.price.trim(),
+        otherAmount: normalizeMoney(row.otherAmount),
         note: row.note,
       })),
     };

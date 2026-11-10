@@ -29,7 +29,7 @@ export const saleOrderItemSchema = z.object({
   pieces: z.coerce.number().int().min(1).max(100_000),
   pricingMode: z.enum(['volume', 'piece']).default('volume'),
   price: z.string().regex(decimal2Re, '单价须为非负数、最多 2 位小数'),
-  otherAmount: z.string().regex(decimal2Re).default('0'),
+  otherAmount: z.string().regex(decimal2Re, '其他金额须为非负数、最多 2 位小数').default('0'),
   note: z.string().trim().max(200).default(''),
 });
 export type SaleOrderItemInput = z.infer<typeof saleOrderItemSchema>;
@@ -43,7 +43,7 @@ export type SaleOrderItemUpdateInput = z.infer<typeof saleOrderItemUpdateSchema>
 const saleOrderBaseFields = {
   saleDate: saleDateSchema,
   customerId: z.string().uuid('请选择客户'),
-  otherAmount: z.string().regex(decimal2Re).default('0'),
+  otherAmount: z.string().regex(decimal2Re, '其他金额须为非负数、最多 2 位小数').default('0'),
   note: z.string().trim().max(500).default(''),
 };
 

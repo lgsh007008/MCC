@@ -1,10 +1,12 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { buttonVariants } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { usePageCrumb } from '@/components/admin/page-breadcrumb';
+import { PrintPreviewDialog } from '@/components/order/print-preview-dialog';
 import {
   Table,
   TableBody,
@@ -52,6 +54,7 @@ interface SaleOrderDetail {
 
 export default function SaleOrderDetailPage(): React.ReactElement {
   const params = useParams<{ id: string }>();
+  const [printOpen, setPrintOpen] = useState(false);
   // 查询带缓存（技术方案 §7.4）：切回标签先用缓存渲染，后台刷新，避免闪「加载中」
   const { data: order, error: queryError } = useQuery({
     queryKey: ['sale-order', params.id],
@@ -156,10 +159,15 @@ export default function SaleOrderDetailPage(): React.ReactElement {
         <Link href={`/admin/sale-orders/${order.id}/edit`} className={buttonVariants()}>
           编辑
         </Link>
+        <Button variant="outline" onClick={() => setPrintOpen(true)}>
+          打印
+        </Button>
         <Link href="/admin/sale-orders" className={buttonVariants({ variant: 'outline' })}>
           返回列表
         </Link>
       </div>
+
+      <PrintPreviewDialog open={printOpen} onOpenChange={setPrintOpen} order={order} />
     </div>
   );
 }

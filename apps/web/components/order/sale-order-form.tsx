@@ -33,6 +33,9 @@ import { cn } from '@/lib/utils';
 
 const MAX_ROWS = 200;
 
+// 其他金额允许留空，提交前按 0 处理（避免空字符串触发金额正则校验）
+const normalizeMoney = (value: string): string => (value.trim() === '' ? '0' : value.trim());
+
 interface FormRow {
   id?: string;
   lengthMm: string;
@@ -257,7 +260,7 @@ export function SaleOrderForm({
     const payload = {
       saleDate,
       customerId,
-      otherAmount,
+      otherAmount: normalizeMoney(otherAmount),
       note,
       items: items.map((row) => ({
         id: row.id,
@@ -266,8 +269,8 @@ export function SaleOrderForm({
         heightMm: row.heightMm,
         pieces: row.pieces === '' ? undefined : Number(row.pieces),
         pricingMode: row.pricingMode,
-        price: row.price,
-        otherAmount: row.otherAmount,
+        price: row.price.trim(),
+        otherAmount: normalizeMoney(row.otherAmount),
         note: row.note,
       })),
     };
