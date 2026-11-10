@@ -71,8 +71,8 @@ test('登录 → 财务台账 → 弹窗新建 / 编辑 → 汇总 → 删除', 
   await expect(eventRow).toContainText('-120.00');
 
   // 详情弹窗：点编号打开（只读），信息条含金额与来源；详情 → 编辑为状态切换
-  await eventRow.getByRole('button', { name: /^\d{6}-\d{4}$/ }).click();
-  await expect(formDialog.getByText(/^\d{6}-\d{4}（其他支出）$/)).toBeVisible();
+  await eventRow.getByRole('button', { name: /^FN-\d{5}$/ }).click();
+  await expect(formDialog.getByText(/^FN-\d{5}（其他支出）$/)).toBeVisible();
   await expect(formDialog.getByText('-120.00', { exact: true })).toBeVisible();
   await expect(formDialog.getByText('手工', { exact: true })).toBeVisible();
   await formDialog.getByRole('button', { name: '编辑', exact: true }).click();

@@ -40,6 +40,17 @@ else
   exit 1
 fi
 
+# 一次性编号重排（幂等）：先停应用避免写入；失败则恢复旧容器并中止发布。
+# 作用：把旧格式单号统一为 CT-/SO-/FN-，与新代码同批切换（1-产品文档.md 五）。
+compose stop web server
+if ! ./deploy/renumber-codes.sh; then
+  echo "编号重排失败，恢复旧容器" >&2
+  # 此时尚未拉取新镜像，用 docker start 原容器恢复旧代码
+  docker start mcc-web-1 mcc-server-1 || true
+  exit 1
+fi
+mark "编号重排完成"
+
 compose pull
 mark "镜像拉取完成"
 # 迁移只向前（技术方案 §9.4）；失败即中止，不进入 rebuild

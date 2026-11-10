@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ChevronRightIcon } from 'lucide-react';
 import { Button, buttonVariants } from '@/components/ui/button';
+import { useCan } from '@/components/auth/permission-context';
 import { MobileActionBar, MobileHeader } from '@/components/mobile/mobile-shell';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -12,7 +13,6 @@ import { cn } from '@/lib/utils';
 // 底部固定「新建销售单」。数据与 PC 列表同一接口（按销售日期倒序）。
 interface OrderListItem {
   id: string;
-  code: string;
   saleDate: string;
   customerName: string;
   totalVolume: string;
@@ -22,6 +22,7 @@ interface OrderListItem {
 const PAGE_SIZE = 20;
 
 export default function MobileSaleOrdersPage(): React.ReactElement {
+  const canManage = useCan('order:manage');
   const [items, setItems] = useState<OrderListItem[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -94,12 +95,11 @@ export default function MobileSaleOrdersPage(): React.ReactElement {
               <ChevronRightIcon className="mt-1 size-5 shrink-0 text-muted-foreground" />
             </div>
             <div className="mt-3 flex items-end justify-between gap-3">
-              <span className="text-sm text-muted-foreground tabular-nums">{order.code}</span>
+              <span className="text-sm text-muted-foreground tabular-nums">
+                合计方量 {order.totalVolume} m³
+              </span>
               <span className="text-xl font-semibold tabular-nums">{order.totalAmount} 元</span>
             </div>
-            <p className="mt-1 text-right text-xs text-muted-foreground">
-              合计方量 {order.totalVolume} m³
-            </p>
           </Link>
         ))}
 
@@ -116,14 +116,16 @@ export default function MobileSaleOrdersPage(): React.ReactElement {
         ) : null}
       </div>
 
-      <MobileActionBar>
-        <Link
-          href="/m/sale-orders/new"
-          className={cn(buttonVariants(), 'h-12 flex-1 text-base')}
-        >
-          新建销售单
-        </Link>
-      </MobileActionBar>
+      {canManage ? (
+        <MobileActionBar>
+          <Link
+            href="/m/sale-orders/new"
+            className={cn(buttonVariants(), 'h-12 flex-1 text-base')}
+          >
+            新建销售单
+          </Link>
+        </MobileActionBar>
+      ) : null}
     </div>
   );
 }

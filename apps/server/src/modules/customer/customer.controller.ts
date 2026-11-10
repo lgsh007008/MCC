@@ -23,6 +23,7 @@ import {
   type CustomerStatusInput,
   type CustomerUpdateInput,
 } from '@mcc/shared';
+import { RequireScopes } from '../../common/decorators/require-scopes.decorator.js';
 import { ZodValidationPipe } from '../../common/zod-validation.pipe.js';
 import {
   CustomerBatchDeleteBodyDto,
@@ -44,6 +45,7 @@ export class CustomerController {
   constructor(private readonly customerService: CustomerService) {}
 
   @Get()
+  @RequireScopes('customer:view')
   @ApiOperation({ summary: '客户列表：筛选（名称模糊、状态）+ 分页' })
   @ApiQuery({ name: 'name', required: false, type: String, description: '客户名称模糊' })
   @ApiQuery({ name: 'status', required: false, enum: ['active', 'inactive'], type: String, description: '状态' })
@@ -57,6 +59,7 @@ export class CustomerController {
 
   // 注意：具体路径须声明在 :id 之前，否则会被 ParseUUIDPipe 当作 id 校验。
   @Get('name-check')
+  @RequireScopes('customer:view')
   @ApiOperation({ summary: '客户重名检查（只提示不阻断）' })
   @ApiQuery({ name: 'name', required: true, type: String, description: '客户名称' })
   @ApiQuery({ name: 'excludeId', required: false, type: String, description: '排除的客户 id（编辑时传自身）' })
@@ -68,6 +71,7 @@ export class CustomerController {
   }
 
   @Get(':id')
+  @RequireScopes('customer:view')
   @ApiOperation({ summary: '客户详情' })
   @ApiOkResponse({ type: CustomerDto })
   detail(@Param('id', ParseUUIDPipe) id: string): Promise<CustomerDto> {
@@ -75,6 +79,7 @@ export class CustomerController {
   }
 
   @Post()
+  @RequireScopes('customer:manage')
   @HttpCode(201)
   @ApiOperation({ summary: '新建客户（编号自动生成；重名只提示不阻断）' })
   @ApiBody({ type: CustomerBodyDto })
@@ -84,6 +89,7 @@ export class CustomerController {
   }
 
   @Put(':id')
+  @RequireScopes('customer:manage')
   @ApiOperation({ summary: '更新客户（名称、联系信息、备注）' })
   @ApiBody({ type: CustomerBodyDto })
   @ApiOkResponse({ type: CustomerDto })
@@ -95,6 +101,7 @@ export class CustomerController {
   }
 
   @Patch(':id/status')
+  @RequireScopes('customer:manage')
   @ApiOperation({ summary: '启用 / 停用客户' })
   @ApiBody({ type: CustomerStatusBodyDto })
   @ApiOkResponse({ type: CustomerDto })
@@ -106,6 +113,7 @@ export class CustomerController {
   }
 
   @Post('batch-status')
+  @RequireScopes('customer:manage')
   @HttpCode(200)
   @ApiOperation({ summary: '批量启用 / 停用客户（已是目标状态或已删的跳过，返回实际变更条数）' })
   @ApiBody({ type: CustomerBatchStatusBodyDto })
@@ -117,6 +125,7 @@ export class CustomerController {
   }
 
   @Post('batch-delete')
+  @RequireScopes('customer:manage')
   @HttpCode(200)
   @ApiOperation({ summary: '批量删除客户（软删除；不存在 / 已删行静默跳过，返回删除条数）' })
   @ApiBody({ type: CustomerBatchDeleteBodyDto })
@@ -128,6 +137,7 @@ export class CustomerController {
   }
 
   @Delete(':id')
+  @RequireScopes('customer:manage')
   @HttpCode(204)
   @ApiOperation({ summary: '删除客户（软删除，编号不回收）' })
   async remove(@Param('id', ParseUUIDPipe) id: string): Promise<void> {

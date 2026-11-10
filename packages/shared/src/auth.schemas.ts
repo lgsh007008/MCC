@@ -27,3 +27,36 @@ export const changePasswordSchema = z.object({
   newPassword: z.string().min(8).max(128),
 });
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
+
+// ── 账号管理（R-账号与权限-002）────────────────────────────
+export const userRoleSchema = z.enum(['ADMIN', 'SALES', 'FINANCE', 'WORKER']);
+export type UserRoleValue = z.infer<typeof userRoleSchema>;
+
+export const userCreateSchema = z.object({
+  username: z.string().trim().min(1, '请输入账号').max(64),
+  password: z.string().min(8, '密码至少 8 位').max(128),
+  role: userRoleSchema,
+});
+export type UserCreateInput = z.infer<typeof userCreateSchema>;
+
+export const userStatusInputSchema = z.object({
+  status: z.enum(['active', 'inactive']),
+});
+export type UserStatusInput = z.infer<typeof userStatusInputSchema>;
+
+export const userRoleInputSchema = z.object({
+  role: userRoleSchema,
+});
+export type UserRoleInput = z.infer<typeof userRoleInputSchema>;
+
+export const userResetPasswordSchema = z.object({
+  password: z.string().min(8, '密码至少 8 位').max(128),
+});
+export type UserResetPasswordInput = z.infer<typeof userResetPasswordSchema>;
+
+export const userListQuerySchema = z.object({
+  keyword: z.string().trim().max(64).optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+});
+export type UserListQuery = z.infer<typeof userListQuerySchema>;

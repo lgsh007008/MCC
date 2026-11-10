@@ -24,11 +24,20 @@ datasource db {
 // user / refresh_token 均归本领域，细节以本文件为准。
 
 enum UserRole {
-  // 单角色「销售」全权限（product/账号与权限.md R-账号与权限-001）；
-  // 新增角色随需求扩展，不预建角色表。
+  // 固定四角色（product/账号与权限.md R-账号与权限-003）；不预建角色表。
+  ADMIN
   SALES
+  FINANCE
+  WORKER
 
   @@map("user_role")
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+
+  @@map("user_status")
 }
 
 model User {
@@ -43,6 +52,7 @@ model User {
   username     String   @map("username")
   passwordHash String   @map("password_hash")
   role         UserRole @default(SALES)
+  status       UserStatus @default(ACTIVE) @map("status")
 
   refreshTokens RefreshToken[]
 
@@ -120,7 +130,7 @@ model Customer {
   updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
   deletedAt DateTime? @map("deleted_at")
 
-  // 编号 C + 5 位全局流水（如 C00001），系统生成、只读、永不复用（design/customer.md §3）
+  // 编号 CT + 连字符 + 5 位全局流水（如 CT-00001），系统生成、只读、永不复用（1-产品文档.md 五）
   code    String         @map("code")
   name    String         @map("name")
   contact String         @default("") @map("contact")
@@ -162,7 +172,7 @@ model SaleOrder {
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
   deletedAt DateTime? @map("deleted_at")
 
-  // 主单编号：年月+当月流水（如 202611-0001），自动生成、只读、永不复用（design/order.md §4）
+  // 主单编号：SO + 连字符 + 5 位全局流水（如 SO-00001），自动生成、只读、永不复用（1-产品文档.md 五）
   code     String   @map("code")
   saleDate DateTime @map("sale_date") @db.Date
   // 客户：外键用于归属与聚合；名称快照保留开单当时的名称（design/order.md §2）
@@ -248,7 +258,7 @@ model FinanceEvent {
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
   deletedAt DateTime? @map("deleted_at")
 
-  // 事件编号：年月+当月流水（取发生日期年月，如 202611-0001），只读、永不复用
+  // 事件编号：FN + 连字符 + 5 位全局流水（如 FN-00001），只读、永不复用（1-产品文档.md 五）
   code         String               @map("code")
   occurredDate DateTime             @map("occurred_date") @db.Date
   category     FinanceEventCategory @map("category")

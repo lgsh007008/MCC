@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowDownIcon, ArrowUpIcon, EyeIcon, PencilIcon, Trash2Icon } from 'lucide-react';
 import { Button, buttonVariants } from '@/components/ui/button';
+import { useCan } from '@/components/auth/permission-context';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { DatePicker } from '@/components/ui/date-picker';
@@ -61,6 +62,7 @@ interface CustomerOption {
 const PAGE_SIZE = 20;
 
 export default function SaleOrdersPage(): React.ReactElement {
+  const canManage = useCan('order:manage');
   const confirm = useConfirm();
   const [filters, setFilters] = useState({ customerId: '', dateFrom: '', dateTo: '' });
   const [applied, setApplied] = useState({ customerId: '', dateFrom: '', dateTo: '' });
@@ -308,13 +310,17 @@ export default function SaleOrdersPage(): React.ReactElement {
       </form>
 
       <div className="flex items-center gap-2">
-        <Link href="/admin/sale-orders/new" className={buttonVariants()}>
-          新建
-        </Link>
-        {selected.size > 0 ? (
-          <Button variant="destructive" onClick={() => void handleBatchDelete()}>
-            批量删除({selected.size})
-          </Button>
+        {canManage ? (
+          <>
+            <Link href="/admin/sale-orders/new" className={buttonVariants()}>
+              新建
+            </Link>
+            {selected.size > 0 ? (
+              <Button variant="destructive" onClick={() => void handleBatchDelete()}>
+                批量删除({selected.size})
+              </Button>
+            ) : null}
+          </>
         ) : null}
       </div>
 
@@ -324,13 +330,15 @@ export default function SaleOrdersPage(): React.ReactElement {
         <Table containerClassName="h-full overflow-y-auto">
           <TableHeader className="sticky top-0 z-10 [&_th]:bg-muted">
             <TableRow>
-              <TableHead className="w-8">
-                <Checkbox
-                  aria-label="本页全选"
-                  checked={allSelected}
-                  onCheckedChange={(checked) => togglePage(checked === true)}
-                />
-              </TableHead>
+              {canManage ? (
+                <TableHead className="w-8">
+                  <Checkbox
+                    aria-label="本页全选"
+                    checked={allSelected}
+                    onCheckedChange={(checked) => togglePage(checked === true)}
+                  />
+                </TableHead>
+              ) : null}
               <TableHead>编号</TableHead>
               <SortHead label="销售日期" field="saleDate" />
               <TableHead>客户</TableHead>
@@ -354,13 +362,15 @@ export default function SaleOrdersPage(): React.ReactElement {
             ) : (
               data.items.map((order) => (
                 <TableRow key={order.id}>
-                  <TableCell>
-                    <Checkbox
-                      aria-label={`选择 ${order.code}`}
-                      checked={selected.has(order.id)}
-                      onCheckedChange={(checked) => toggleRow(order.id, checked === true)}
-                    />
-                  </TableCell>
+                  {canManage ? (
+                    <TableCell>
+                      <Checkbox
+                        aria-label={`选择 ${order.code}`}
+                        checked={selected.has(order.id)}
+                        onCheckedChange={(checked) => toggleRow(order.id, checked === true)}
+                      />
+                    </TableCell>
+                  ) : null}
                   <TableCell>
                     <Link
                       href={`/admin/sale-orders/${order.id}`}
@@ -388,24 +398,28 @@ export default function SaleOrdersPage(): React.ReactElement {
                       >
                         <EyeIcon className="size-4" />
                       </Link>
-                      <Link
-                        href={`/admin/sale-orders/${order.id}/edit`}
-                        aria-label="编辑"
-                        title="编辑"
-                        className={buttonVariants({ variant: 'ghost', size: 'icon-sm' })}
-                      >
-                        <PencilIcon className="size-4" />
-                      </Link>
-                      <Button
-                        size="icon-sm"
-                        variant="ghost"
-                        aria-label="删除"
-                        title="删除"
-                        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                        onClick={() => void handleDelete(order)}
-                      >
-                        <Trash2Icon className="size-4" />
-                      </Button>
+                      {canManage ? (
+                        <>
+                          <Link
+                            href={`/admin/sale-orders/${order.id}/edit`}
+                            aria-label="编辑"
+                            title="编辑"
+                            className={buttonVariants({ variant: 'ghost', size: 'icon-sm' })}
+                          >
+                            <PencilIcon className="size-4" />
+                          </Link>
+                          <Button
+                            size="icon-sm"
+                            variant="ghost"
+                            aria-label="删除"
+                            title="删除"
+                            className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                            onClick={() => void handleDelete(order)}
+                          >
+                            <Trash2Icon className="size-4" />
+                          </Button>
+                        </>
+                      ) : null}
                     </div>
                   </TableCell>
                 </TableRow>
@@ -414,7 +428,7 @@ export default function SaleOrdersPage(): React.ReactElement {
           </TableBody>
           <TableFooter className="sticky bottom-0 z-10 bg-muted [&_td]:bg-muted">
             <TableRow>
-              <TableCell />
+              {canManage ? <TableCell /> : null}
               <TableCell className="font-medium">合计</TableCell>
               <TableCell />
               <TableCell />

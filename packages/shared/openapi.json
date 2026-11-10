@@ -108,6 +108,202 @@
         ]
       }
     },
+    "/api/v1/users": {
+      "get": {
+        "operationId": "UsersController_list",
+        "parameters": [
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "description": "每页条数，默认 20（最大 100）",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "页码，默认 1",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "keyword",
+            "required": false,
+            "in": "query",
+            "description": "账号名模糊",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserListDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "账号列表（不含密码）",
+        "tags": [
+          "users"
+        ]
+      },
+      "post": {
+        "operationId": "UsersController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserCreateBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "新建账号（租户内账号唯一；初始密码至少 8 位）",
+        "tags": [
+          "users"
+        ]
+      }
+    },
+    "/api/v1/users/{id}/status": {
+      "patch": {
+        "operationId": "UsersController_setStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserStatusBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "启用 / 停用账号（不能停用自己或最后一个启用管理员）",
+        "tags": [
+          "users"
+        ]
+      }
+    },
+    "/api/v1/users/{id}/role": {
+      "patch": {
+        "operationId": "UsersController_setRole",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserRoleBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "修改角色（不能降级最后一个启用管理员）",
+        "tags": [
+          "users"
+        ]
+      }
+    },
+    "/api/v1/users/{id}/reset-password": {
+      "post": {
+        "operationId": "UsersController_resetPassword",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserResetPasswordBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "重置账号密码并撤销该账号全部刷新会话",
+        "tags": [
+          "users"
+        ]
+      }
+    },
     "/api/v1/customers": {
       "get": {
         "operationId": "CustomerController_list",
@@ -1100,7 +1296,7 @@
           },
           "role": {
             "type": "string",
-            "description": "角色（当前恒为 SALES）"
+            "description": "角色：ADMIN / SALES / FINANCE / WORKER"
           }
         },
         "required": [
@@ -1145,6 +1341,149 @@
         "required": [
           "oldPassword",
           "newPassword"
+        ]
+      },
+      "UserDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "账号 id"
+          },
+          "username": {
+            "type": "string",
+            "description": "账号名"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "ADMIN",
+              "SALES",
+              "FINANCE",
+              "WORKER"
+            ],
+            "description": "角色"
+          },
+          "roleLabel": {
+            "type": "string",
+            "description": "角色显示名"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "inactive"
+            ],
+            "description": "状态"
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "创建时间（ISO）"
+          }
+        },
+        "required": [
+          "id",
+          "username",
+          "role",
+          "roleLabel",
+          "status",
+          "createdAt"
+        ]
+      },
+      "UserListDto": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "number",
+            "description": "总数"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserDto"
+            }
+          }
+        },
+        "required": [
+          "total",
+          "items"
+        ]
+      },
+      "UserCreateBodyDto": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "description": "账号（租户内唯一）",
+            "example": "sales01"
+          },
+          "password": {
+            "type": "string",
+            "description": "初始密码（至少 8 位）",
+            "example": "Mcc@2026"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "ADMIN",
+              "SALES",
+              "FINANCE",
+              "WORKER"
+            ],
+            "description": "角色"
+          }
+        },
+        "required": [
+          "username",
+          "password",
+          "role"
+        ]
+      },
+      "UserStatusBodyDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "inactive"
+            ],
+            "description": "启用 / 停用"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "UserRoleBodyDto": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "ADMIN",
+              "SALES",
+              "FINANCE",
+              "WORKER"
+            ],
+            "description": "新角色"
+          }
+        },
+        "required": [
+          "role"
+        ]
+      },
+      "UserResetPasswordBodyDto": {
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": "string",
+            "description": "新密码（至少 8 位）",
+            "example": "Mcc@2026"
+          }
+        },
+        "required": [
+          "password"
         ]
       },
       "CustomerDto": {

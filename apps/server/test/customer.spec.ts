@@ -62,7 +62,7 @@ describe('客户接口（契约/集成）', () => {
   it('新建：编号 C + 5 位流水，默认启用', async () => {
     const res = await auth(http().post(`/${API_PREFIX}/customers`)).send(body());
     expect(res.status).toBe(201);
-    expect(String(res.body.code)).toMatch(/^C\d{5,}$/);
+    expect(String(res.body.code)).toMatch(/^CT-\d{5}$/);
     expect(res.body.status).toBe('active');
     expect(res.body.name).toBe(customerName);
     customerId = res.body.id as string;

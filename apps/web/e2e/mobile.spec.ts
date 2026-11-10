@@ -47,6 +47,8 @@ test('手机登录 → 移动入口 → 开单 → 详情 → 列表', async ({ 
     await page.getByRole('link', { name: /成品销售单/ }).click();
     await expect(page).toHaveURL(/\/m\/sale-orders$/);
     await expect(page.getByRole('heading', { name: '成品销售单' })).toBeVisible();
+    // 移动端不展示单据编号（product/order.md 移动页）
+    await expect(page.getByText(/SO-\d{5}/)).toHaveCount(0);
 
     // 新建：单列表单 + 明细行卡片
     await page.getByRole('link', { name: '新建销售单' }).click();
@@ -66,6 +68,7 @@ test('手机登录 → 移动入口 → 开单 → 详情 → 列表', async ({ 
     await expect(page).toHaveURL(/\/m\/sale-orders\/[0-9a-f-]{36}$/);
     await expect(page.getByText('合计金额')).toBeVisible();
     await expect(page.getByText(customerName)).toBeVisible();
+    await expect(page.getByText(/SO-\d{5}/)).toHaveCount(0);
 
     // 返回列表：新建的单据以卡片出现
     await page.getByRole('link', { name: '返回列表' }).click();

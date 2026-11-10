@@ -81,7 +81,7 @@ describe('财务接口（契约/集成）', () => {
     expect(res.status).toBe(201);
     expect(res.body.amount).toBe('-100.50');
     expect(res.body.source).toBe('manual');
-    expect(String(res.body.code)).toMatch(/^203001-\d{4}$/);
+    expect(String(res.body.code)).toMatch(/^FN-\d{5}$/);
     manualEventId = res.body.id as string;
   });
 

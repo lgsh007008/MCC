@@ -2,9 +2,9 @@
 
 import { Fragment, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { ChevronDownIcon, PanelLeftCloseIcon, PanelLeftOpenIcon } from 'lucide-react';
-import { changePasswordSchema } from '@mcc/shared';
+import { ROLE_LABELS, changePasswordSchema, hasScope, type UserRole } from '@mcc/shared';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -50,8 +50,9 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 import { api, refreshSession } from '@/lib/api';
-import { authSession } from '@/lib/auth/session';
-import { findNavByPath, homeItem, navGroups } from '@/lib/nav';
+import { authSession, currentRole, currentUsername } from '@/lib/auth/session';
+import { findNavByPath, homeItem, scopeForPath, visibleNavGroups } from '@/lib/nav';
+import { RoleProvider } from '@/components/auth/permission-context';
 import { ConfirmProvider } from '@/components/ui/confirm-dialog';
 import { PageBreadcrumbProvider, usePageBreadcrumb } from './page-breadcrumb';
 import { AppQueryProvider } from './query-provider';
@@ -105,6 +106,14 @@ function SidebarCollapseButton(): React.ReactElement {
   );
 }
 
+function NoPermission(): React.ReactElement {
+  return (
+    <div className="rounded-lg border border-border bg-card p-6 text-sm text-muted-foreground">
+      无权限访问该页面。
+    </div>
+  );
+}
+
 function AdminShellInner({
   children,
   defaultSidebarOpen,
@@ -113,8 +122,10 @@ function AdminShellInner({
   defaultSidebarOpen: boolean;
 }): React.ReactElement {
   const pathname = usePathname();
+  const router = useRouter();
   const { reset: resetTabs } = useTabs();
   const mainRef = useRef<HTMLElement>(null);
+  const [role, setRole] = useState<UserRole | null>(currentRole());
   // 每个标签记住主内容区滚动位置，切回时恢复（design/平台布局.md §1.6）
   const scrollPositions = useRef(new Map<string, number>());
   const [pwdOpen, setPwdOpen] = useState(false);
@@ -132,6 +143,7 @@ function AdminShellInner({
       if (cancelled) {
         return;
       }
+      setRole(currentRole());
       if (!ok && window.location.pathname.startsWith('/admin')) {
         window.location.assign('/login');
       }
@@ -176,6 +188,11 @@ function AdminShellInner({
 
   const current = findNavByPath(pathname);
   const pageCrumbs = usePageBreadcrumb()?.crumbs ?? [];
+  const groups = visibleNavGroups(role);
+  const username = currentUsername();
+  // 路由裁剪：无权限页面显示统一提示，不渲染页面内容（服务端守卫仍是最终边界）
+  const requiredScope = scopeForPath(pathname);
+  const allowed = requiredScope === null || role === null || hasScope(role, requiredScope);
 
   // 滚动位置：路径变化后恢复该标签上次的位置；滚动时持续记录当前路径的位置
   useEffect(() => {
@@ -217,7 +234,8 @@ function AdminShellInner({
   };
 
   return (
-    <SidebarProvider defaultOpen={defaultSidebarOpen} className="h-svh overflow-hidden">
+    <RoleProvider role={role}>
+      <SidebarProvider defaultOpen={defaultSidebarOpen} className="h-svh overflow-hidden">
       <Sidebar collapsible="icon">
         <SidebarHeader className="border-b border-border">
           <span className="px-2 text-sm font-semibold">
@@ -238,7 +256,7 @@ function AdminShellInner({
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
-          {navGroups.map((group) => {
+          {groups.map((group) => {
             const collapsed = isGroupCollapsed(group.label);
             return (
               <SidebarGroup key={group.label}>
@@ -339,10 +357,17 @@ function AdminShellInner({
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuGroup>
-                    <DropdownMenuLabel>账号</DropdownMenuLabel>
+                    <DropdownMenuLabel>
+                      {username ? `${username}${role ? ` · ${ROLE_LABELS[role]}` : ''}` : '账号'}
+                    </DropdownMenuLabel>
                   </DropdownMenuGroup>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => setPwdOpen(true)}>修改密码</DropdownMenuItem>
+                  {hasScope(role, 'account:manage') ? (
+                    <DropdownMenuItem onClick={() => router.push('/admin/users')}>
+                      账号管理
+                    </DropdownMenuItem>
+                  ) : null}
                   <DropdownMenuItem onClick={() => void handleLogout()}>退出登录</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -414,7 +439,9 @@ function AdminShellInner({
           </div>
         </header>
 
-        <main ref={mainRef} className="scroll-area min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-7">{children}</main>
+        <main ref={mainRef} className="scroll-area min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-7">
+          {allowed ? children : <NoPermission />}
+        </main>
       </SidebarInset>
 
       <Dialog open={pwdOpen} onOpenChange={setPwdOpen}>
@@ -456,6 +483,7 @@ function AdminShellInner({
           </form>
         </DialogContent>
       </Dialog>
-    </SidebarProvider>
+      </SidebarProvider>
+    </RoleProvider>
   );
 }

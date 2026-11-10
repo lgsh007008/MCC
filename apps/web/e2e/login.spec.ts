@@ -68,7 +68,7 @@ test('登录 → 首页 → 订单菜单 → 销售单列表 → 退出 → 未�
   await page.getByRole('button', { name: '保存' }).click();
   await expect(page).toHaveURL(/\/admin\/customers\/[0-9a-f-]{36}$/);
   const breadcrumb = page.getByRole('navigation', { name: 'breadcrumb' });
-  await expect(breadcrumb.getByText(/^C\d{5,}$/)).toBeVisible();
+  await expect(breadcrumb.getByText(/^CT-\d{5}$/)).toBeVisible();
 
   // 新建页：明细区行操作「复制行」可用（1 → 2 行）；面包屑页面标识 =「新建」
   await page.goto('/admin/sale-orders/new');
@@ -95,7 +95,7 @@ test('登录 → 首页 → 订单菜单 → 销售单列表 → 退出 → 未�
   await page.getByRole('button', { name: '保存' }).click();
 
   await expect(page).toHaveURL(/\/admin\/sale-orders\/[0-9a-f-]{36}$/);
-  await expect(breadcrumb.getByText(/^\d{6}-\d{4}$/)).toBeVisible();
+  await expect(breadcrumb.getByText(/^SO-\d{5}$/)).toBeVisible();
 
   // 打印预览：弹窗打开、A4 模板内容可见、ESC 关闭（product/order.md R-订单-002）
   await page.getByRole('button', { name: '打印', exact: true }).click();
@@ -150,6 +150,29 @@ test('登录 → 首页 → 订单菜单 → 销售单列表 → 退出 → 未�
       )
       .toBe(true);
   }
+
+  // 管理员头像菜单：账号管理入口可见；账号页可访问（R-账号与权限-002）
+  await page.getByText('销', { exact: true }).click();
+  await page.getByText('账号管理', { exact: true }).click();
+  await expect(page).toHaveURL(/\/admin\/users$/);
+  await expect(page.getByRole('columnheader', { name: '账号' })).toBeVisible();
+  await expect(page.getByRole('cell', { name: 'admin', exact: true })).toBeVisible();
+
+  // 列表页模式：账号筛选 + 分页总数
+  await page.getByPlaceholder('账号名模糊').fill('admin');
+  await page.getByRole('button', { name: '查询', exact: true }).click();
+  await expect(page.getByRole('cell', { name: 'admin', exact: true })).toBeVisible();
+  await expect(page.getByText(/第 1 \/ \d+ 页 · 共 \d+ 条/)).toBeVisible();
+
+  // 角色权限说明：只读弹窗展示四角色矩阵与端权限说明
+  await page.getByRole('button', { name: '角色权限说明' }).click();
+  const permissionsDialog = page.getByTestId('role-permissions-dialog');
+  await expect(permissionsDialog).toBeVisible();
+  await expect(permissionsDialog.getByText('管理员', { exact: true })).toBeVisible();
+  await expect(permissionsDialog.getByText('工人', { exact: true })).toBeVisible();
+  await expect(permissionsDialog.getByText(/PC 与手机端共用同一套权限/)).toBeVisible();
+  await permissionsDialog.getByRole('button', { name: '关闭' }).click();
+  await expect(permissionsDialog).toHaveCount(0);
 
   // 退出登录 → 回登录页
   await page.getByText('销', { exact: true }).click();

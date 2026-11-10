@@ -14,11 +14,11 @@ import { PrismaService } from '../../common/prisma.service.js';
 import type { CustomerDto, CustomerListDto } from './dto/customer.dto.js';
 
 // 客户档案（product/customer.md R-客户-001；design/customer.md）。
-// 编号 C + 5 位全局流水；名称不唯一（重名只提示）；停用不可被新单选择；不提供删除。
-// 累计下单方量不落本表：由 order 域按未软删销售单聚合。
+// 编号 CT + 连字符 + 5 位全局流水（不含日期，见 1-产品文档.md 五）；名称不唯一（重名只提示）；
+// 停用不可被新单选择；不提供删除。累计下单方量不落本表：由 order 域按未软删销售单聚合。
 
 const CODE_RETRY_LIMIT = 3;
-const CODE_PREFIX = 'C';
+const CODE_PREFIX = 'CT-';
 const CODE_PAD = 5;
 
 const isoDate = (value: Date): string => value.toISOString().slice(0, 10);

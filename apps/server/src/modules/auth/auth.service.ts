@@ -1,6 +1,7 @@
 ﻿import { Injectable } from '@nestjs/common';
 import { createHash, randomBytes } from 'node:crypto';
-import type { ChangePasswordInput, LoginInput } from '@mcc/shared';
+import type { ChangePasswordInput, LoginInput, UserRole } from '@mcc/shared';
+import { isUserRole } from '@mcc/shared';
 import { hash as hashPassword, verify as verifyPassword } from '@node-rs/argon2';
 import jwt, { type JwtPayload } from 'jsonwebtoken';
 import { problem } from '../../common/http-problem.js';
@@ -21,7 +22,7 @@ export interface LoginResult {
   refreshToken: string;
   rememberMe: boolean;
   username: string;
-  role: string;
+  role: UserRole;
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -57,6 +58,9 @@ export class AuthService {
         await this.redis.expire(failKey, LOGIN_FAIL_LOCK_SECONDS);
       }
       throw problem(401, 'INVALID_CREDENTIALS', '账号或密码错误');
+    }
+    if (user.status !== 'ACTIVE') {
+      throw problem(401, 'ACCOUNT_INACTIVE', '账号已停用，请联系管理员');
     }
 
     await this.redis.del(failKey);
@@ -94,7 +98,8 @@ export class AuthService {
       !record ||
       record.revokedAt !== null ||
       record.expiresAt <= new Date() ||
-      record.user.deletedAt !== null
+      record.user.deletedAt !== null ||
+      record.user.status !== 'ACTIVE'
     ) {
       throw problem(401, 'TOKEN_INVALID', '刷新令牌无效或已过期');
     }
@@ -144,7 +149,7 @@ export class AuthService {
         username?: string;
         role?: string;
       };
-      if (!payload.sub || typeof payload.username !== 'string' || typeof payload.role !== 'string') {
+      if (!payload.sub || typeof payload.username !== 'string' || !isUserRole(payload.role)) {
         throw problem(401, 'TOKEN_INVALID', '访问令牌无效');
       }
       return { userId: payload.sub, username: payload.username, role: payload.role };
@@ -153,7 +158,7 @@ export class AuthService {
     }
   }
 
-  private signAccessToken(user: { id: string; username: string; role: string }): string {
+  private signAccessToken(user: { id: string; username: string; role: UserRole }): string {
     return jwt.sign({ username: user.username, role: user.role }, this.jwtSecret(), {
       subject: user.id,
       expiresIn: ACCESS_TOKEN_TTL_SECONDS,

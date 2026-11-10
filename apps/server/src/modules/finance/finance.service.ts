@@ -49,6 +49,9 @@ const isoDate = (value: Date): string => value.toISOString().slice(0, 10);
 const toDate = (value: string): Date => new Date(`${value}T00:00:00.000Z`);
 
 const CODE_RETRY_LIMIT = 3;
+// 全局编号规范（1-产品文档.md 五）：FN + 连字符 + 5 位全局流水，不含日期
+const CODE_PREFIX = 'FN-';
+const CODE_PAD = 5;
 
 const AUTO_READONLY = '自动生成的事件不可编辑或删除，请以来源单据为准';
 
@@ -77,18 +80,17 @@ export interface SaleOrderEventInput {
 export class FinanceService {
   constructor(private readonly prisma: PrismaService) {}
 
-  // 编号：年月（取发生日期）+ 当月流水（design/finance.md §4）；事务内取流水、唯一约束兜底
-  private nextCode(tx: Prisma.TransactionClient, occurredDate: string): Promise<string> {
-    const prefix = `${occurredDate.slice(0, 4)}${occurredDate.slice(5, 7)}`;
+  // 编号：FN-#####（全局流水，不含日期；design/finance.md §4）；事务内取流水、唯一约束兜底
+  private nextCode(tx: Prisma.TransactionClient): Promise<string> {
     return tx.financeEvent
       .findFirst({
-        where: { code: { startsWith: `${prefix}-` } },
+        where: { code: { startsWith: CODE_PREFIX } },
         orderBy: { code: 'desc' },
         select: { code: true },
       })
       .then((last) => {
-        const seq = last ? Number(last.code.slice(8)) + 1 : 1;
-        return `${prefix}-${String(seq).padStart(4, '0')}`;
+        const seq = last ? Number(last.code.slice(CODE_PREFIX.length)) + 1 : 1;
+        return `${CODE_PREFIX}${String(seq).padStart(CODE_PAD, '0')}`;
       });
   }
 
@@ -197,7 +199,7 @@ export class FinanceService {
     for (let attempt = 0; attempt < CODE_RETRY_LIMIT; attempt++) {
       try {
         const created = await this.prisma.client.$transaction(async (tx) => {
-          const code = await this.nextCode(tx, input.occurredDate);
+          const code = await this.nextCode(tx);
           return tx.financeEvent.create({
             data: {
               code,
@@ -333,7 +335,7 @@ export class FinanceService {
       });
       return;
     }
-    const code = await this.nextCode(tx, input.saleDate);
+    const code = await this.nextCode(tx);
     await tx.financeEvent.create({
       data: {
         code,

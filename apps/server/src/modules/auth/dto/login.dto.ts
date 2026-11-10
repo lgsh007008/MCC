@@ -25,7 +25,7 @@ export class LoginResponseDto {
   @ApiProperty({ type: String, description: '账号名' })
   username!: string;
 
-  @ApiProperty({ type: String, description: '角色（当前恒为 SALES）' })
+  @ApiProperty({ type: String, description: '角色：ADMIN / SALES / FINANCE / WORKER' })
   role!: string;
 }
 

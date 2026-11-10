@@ -72,6 +72,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 账号列表（不含密码） */
+        get: operations["UsersController_list"];
+        put?: never;
+        /** 新建账号（租户内账号唯一；初始密码至少 8 位） */
+        post: operations["UsersController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/users/{id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** 启用 / 停用账号（不能停用自己或最后一个启用管理员） */
+        patch: operations["UsersController_setStatus"];
+        trace?: never;
+    };
+    "/api/v1/users/{id}/role": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** 修改角色（不能降级最后一个启用管理员） */
+        patch: operations["UsersController_setRole"];
+        trace?: never;
+    };
+    "/api/v1/users/{id}/reset-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 重置账号密码并撤销该账号全部刷新会话 */
+        post: operations["UsersController_resetPassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/customers": {
         parameters: {
             query?: never;
@@ -345,7 +414,7 @@ export interface components {
             accessToken: string;
             /** @description 账号名 */
             username: string;
-            /** @description 角色（当前恒为 SALES） */
+            /** @description 角色：ADMIN / SALES / FINANCE / WORKER */
             role: string;
         };
         RefreshRequestDto: {
@@ -361,6 +430,69 @@ export interface components {
             oldPassword: string;
             /** @description 新密码，至少 8 位 */
             newPassword: string;
+        };
+        UserDto: {
+            /** @description 账号 id */
+            id: string;
+            /** @description 账号名 */
+            username: string;
+            /**
+             * @description 角色
+             * @enum {string}
+             */
+            role: "ADMIN" | "SALES" | "FINANCE" | "WORKER";
+            /** @description 角色显示名 */
+            roleLabel: string;
+            /**
+             * @description 状态
+             * @enum {string}
+             */
+            status: "active" | "inactive";
+            /** @description 创建时间（ISO） */
+            createdAt: string;
+        };
+        UserListDto: {
+            /** @description 总数 */
+            total: number;
+            items: components["schemas"]["UserDto"][];
+        };
+        UserCreateBodyDto: {
+            /**
+             * @description 账号（租户内唯一）
+             * @example sales01
+             */
+            username: string;
+            /**
+             * @description 初始密码（至少 8 位）
+             * @example Mcc@2026
+             */
+            password: string;
+            /**
+             * @description 角色
+             * @enum {string}
+             */
+            role: "ADMIN" | "SALES" | "FINANCE" | "WORKER";
+        };
+        UserStatusBodyDto: {
+            /**
+             * @description 启用 / 停用
+             * @enum {string}
+             */
+            status: "active" | "inactive";
+        };
+        UserRoleBodyDto: {
+            /**
+             * @description 新角色
+             * @enum {string}
+             */
+            role: "ADMIN" | "SALES" | "FINANCE" | "WORKER";
+        };
+        UserResetPasswordBodyDto: {
+            /**
+             * @description 新密码（至少 8 位）
+             * @example Mcc@2026
+             */
+            password: string;
         };
         CustomerDto: {
             /** @description 客户 id */
@@ -890,6 +1022,128 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ChangePasswordBodyDto"];
+            };
+        };
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    UsersController_list: {
+        parameters: {
+            query?: {
+                /** @description 每页条数，默认 20（最大 100） */
+                pageSize?: number;
+                /** @description 页码，默认 1 */
+                page?: number;
+                /** @description 账号名模糊 */
+                keyword?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserListDto"];
+                };
+            };
+        };
+    };
+    UsersController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserCreateBodyDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserDto"];
+                };
+            };
+        };
+    };
+    UsersController_setStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserStatusBodyDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserDto"];
+                };
+            };
+        };
+    };
+    UsersController_setRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserRoleBodyDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserDto"];
+                };
+            };
+        };
+    };
+    UsersController_resetPassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserResetPasswordBodyDto"];
             };
         };
         responses: {

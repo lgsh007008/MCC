@@ -1,22 +1,44 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { ArrowLeftIcon } from 'lucide-react';
+import { hasScope, type Scope, type UserRole } from '@mcc/shared';
+import { RoleProvider } from '@/components/auth/permission-context';
 import { refreshSession } from '@/lib/api';
-import { authSession } from '@/lib/auth/session';
+import { authSession, currentRole } from '@/lib/auth/session';
 
 // 移动 Web 壳（design/平台布局.md §1.8；ADR-011）：与 PC 后台的 AdminShell 平行，
 // 只保留顶部返回、单列内容与页面自带的底部操作条；不引入侧边栏 / 多标签页 / 面包屑。
 // 根节点 data-mode="mobile" 挂载移动令牌作用域（适老化基线，不做用户开关）。
 
+// 移动路由 → scope（与 PC 共用同一套权限，不按端拆分）
+const MOBILE_MANAGE_PATH = /^\/m\/sale-orders\/(new|[^/]+\/edit)$/;
+function scopeForMobilePath(pathname: string): Scope | null {
+  if (MOBILE_MANAGE_PATH.test(pathname)) {
+    return 'order:manage';
+  }
+  if (pathname.startsWith('/m/sale-orders')) {
+    return 'order:view';
+  }
+  return null;
+}
+
 export function MobileShell({ children }: { children: React.ReactNode }): React.ReactElement {
+  const pathname = usePathname();
+  const [role, setRole] = useState<UserRole | null>(currentRole());
+
   // 登录态守卫：与 AdminShell 同口径，挂载后经 refresh（httpOnly Cookie）静默恢复；失败跳登录页
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       const ok = authSession.get() !== null || (await refreshSession());
-      if (!cancelled && !ok) {
+      if (cancelled) {
+        return;
+      }
+      setRole(currentRole());
+      if (!ok) {
         window.location.assign('/login');
       }
     })();
@@ -25,12 +47,21 @@ export function MobileShell({ children }: { children: React.ReactNode }): React.
     };
   }, []);
 
+  const required = scopeForMobilePath(pathname);
+  const allowed = required === null || role === null || hasScope(role, required);
+
   return (
-    <div data-mode="mobile" className="min-h-svh bg-background text-base text-foreground">
-      <div className="mx-auto min-h-svh w-full max-w-[560px] border-x border-border/60 bg-background">
-        {children}
+    <RoleProvider role={role}>
+      <div data-mode="mobile" className="min-h-svh bg-background text-base text-foreground">
+        <div className="mx-auto min-h-svh w-full max-w-[560px] border-x border-border/60 bg-background">
+          {allowed ? (
+            children
+          ) : (
+            <p className="p-6 text-base text-muted-foreground">无权限访问该页面。</p>
+          )}
+        </div>
       </div>
-    </div>
+    </RoleProvider>
   );
 }
 

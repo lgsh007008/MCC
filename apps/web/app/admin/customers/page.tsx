@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ArrowDownIcon, ArrowUpIcon, BanIcon, CircleCheckIcon, EyeIcon, PencilIcon, Trash2Icon } from 'lucide-react';
 import { Button, buttonVariants } from '@/components/ui/button';
+import { useCan } from '@/components/auth/permission-context';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
@@ -69,6 +70,7 @@ async function fetchCustomerStats(
 }
 
 export default function CustomersPage(): React.ReactElement {
+  const canManage = useCan('customer:manage');
   const confirm = useConfirm();
   const [filters, setFilters] = useState({ name: '', status: '' });
   const [applied, setApplied] = useState({ name: '', status: '' });
@@ -448,28 +450,32 @@ export default function CustomersPage(): React.ReactElement {
       </form>
 
       <div className="flex items-center gap-2">
-        <Link href="/admin/customers/new" className={buttonVariants()}>
-          新建
-        </Link>
-        {selectedCustomers.length > 0 ? (
+        {canManage ? (
           <>
-            <Button
-              variant="outline"
-              disabled={inactiveSelectedCount === 0}
-              onClick={() => void batchSetStatus('active')}
-            >
-              批量启用
-            </Button>
-            <Button
-              variant="destructive"
-              disabled={activeSelectedCount === 0}
-              onClick={() => void batchSetStatus('inactive')}
-            >
-              批量停用
-            </Button>
-            <Button variant="destructive" onClick={() => void batchRemove()}>
-              批量删除
-            </Button>
+            <Link href="/admin/customers/new" className={buttonVariants()}>
+              新建
+            </Link>
+            {selectedCustomers.length > 0 ? (
+              <>
+                <Button
+                  variant="outline"
+                  disabled={inactiveSelectedCount === 0}
+                  onClick={() => void batchSetStatus('active')}
+                >
+                  批量启用
+                </Button>
+                <Button
+                  variant="destructive"
+                  disabled={activeSelectedCount === 0}
+                  onClick={() => void batchSetStatus('inactive')}
+                >
+                  批量停用
+                </Button>
+                <Button variant="destructive" onClick={() => void batchRemove()}>
+                  批量删除
+                </Button>
+              </>
+            ) : null}
           </>
         ) : null}
       </div>
@@ -480,13 +486,15 @@ export default function CustomersPage(): React.ReactElement {
         <Table containerClassName="h-full overflow-y-auto">
           <TableHeader className="sticky top-0 z-10 [&_th]:bg-muted">
             <TableRow>
-              <TableHead className="w-8">
-                <Checkbox
-                  aria-label="本页全选"
-                  checked={allSelected}
-                  onCheckedChange={(checked) => togglePage(checked === true)}
-                />
-              </TableHead>
+              {canManage ? (
+                <TableHead className="w-8">
+                  <Checkbox
+                    aria-label="本页全选"
+                    checked={allSelected}
+                    onCheckedChange={(checked) => togglePage(checked === true)}
+                  />
+                </TableHead>
+              ) : null}
               <TableHead>编号</TableHead>
               <TableHead>客户名称</TableHead>
               <TableHead>联系信息</TableHead>
@@ -519,13 +527,15 @@ export default function CustomersPage(): React.ReactElement {
             ) : (
               rows.map((customer) => (
                 <TableRow key={customer.id}>
-                  <TableCell>
-                    <Checkbox
-                      aria-label={`选择 ${customer.name}`}
-                      checked={selected.has(customer.id)}
-                      onCheckedChange={(checked) => toggleRow(customer.id, checked === true)}
-                    />
-                  </TableCell>
+                  {canManage ? (
+                    <TableCell>
+                      <Checkbox
+                        aria-label={`选择 ${customer.name}`}
+                        checked={selected.has(customer.id)}
+                        onCheckedChange={(checked) => toggleRow(customer.id, checked === true)}
+                      />
+                    </TableCell>
+                  ) : null}
                   <TableCell>
                     <Link href={`/admin/customers/${customer.id}`} className="text-primary hover:underline">
                       {customer.code}
@@ -555,37 +565,41 @@ export default function CustomersPage(): React.ReactElement {
                       >
                         <EyeIcon className="size-4" />
                       </Link>
-                      <Link
-                        href={`/admin/customers/${customer.id}/edit`}
-                        aria-label="编辑"
-                        title="编辑"
-                        className={buttonVariants({ variant: 'ghost', size: 'icon-sm' })}
-                      >
-                        <PencilIcon className="size-4" />
-                      </Link>
-                      <Button
-                        size="icon-sm"
-                        variant="ghost"
-                        aria-label={customer.status === 'active' ? '停用' : '启用'}
-                        title={customer.status === 'active' ? '停用' : '启用'}
-                        onClick={() => void toggleStatus(customer)}
-                      >
-                        {customer.status === 'active' ? (
-                          <BanIcon className="size-4 text-destructive" />
-                        ) : (
-                          <CircleCheckIcon className="size-4" />
-                        )}
-                      </Button>
-                      <Button
-                        size="icon-sm"
-                        variant="ghost"
-                        aria-label="删除"
-                        title="删除"
-                        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                        onClick={() => void removeCustomer(customer)}
-                      >
-                        <Trash2Icon className="size-4" />
-                      </Button>
+                      {canManage ? (
+                        <>
+                          <Link
+                            href={`/admin/customers/${customer.id}/edit`}
+                            aria-label="编辑"
+                            title="编辑"
+                            className={buttonVariants({ variant: 'ghost', size: 'icon-sm' })}
+                          >
+                            <PencilIcon className="size-4" />
+                          </Link>
+                          <Button
+                            size="icon-sm"
+                            variant="ghost"
+                            aria-label={customer.status === 'active' ? '停用' : '启用'}
+                            title={customer.status === 'active' ? '停用' : '启用'}
+                            onClick={() => void toggleStatus(customer)}
+                          >
+                            {customer.status === 'active' ? (
+                              <BanIcon className="size-4 text-destructive" />
+                            ) : (
+                              <CircleCheckIcon className="size-4" />
+                            )}
+                          </Button>
+                          <Button
+                            size="icon-sm"
+                            variant="ghost"
+                            aria-label="删除"
+                            title="删除"
+                            className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                            onClick={() => void removeCustomer(customer)}
+                          >
+                            <Trash2Icon className="size-4" />
+                          </Button>
+                        </>
+                      ) : null}
                     </div>
                   </TableCell>
                 </TableRow>

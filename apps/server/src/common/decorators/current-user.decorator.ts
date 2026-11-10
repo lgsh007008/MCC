@@ -1,10 +1,11 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
+import type { UserRole } from '@mcc/shared';
 
 // 守卫上下文注入的当前账号（技术方案 §8.2：前端不做安全判断，身份一律来自服务层解析）。
 export interface AuthUser {
   userId: string;
   username: string;
-  role: string;
+  role: UserRole;
 }
 
 export const CurrentUser = createParamDecorator(

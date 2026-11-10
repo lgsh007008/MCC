@@ -1,4 +1,5 @@
 export * from './pagination.schemas';
+export * from './auth.permissions';
 export * from './auth.schemas';
 export * from './customer.schemas';
 export * from './order.calc';

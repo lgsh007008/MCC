@@ -26,6 +26,7 @@ import {
   type SaleOrderUpdateInput,
 } from '@mcc/shared';
 import { CurrentUser, type AuthUser } from '../../common/decorators/current-user.decorator.js';
+import { RequireScopes } from '../../common/decorators/require-scopes.decorator.js';
 import { problem } from '../../common/http-problem.js';
 import { RedisService } from '../../common/redis.service.js';
 import { ZodValidationPipe } from '../../common/zod-validation.pipe.js';
@@ -52,6 +53,7 @@ export class OrderController {
   ) {}
 
   @Get()
+  @RequireScopes('order:view')
   @ApiOperation({ summary: '销售单列表：筛选（销售日期区间、客户）+ 排序 + 分页' })
   @ApiQuery({ name: 'customerId', required: false, type: String, description: '客户 id' })
   @ApiQuery({ name: 'dateFrom', required: false, type: String, description: '销售日期起（YYYY-MM-DD）' })
@@ -69,6 +71,7 @@ export class OrderController {
 
   // 注意：具体路径须声明在 :id 之前，否则会被 ParseUUIDPipe 当作 id 校验。
   @Get('customer-volume-summary')
+  @RequireScopes('order:view')
   @ApiOperation({ summary: '客户维度累计方量（未软删销售单合计，供客户列表/详情批量取数）' })
   @ApiQuery({ name: 'customerIds', required: true, type: String, description: '客户 id，逗号分隔（1~200）' })
   @ApiOkResponse({ type: CustomerVolumeSummaryDto })
@@ -80,6 +83,7 @@ export class OrderController {
   }
 
   @Get(':id')
+  @RequireScopes('order:view')
   @ApiOperation({ summary: '销售单详情（含明细）' })
   @ApiOkResponse({ type: SaleOrderDto })
   detail(@Param('id', ParseUUIDPipe) id: string): Promise<SaleOrderDto> {
@@ -87,6 +91,7 @@ export class OrderController {
   }
 
   @Post()
+  @RequireScopes('order:manage')
   @HttpCode(201)
   @ApiOperation({ summary: '新建销售单；重复提交防抖：请求头 Idempotency-Key' })
   @ApiBody({ type: SaleOrderBodyDto })
@@ -122,6 +127,7 @@ export class OrderController {
   }
 
   @Put(':id')
+  @RequireScopes('order:manage')
   @ApiOperation({ summary: '更新销售单（整单提交：明细重算落账）' })
   @ApiBody({ type: SaleOrderUpdateBodyDto })
   @ApiOkResponse({ type: SaleOrderDto })
@@ -133,6 +139,7 @@ export class OrderController {
   }
 
   @Post('batch-delete')
+  @RequireScopes('order:manage')
   @HttpCode(200)
   @ApiOperation({ summary: '批量删除销售单（软删除；不存在/已删行静默跳过）' })
   @ApiBody({ type: SaleOrderBatchDeleteBodyDto })
@@ -144,6 +151,7 @@ export class OrderController {
   }
 
   @Delete(':id')
+  @RequireScopes('order:manage')
   @HttpCode(204)
   @ApiOperation({ summary: '删除销售单（软删除，编号不回收）' })
   async remove(@Param('id', ParseUUIDPipe) id: string): Promise<void> {

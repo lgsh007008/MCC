@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { buttonVariants } from '@/components/ui/button';
+import { useCan } from '@/components/auth/permission-context';
 import { MobileActionBar, MobileHeader } from '@/components/mobile/mobile-shell';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -12,7 +13,6 @@ import { cn } from '@/lib/utils';
 // 底部固定「编辑」「返回列表」。
 interface SaleOrderItemDetail {
   id: string;
-  code: string;
   pricingMode: 'volume' | 'piece';
   lengthMm: number;
   widthMm: number;
@@ -27,11 +27,8 @@ interface SaleOrderItemDetail {
 
 interface SaleOrderDetail {
   id: string;
-  code: string;
   saleDate: string;
   customerName: string;
-  customerCode?: string | null;
-  customerDeleted?: boolean;
   totalVolume: string;
   subtotalAmount: string;
   otherAmount: string;
@@ -50,6 +47,7 @@ function InfoRow({ label, value }: { label: string; value: string }): React.Reac
 }
 
 export default function MobileSaleOrderDetailPage(): React.ReactElement {
+  const canManage = useCan('order:manage');
   const params = useParams<{ id: string }>();
   const [order, setOrder] = useState<SaleOrderDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -103,16 +101,11 @@ export default function MobileSaleOrderDetailPage(): React.ReactElement {
 
       <div className="space-y-4 p-4">
         <section className="rounded-xl border border-border bg-card p-4">
-          <p className="text-sm text-muted-foreground">销售单</p>
-          <p className="mt-1 text-2xl font-semibold tabular-nums">{order.code}</p>
-          <p className="mt-1 text-lg">{order.customerName}</p>
+          <p className="text-sm text-muted-foreground">客户</p>
+          <p className="mt-1 text-2xl font-semibold">{order.customerName}</p>
+          <p className="mt-1 text-base text-muted-foreground tabular-nums">{order.saleDate}</p>
 
           <div className="mt-4 space-y-2 border-t border-border pt-4">
-            <InfoRow label="销售日期" value={order.saleDate} />
-            <InfoRow
-              label="客户编号"
-              value={`${order.customerCode ?? '—'}${order.customerDeleted ? '（已删除）' : ''}`}
-            />
             <InfoRow label="产品类型" value="方木" />
             <InfoRow label="备注" value={order.note || '—'} />
           </div>
@@ -137,10 +130,10 @@ export default function MobileSaleOrderDetailPage(): React.ReactElement {
 
         <section className="space-y-3">
           <h2 className="px-1 text-base font-semibold">明细（{order.items.length} 行）</h2>
-          {order.items.map((item) => (
+          {order.items.map((item, index) => (
             <div key={item.id} className="rounded-xl border border-border bg-card p-4">
               <div className="flex items-center justify-between gap-3">
-                <span className="text-base font-medium tabular-nums">{item.code}</span>
+                <span className="text-base font-medium">第 {index + 1} 行</span>
                 <span className="text-lg font-semibold tabular-nums">{item.lineAmount} 元</span>
               </div>
               <p className="mt-2 text-base tabular-nums">
@@ -160,12 +153,14 @@ export default function MobileSaleOrderDetailPage(): React.ReactElement {
       </div>
 
       <MobileActionBar>
-        <Link
-          href={`/m/sale-orders/${order.id}/edit`}
-          className={cn(buttonVariants(), 'h-12 flex-1 text-base')}
-        >
-          编辑
-        </Link>
+        {canManage ? (
+          <Link
+            href={`/m/sale-orders/${order.id}/edit`}
+            className={cn(buttonVariants(), 'h-12 flex-1 text-base')}
+          >
+            编辑
+          </Link>
+        ) : null}
         <Link
           href="/m/sale-orders"
           className={cn(buttonVariants({ variant: 'outline' }), 'h-12 flex-1 text-base')}

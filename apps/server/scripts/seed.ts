@@ -20,7 +20,7 @@ async function main(): Promise<void> {
         data: {
           username: account.username,
           passwordHash: await hash(account.password),
-          role: 'SALES',
+          role: 'ADMIN',
         },
       });
       console.log(`账号 ${account.username} 已创建（首次登录后请及时修改密码）`);

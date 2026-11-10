@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { buttonVariants } from '@/components/ui/button';
+import { useCan } from '@/components/auth/permission-context';
 import { usePageCrumb } from '@/components/admin/page-breadcrumb';
 import { api } from '@/lib/api';
 
@@ -21,6 +22,7 @@ interface CustomerDetail {
 }
 
 export default function CustomerDetailPage(): React.ReactElement {
+  const canManage = useCan('customer:manage');
   const params = useParams<{ id: string }>();
   const [customer, setCustomer] = useState<CustomerDetail | null>(null);
   const [volume, setVolume] = useState('0.0000');
@@ -116,9 +118,11 @@ export default function CustomerDetailPage(): React.ReactElement {
       </div>
 
       <div className="flex gap-2">
-        <Link href={`/admin/customers/${customer.id}/edit`} className={buttonVariants()}>
-          编辑
-        </Link>
+        {canManage ? (
+          <Link href={`/admin/customers/${customer.id}/edit`} className={buttonVariants()}>
+            编辑
+          </Link>
+        ) : null}
         <Link href="/admin/customers" className={buttonVariants({ variant: 'outline' })}>
           返回列表
         </Link>

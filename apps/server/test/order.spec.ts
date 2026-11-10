@@ -113,7 +113,7 @@ describe('订单接口（契约/集成）', () => {
       .set('Authorization', `Bearer ${accessToken}`)
       .send(body());
     expect(res.status).toBe(201);
-    expect(String(res.body.code)).toMatch(/^202611-\d{4}$/);
+    expect(String(res.body.code)).toMatch(/^SO-\d{5}$/);
     expect(res.body.customerName).toBe(customerName);
 
     const line1 = calcLineAmount('volume', volumeLine, 3, '550.25');

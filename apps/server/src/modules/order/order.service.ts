@@ -33,6 +33,9 @@ const isoDate = (value: Date): string => value.toISOString().slice(0, 10);
 const toDate = (value: string): Date => new Date(`${value}T00:00:00.000Z`);
 
 const CODE_RETRY_LIMIT = 3;
+// 全局编号规范（1-产品文档.md 五）：SO + 连字符 + 5 位全局流水，不含日期
+const CODE_PREFIX = 'SO-';
+const CODE_PAD = 5;
 
 type RawItem = SaleOrderItemInput | SaleOrderItemUpdateInput;
 
@@ -109,19 +112,18 @@ export class OrderService {
     private readonly finance: FinanceService,
   ) {}
 
-  // 编号：年月（取销售日期）+ 当月流水，如 202611-0001（design/order.md §4）。
+  // 编号：SO-#####（全局流水，不含日期；design/order.md §4）。
   // 事务内取值 + 唯一约束兜底并发，P2002 冲突时重试。
-  private nextCode(tx: Prisma.TransactionClient, saleDate: string): Promise<string> {
-    const prefix = `${saleDate.slice(0, 4)}${saleDate.slice(5, 7)}`;
+  private nextCode(tx: Prisma.TransactionClient): Promise<string> {
     return tx.saleOrder
       .findFirst({
-        where: { code: { startsWith: `${prefix}-` } },
+        where: { code: { startsWith: CODE_PREFIX } },
         orderBy: { code: 'desc' },
         select: { code: true },
       })
       .then((last) => {
-        const seq = last ? Number(last.code.slice(8)) + 1 : 1;
-        return `${prefix}-${String(seq).padStart(4, '0')}`;
+        const seq = last ? Number(last.code.slice(CODE_PREFIX.length)) + 1 : 1;
+        return `${CODE_PREFIX}${String(seq).padStart(CODE_PAD, '0')}`;
       });
   }
 
@@ -262,7 +264,7 @@ export class OrderService {
     for (let attempt = 0; attempt < CODE_RETRY_LIMIT; attempt++) {
       try {
         const order = await this.prisma.client.$transaction(async (tx) => {
-          const code = await this.nextCode(tx, input.saleDate);
+          const code = await this.nextCode(tx);
           const created = await tx.saleOrder.create({
             data: {
               code,
