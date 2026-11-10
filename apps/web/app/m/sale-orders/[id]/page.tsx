@@ -2,15 +2,17 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
-import { buttonVariants } from '@/components/ui/button';
+import { useParams, useRouter } from 'next/navigation';
+import { Trash2Icon } from 'lucide-react';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 import { useCan } from '@/components/auth/permission-context';
 import { MobileActionBar, MobileHeader } from '@/components/mobile/mobile-shell';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 // 销售单移动详情（product/order.md 移动页）：只读卡片，无面包屑 / 标签页；
-// 底部固定「编辑」「返回列表」。
+// 底部固定「编辑」「返回列表」；`order:manage` 在明细下方可删除整单（二次确认）。
 interface SaleOrderItemDetail {
   id: string;
   pricingMode: 'volume' | 'piece';
@@ -48,9 +50,41 @@ function InfoRow({ label, value }: { label: string; value: string }): React.Reac
 
 export default function MobileSaleOrderDetailPage(): React.ReactElement {
   const canManage = useCan('order:manage');
+  const router = useRouter();
+  const confirm = useConfirm();
   const params = useParams<{ id: string }>();
   const [order, setOrder] = useState<SaleOrderDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  async function handleDelete(): Promise<void> {
+    setDeleteError(null);
+    try {
+      await confirm({
+        title: '删除销售单',
+        description: `${order?.customerName ?? ''} · ${order?.saleDate ?? ''}，删除后不可恢复，编号不回收。`,
+        confirmText: '删除',
+        tone: 'danger',
+        onConfirm: async () => {
+          setDeleting(true);
+          try {
+            const { response } = await api.DELETE('/api/v1/sale-orders/{id}', {
+              params: { path: { id: params.id } },
+            });
+            if (!response.ok) {
+              throw new Error('删除失败，请稍后重试');
+            }
+            router.replace('/m/sale-orders');
+          } finally {
+            setDeleting(false);
+          }
+        },
+      });
+    } catch {
+      setDeleteError('删除失败，请稍后重试');
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -150,6 +184,26 @@ export default function MobileSaleOrderDetailPage(): React.ReactElement {
             </div>
           ))}
         </section>
+
+        {canManage ? (
+          <section className="space-y-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="h-12 w-full border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+              disabled={deleting}
+              onClick={() => void handleDelete()}
+            >
+              <Trash2Icon className="size-4" />
+              删除销售单
+            </Button>
+            {deleteError ? (
+              <p role="alert" className="text-base text-destructive">
+                {deleteError}
+              </p>
+            ) : null}
+          </section>
+        ) : null}
       </div>
 
       <MobileActionBar>

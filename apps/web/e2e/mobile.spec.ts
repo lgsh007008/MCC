@@ -80,9 +80,24 @@ test('手机登录 → 移动入口 → 开单 → 详情 → 列表', async ({ 
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
     );
     expect(overflow).toBeLessThanOrEqual(0);
+
+    // 详情删除：单条 + 二次确认 → 回列表且卡片消失
+    await page.getByText(customerName).first().click();
+    await expect(page.getByRole('heading', { name: '销售单详情' })).toBeVisible();
+    await page.getByRole('button', { name: '删除销售单' }).click();
+    const confirmDialog = page.getByRole('alertdialog');
+    await expect(confirmDialog).toBeVisible();
+    await confirmDialog.getByRole('button', { name: '删除', exact: true }).click();
+    await expect(page).toHaveURL(/\/m\/sale-orders$/);
+    await expect(page.getByText(customerName)).toHaveCount(0);
   } finally {
     await page.request.delete(`/api/v1/customers/${customer.id}`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
   }
+
+  // 退出登录：入口页标题行右侧（product/平台布局.md 移动页）
+  await page.goto('/m');
+  await page.getByRole('button', { name: '退出登录' }).click();
+  await expect(page).toHaveURL(/\/login$/);
 });

@@ -85,11 +85,12 @@ modules/order/
 
 ## 7. 前端实现节（web）
 
+- **多端变更清单**：修改销售单的字段、校验、计算或交互时，按序核对——`packages/shared`（schema / 计算纯函数）→ `apps/server`（DTO / service）→ 重建契约（`gen:openapi` / `gen:client`）→ PC 表单 / 列表 / 详情（`components/order/sale-order-form.tsx`、`app/admin/sale-orders/**`）→ 移动端表单 / 列表 / 详情（`components/mobile/sale-order-form.tsx`、`app/m/sale-orders/**`）→ PC 与移动 E2E；移动端不展示编号等差异按 `product/order.md` 移动页口径处理，不可直接照搬 PC。
 - 列表页（`/admin/sale-orders`）：筛选 / 多选 / 排序 / 分页按列表页模式（组件拼装见 `design/平台布局.md` §1.5）；客户筛选项为下拉（数据源 customer 列表接口，含停用客户，按 `customerId` 下发），列显示 `customerName` 快照；排序参数随请求下发（sortBy / sortOrder），批量删除调 batch-delete；路由与菜单随菜单表（`design/平台布局.md` §1.3 静态配置）登记更新
 - 表单页：客户为下拉选择（数据源 customer 列表接口，只列启用客户；编辑历史单且其客户已停用或已删除时，用单据自带的 `customerId + customerName` 快照补一个选项并保持选中，不再请求客户档案，否则单据无法保存）；明细行动态增删（行操作 = 复制 / 删除，图标按钮）；复制为深拷贝当前行（去行 id，追加末尾，达 200 行禁用，新增行滚动到可见）；尺寸列顺序为长度、宽度、高度，均用文本输入 + `inputMode="numeric"`（整数毫米、不显示步进器），根数同样文本输入，计价方式下拉（按方量 / 按根数，最小宽度 `w-24`），单价标签随计价方式切换为「元/m³」或「元/根」；小计金额两种方式下均只读；输入时实时调用 `packages/shared` 计算纯函数显示方量 / 小计 / 合计（与服务端落账同源）；面包屑标识经 `usePageCrumb` 注入壳（新建 =「新建」；编辑 =「单号 / 编辑」，单号链接回详情）
 - 保存：整单提交（主表 + 明细，明细不含 `productType`），服务端固定写入方木、重算校验后落账并回传；服务端经 customer 公开接口校验客户启用态，客户未变更的更新不校验
 - 详情页：只读展示 + 编辑入口；信息条展示客户编号与名称快照、产品类型（方木）；客户档案已删除时编号后缀标注「已删除」；明细单价按行标注「元/m³」或「元/根」，不单列计价方式；面包屑标识经 `usePageCrumb` 注入壳（单号）
-- 移动页（移动 Web `/m`，ADR-011）：路由 `/m`（入口卡片）、`/m/sale-orders`（卡片列表 + 加载更多；卡片层级 = 销售日期大号 + 客户名称在上、合计方量 + 合计金额在下）、`/m/sale-orders/new`、`/m/sale-orders/[id]`（详情）、`/m/sale-orders/[id]/edit`；**移动端不展示销售单编号、客户编号与明细编码**（PC 与打印单据保留，接口字段不删）；壳用 `components/mobile/mobile-shell.tsx`（`data-mode="mobile"`，无侧边栏 / 标签页 / 面包屑），页面自带底部固定操作条；表单组件 `components/mobile/sale-order-form.tsx` 为新建 / 编辑共用，状态与校验沿用 PC 表单口径（`saleOrderUpdateSchema`、`calcVolumeM3` / `calcLineAmount` / `calcOrderTotals` 同源），明细逐行卡片、行内两列栅格、数字字段 `inputMode="numeric"`；保存成功跳 `/m/sale-orders/{id}`；不新增后端接口
+- 移动页（移动 Web `/m`，ADR-011）：路由 `/m`（入口卡片）、`/m/sale-orders`（卡片列表 + 加载更多；卡片层级 = 销售日期大号 + 客户名称在上、合计方量 + 合计金额在下）、`/m/sale-orders/new`、`/m/sale-orders/[id]`（详情）、`/m/sale-orders/[id]/edit`；**移动端不展示销售单编号、客户编号与明细编码**（PC 与打印单据保留，接口字段不删）；详情页在明细下方提供「删除销售单」（`order:manage` 才渲染，`useConfirm` 二次确认，`DELETE /api/v1/sale-orders/{id}` 成功后 `router.replace('/m/sale-orders')`）；壳用 `components/mobile/mobile-shell.tsx`（`data-mode="mobile"`，无侧边栏 / 标签页 / 面包屑），页面自带底部固定操作条；表单组件 `components/mobile/sale-order-form.tsx` 为新建 / 编辑共用，状态与校验沿用 PC 表单口径（`saleOrderUpdateSchema`、`calcVolumeM3` / `calcLineAmount` / `calcOrderTotals` 同源），明细逐行卡片、行内两列栅格、数字字段 `inputMode="numeric"`；保存成功跳 `/m/sale-orders/{id}`；不新增后端接口
 
 ## 8. 打印实现（web）
 
@@ -139,9 +140,11 @@ modules/order/
 | 8 打印实现 | 新增 | — | 新增打印实现节：A4 单联模板组件、打印预览弹窗（左侧缩放预览 + 右侧操作栏）、隐藏 iframe + 样式复制 + `createRoot` + `print()` 的打印隔离、复用详情数据不重算、E2E 与人工打印验收 | 落地 R-订单-002；预览与打印共用同一模板，打印样式不污染主文档 |
 | 8 打印实现 | 修改 | 签字栏为制单 / 司机 / 客户；未说明浏览器页眉页脚 | 签字栏固定为「客户」；操作栏提示“如出现浏览器页眉页脚，在打印对话框中取消勾选”，不用 CSS 关闭页眉页脚 | 用户确认仅需客户签字；浏览器页眉页脚不可由页面关闭，需明示提示与取舍 |
 | 7 前端实现节 | 新增 | 无移动端实现落点 | 补移动页（`/m`）实现：路由清单、`MobileShell`、新建/编辑共用移动表单、明细行卡片与数字键盘、保存跳转移动详情、复用 shared 校验与计算纯函数、不新增后端接口 | 落地产品文档新增的销售单移动页（ADR-011），明确实现路径与复用边界 |
+| 7 前端实现节 | 新增 | 未约定多端变更核对顺序 | 新增「多端变更清单」：shared → server DTO/service → 重建契约 → PC 表单/列表/详情 → 移动表单/列表/详情 → PC 与移动 E2E；移动端不展示编号等差异按产品文档移动页口径处理 | 避免后续只改 PC、漏掉移动端；把影响面写进实现节，AI 与开发者可直接照单核对 |
 | 7 前端实现节 · 移动列表 | 修改 | 移动卡片未写层级口径 | 补「卡片层级 = 销售日期大号 + 客户名称在上、编号小字 + 合计金额在下」 | 与产品文档移动页列表对调主次信息同步，避免实现再按旧层级写 |
 | 4 编号生成 | 修改 | 主单编号 `YYYYMM-####`（取销售日期年月 + 当月流水） | 改为 `SO-#####`：取 `SO-` 前缀最大流水 +1，不含日期；明细仍为主单号 + 行序（如 `SO-00001-01`） | 全局编号规范统一弃用日期前缀，改按域字母识别；`nextCode` 不再读取 `saleDate` |
 | 7 前端实现节 · 移动页 | 修改 | 移动列表底行显示单号、详情标题显示单号与客户编号、明细行显示明细编码 | 移动端不渲染任何编号：列表底行改合计方量 + 合计金额；详情标题区改为客户名称 + 销售日期，信息条去掉客户编号，明细行头改为「第 x 行」；接口与 PC / 打印保持原样 | 现场使用不看编号；隐藏只发生在移动端展示层，不改数据与契约 |
+| 7 前端实现节 · 移动详情 | 新增 | 移动端无删除入口 | 明细下方增加「删除销售单」（`order:manage` 才渲染）：`useConfirm` 二次确认 → `DELETE /api/v1/sale-orders/{id}` → `router.replace('/m/sale-orders')`；失败页内提示 | 现场录错单需要可删；单条删除 + 二次确认控制误触，不做批量与滑动删除 |
 
 ---
 

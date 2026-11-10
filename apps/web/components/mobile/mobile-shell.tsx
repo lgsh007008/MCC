@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { ArrowLeftIcon } from 'lucide-react';
 import { hasScope, type Scope, type UserRole } from '@mcc/shared';
 import { RoleProvider } from '@/components/auth/permission-context';
+import { ConfirmProvider } from '@/components/ui/confirm-dialog';
 import { refreshSession } from '@/lib/api';
 import { authSession, currentRole } from '@/lib/auth/session';
 
@@ -52,15 +53,17 @@ export function MobileShell({ children }: { children: React.ReactNode }): React.
 
   return (
     <RoleProvider role={role}>
-      <div data-mode="mobile" className="min-h-svh bg-background text-base text-foreground">
-        <div className="mx-auto min-h-svh w-full max-w-[560px] border-x border-border/60 bg-background">
-          {allowed ? (
-            children
-          ) : (
-            <p className="p-6 text-base text-muted-foreground">无权限访问该页面。</p>
-          )}
+      <ConfirmProvider>
+        <div data-mode="mobile" className="min-h-svh bg-background text-base text-foreground">
+          <div className="mx-auto min-h-svh w-full max-w-[560px] border-x border-border/60 bg-background">
+            {allowed ? (
+              children
+            ) : (
+              <p className="p-6 text-base text-muted-foreground">无权限访问该页面。</p>
+            )}
+          </div>
         </div>
-      </div>
+      </ConfirmProvider>
     </RoleProvider>
   );
 }
@@ -68,9 +71,11 @@ export function MobileShell({ children }: { children: React.ReactNode }): React.
 export function MobileHeader({
   title,
   backHref,
+  action,
 }: {
   title: string;
   backHref?: string;
+  action?: React.ReactNode;
 }): React.ReactElement {
   return (
     <header className="sticky top-0 z-20 flex h-14 items-center gap-1 border-b border-border bg-background px-2">
@@ -85,6 +90,7 @@ export function MobileHeader({
         </Link>
       ) : null}
       <h1 className="min-w-0 flex-1 truncate px-1 text-lg font-semibold">{title}</h1>
+      {action ? <div className="shrink-0">{action}</div> : null}
     </header>
   );
 }
