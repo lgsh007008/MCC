@@ -160,7 +160,7 @@ export class OrderService {
   }
 
   async list(query: SaleOrderListQuery): Promise<SaleOrderListDto> {
-    const where: Prisma.SaleOrderWhereInput = {};
+    const where: Prisma.SaleOrderWhereInput = { deletedAt: null };
     if (query.customerId) {
       where.customerId = query.customerId;
     }

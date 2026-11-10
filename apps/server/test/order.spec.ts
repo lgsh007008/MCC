@@ -267,7 +267,13 @@ describe('订单接口（契约/集成）', () => {
     expect(decimalMm.body.code).toBe('VALIDATION_FAILED');
   });
 
-  it('删除：软删除后详情与后续删除均为 404', async () => {
+  it('删除：软删除后详情、列表与后续删除均不可见', async () => {
+    const before = await http()
+      .get(`/${API_PREFIX}/sale-orders`)
+      .query({ page: 1, pageSize: 20, customerId })
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(before.status).toBe(200);
+
     const del = await http()
       .delete(`/${API_PREFIX}/sale-orders/${created.id}`)
       .set('Authorization', `Bearer ${accessToken}`);
@@ -278,6 +284,16 @@ describe('订单接口（契约/集成）', () => {
       .set('Authorization', `Bearer ${accessToken}`);
     expect(detail.status).toBe(404);
     expect(detail.body.code).toBe('NOT_FOUND');
+
+    const listed = await http()
+      .get(`/${API_PREFIX}/sale-orders`)
+      .query({ page: 1, pageSize: 20, customerId })
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(listed.status).toBe(200);
+    expect(listed.body.total).toBe(before.body.total - 1);
+    expect(
+      listed.body.items.some((item: { id: string }) => item.id === created.id),
+    ).toBe(false);
 
     const delAgain = await http()
       .delete(`/${API_PREFIX}/sale-orders/${created.id}`)

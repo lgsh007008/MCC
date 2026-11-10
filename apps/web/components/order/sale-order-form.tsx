@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { api } from '@/lib/api';
+import { randomUuid } from '@/lib/uuid';
 import { cn } from '@/lib/utils';
 
 // 销售单表单（product/order.md R-订单-001；页面模式规范见 product/平台布局.md）：
@@ -290,7 +291,7 @@ export function SaleOrderForm({
       } else {
         const { data, response } = await api.POST('/api/v1/sale-orders', {
           body: parsed.data,
-          headers: { 'Idempotency-Key': crypto.randomUUID() },
+          headers: { 'Idempotency-Key': randomUuid() },
         });
         if (!response.ok || !data) {
           const body = (await response.json().catch(() => null)) as { message?: string } | null;
