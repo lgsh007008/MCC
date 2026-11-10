@@ -7,14 +7,14 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 // ── 请求体 ──────────────────────────────────────────────
 
 export class SaleOrderItemBodyDto {
-  @ApiProperty({ type: Number, description: '厚度（整数毫米）', example: 20 })
-  thicknessMm!: number;
+  @ApiProperty({ type: Number, description: '长度（整数毫米）', example: 3000 })
+  lengthMm!: number;
 
   @ApiProperty({ type: Number, description: '宽度（整数毫米）', example: 100 })
   widthMm!: number;
 
-  @ApiProperty({ type: Number, description: '长度（整数毫米）', example: 3000 })
-  lengthMm!: number;
+  @ApiProperty({ type: Number, description: '高度（整数毫米，即原厚度）', example: 20 })
+  heightMm!: number;
 
   @ApiProperty({ type: Number, description: '根数（正整数）', example: 10 })
   pieces!: number;
@@ -98,14 +98,14 @@ export class SaleOrderItemResponseDto {
   @ApiProperty({ type: String, enum: ['volume', 'piece'], description: '计价方式：volume 按方量 / piece 按根数' })
   pricingMode!: 'volume' | 'piece';
 
-  @ApiProperty({ type: Number, description: '厚度（整数毫米）' })
-  thicknessMm!: number;
+  @ApiProperty({ type: Number, description: '长度（整数毫米）' })
+  lengthMm!: number;
 
   @ApiProperty({ type: Number, description: '宽度（整数毫米）' })
   widthMm!: number;
 
-  @ApiProperty({ type: Number, description: '长度（整数毫米）' })
-  lengthMm!: number;
+  @ApiProperty({ type: Number, description: '高度（整数毫米，即原厚度）' })
+  heightMm!: number;
 
   @ApiProperty({ type: Number, description: '根数' })
   pieces!: number;

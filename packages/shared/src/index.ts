@@ -3,4 +3,6 @@ export * from './auth.schemas';
 export * from './customer.schemas';
 export * from './order.calc';
 export * from './order.schemas';
+export * from './finance.calc';
+export * from './finance.schemas';
 export * from './api-client';

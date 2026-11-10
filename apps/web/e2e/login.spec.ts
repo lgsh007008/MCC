@@ -83,13 +83,13 @@ test('登录 → 首页 → 订单菜单 → 销售单列表 → 退出 → 未�
   // 客户下拉：应用内下拉（非原生 select），点触发器后选上一步新建的客户
   await page.getByLabel('客户', { exact: true }).click();
   await page.getByRole('option', { name: customerName }).click();
-  // 明细行按单元格定位：厚度 / 宽度 / 长度 / 根数 / 单价
+  // 明细行按单元格定位：长度 / 宽度 / 高度 / 根数 / 单价
   const row = page.locator('tbody tr').first();
   const cellInput = (index: number): ReturnType<typeof row.locator> =>
     row.locator('td').nth(index).locator('input');
-  await cellInput(0).fill('20');
+  await cellInput(0).fill('3000');
   await cellInput(1).fill('100');
-  await cellInput(2).fill('3000');
+  await cellInput(2).fill('20');
   await cellInput(3).fill('10');
   await cellInput(6).fill('600.00');
   await page.getByRole('button', { name: '保存' }).click();

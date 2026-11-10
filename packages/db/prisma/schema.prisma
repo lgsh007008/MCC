@@ -199,10 +199,10 @@ model SaleOrderItem {
   productType SaleOrderItemType   @default(SQUARE_TIMBER) @map("product_type")
   pricingMode SaleOrderPricingMode @default(VOLUME) @map("pricing_mode")
 
-  // 尺寸：整数毫米；方量对所有行非空（每行都计算，工资依据）
-  thicknessMm Int      @map("thickness_mm")
-  widthMm     Int      @map("width_mm")
+  // 尺寸：整数毫米，顺序为长、宽、高；方量对所有行非空（每行都计算，工资依据）
   lengthMm    Int      @map("length_mm")
+  widthMm     Int      @map("width_mm")
+  heightMm    Int      @map("height_mm")
   pieces      Int      @map("pieces")
   volumeM3    Decimal  @map("volume_m3") @db.Decimal(18, 4)
   price       Decimal  @map("price") @db.Decimal(18, 2)
@@ -215,4 +215,56 @@ model SaleOrderItem {
   @@unique([orderId, seq])
   @@index([orderId])
   @@map("sale_order_items")
+}
+
+// ── 财务领域（finance，design/finance.md §2）────────────────
+// 业务发生台账：单式流水，一笔业务一条事件，金额有符号（收入正、支出负）。
+// 管理会计口径，不做复式记账（product/finance.md R-财务-001 口径声明）。
+// 自动事件（销售收入）由订单域在同一事务内经 FinanceService 写入，源单唯一约束防重复。
+
+enum FinanceEventCategory {
+  // 收入类为正；成本 / 费用类为负（符号由服务端按分类规范化）
+  SALES_REVENUE
+  OTHER_REVENUE
+  PURCHASE_COST
+  LABOR_COST
+  OTHER_EXPENSE
+
+  @@map("finance_event_category")
+}
+
+enum FinanceEventSource {
+  // AUTO：由业务单据自动生成（当前仅销售单 → 销售收入）；MANUAL：手工记账
+  AUTO
+  MANUAL
+
+  @@map("finance_event_source")
+}
+
+model FinanceEvent {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @default("default") @map("tenant_id")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at")
+
+  // 事件编号：年月+当月流水（取发生日期年月，如 202611-0001），只读、永不复用
+  code         String               @map("code")
+  occurredDate DateTime             @map("occurred_date") @db.Date
+  category     FinanceEventCategory @map("category")
+  // 有符号金额（收入正、支出负），2 位小数
+  amount       Decimal              @map("amount") @db.Decimal(18, 2)
+  note         String               @default("") @map("note")
+  source       FinanceEventSource   @default(MANUAL) @map("source")
+  // 源单：自动事件记录销售单类型 / id / 编号；手工事件为空
+  sourceType   String?              @map("source_type")
+  sourceId     String?              @db.Uuid @map("source_id")
+  sourceCode   String?              @map("source_code")
+
+  @@unique([tenantId, code])
+  // 源单唯一：同一单据只生成一条事件（手工事件三列为 NULL，唯一索引允许多个 NULL）
+  @@unique([tenantId, sourceType, sourceId])
+  @@index([occurredDate])
+  @@index([category])
+  @@map("finance_events")
 }

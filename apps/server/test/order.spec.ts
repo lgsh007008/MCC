@@ -27,8 +27,8 @@ describe('订单接口（契约/集成）', () => {
   const password = 'Secret#12345';
   const customerName = `it-order-customer-${Date.now()}`;
 
-  const volumeLine = calcVolumeM3(20, 80, 300, 3);
-  const pieceVolume = calcVolumeM3(20, 100, 3000, 10);
+  const volumeLine = calcVolumeM3(300, 80, 20, 3);
+  const pieceVolume = calcVolumeM3(3000, 100, 20, 10);
 
   const body = (): SaleOrderInput => ({
     saleDate: '2026-11-09',
@@ -37,9 +37,9 @@ describe('订单接口（契约/集成）', () => {
     note: '集成测试单',
     items: [
       {
-        thicknessMm: 20,
-        widthMm: 80,
         lengthMm: 300,
+        widthMm: 80,
+        heightMm: 20,
         pieces: 3,
         pricingMode: 'volume',
         price: '550.25',
@@ -47,9 +47,9 @@ describe('订单接口（契约/集成）', () => {
         note: '',
       },
       {
-        thicknessMm: 20,
-        widthMm: 100,
         lengthMm: 3000,
+        widthMm: 100,
+        heightMm: 20,
         pieces: 10,
         pricingMode: 'piece',
         price: '40.00',
@@ -83,6 +83,14 @@ describe('订单接口（契约/集成）', () => {
   });
 
   afterAll(async () => {
+    // 订单创建会联动生成财务事件（design/finance.md §6），先按源单清理再删订单
+    const orders = await prisma.client.saleOrder.findMany({
+      where: { customerId },
+      select: { id: true },
+    });
+    await prisma.client.financeEvent.deleteMany({
+      where: { sourceType: 'sale_order', sourceId: { in: orders.map((row) => row.id) } },
+    });
     await prisma.client.saleOrder.deleteMany({ where: { customerId } });
     await prisma.client.customer.deleteMany({ where: { name: { startsWith: 'it-order-' } } });
     await prisma.client.user.deleteMany({ where: { username: { startsWith: 'it-order-user-' } } });
@@ -130,6 +138,7 @@ describe('订单接口（契约/集成）', () => {
     expect(res.body.items[0].code).toBe(`${res.body.code}-01`);
     expect(res.body.items[0].productType).toBe('square_timber');
     expect(res.body.items[0].pricingMode).toBe('volume');
+    expect(res.body.items[0].heightMm).toBe(20);
     expect(res.body.items[0].volumeM3).toBe(volumeLine);
     expect(res.body.items[1].pricingMode).toBe('piece');
     expect(res.body.items[1].volumeM3).toBe(pieceVolume);
@@ -187,9 +196,9 @@ describe('订单接口（契约/集成）', () => {
         items: [
           {
             id: firstRow.id,
-            thicknessMm: 20,
-            widthMm: 80,
             lengthMm: 300,
+            widthMm: 80,
+            heightMm: 20,
             pieces: 4,
             pricingMode: 'piece',
             price: '12.50',
@@ -200,7 +209,7 @@ describe('订单接口（契约/集成）', () => {
       });
     expect(res.status).toBe(200);
     expect(res.body.items).toHaveLength(1);
-    const volume4 = calcVolumeM3(20, 80, 300, 4);
+    const volume4 = calcVolumeM3(300, 80, 20, 4);
     expect(res.body.items[0].volumeM3).toBe(volume4);
     expect(res.body.items[0].pricingMode).toBe('piece');
     expect(res.body.items[0].lineAmount).toBe(calcLineAmount('piece', volume4, 4, '12.50'));
@@ -252,7 +261,7 @@ describe('订单接口（契约/集成）', () => {
       .set('Authorization', `Bearer ${accessToken}`)
       .send({
         ...body(),
-        items: [{ ...body().items[0], thicknessMm: 20.5 }],
+        items: [{ ...body().items[0], heightMm: 20.5 }],
       });
     expect(decimalMm.status).toBe(400);
     expect(decimalMm.body.code).toBe('VALIDATION_FAILED');

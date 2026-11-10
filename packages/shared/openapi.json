@@ -452,6 +452,311 @@
         ]
       }
     },
+    "/api/v1/finance/events": {
+      "get": {
+        "operationId": "FinanceController_list",
+        "parameters": [
+          {
+            "name": "sortOrder",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "occurredDate",
+                "amount"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "description": "每页条数，默认 20（最大 100）",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "页码，默认 1",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "source",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "auto",
+                "manual"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "category",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "sales_revenue",
+                "other_revenue",
+                "purchase_cost",
+                "labor_cost",
+                "other_expense"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateTo",
+            "required": false,
+            "in": "query",
+            "description": "发生日期止（YYYY-MM-DD）",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateFrom",
+            "required": false,
+            "in": "query",
+            "description": "发生日期起（YYYY-MM-DD）",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FinanceEventListDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "财务事件列表：筛选（发生日期区间、分类、来源）+ 排序 + 分页",
+        "tags": [
+          "finance"
+        ]
+      },
+      "post": {
+        "operationId": "FinanceController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FinanceEventBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FinanceEventDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "手工记账（仅其他收入 / 其他支出；金额按正数提交）",
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/summary": {
+      "get": {
+        "operationId": "FinanceController_summary",
+        "parameters": [
+          {
+            "name": "dateTo",
+            "required": false,
+            "in": "query",
+            "description": "发生日期止（YYYY-MM-DD）",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateFrom",
+            "required": false,
+            "in": "query",
+            "description": "发生日期起（YYYY-MM-DD）",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FinanceSummaryDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "收支汇总（日期区间实时聚合：总收入 / 总成本 / 净利润 / 分类小计）",
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/events/{id}": {
+      "get": {
+        "operationId": "FinanceController_detail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FinanceEventDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "财务事件详情",
+        "tags": [
+          "finance"
+        ]
+      },
+      "put": {
+        "operationId": "FinanceController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FinanceEventUpdateBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FinanceEventDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "更新手工事件（自动生成的事件不可编辑）",
+        "tags": [
+          "finance"
+        ]
+      },
+      "delete": {
+        "operationId": "FinanceController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "删除手工事件（软删除；自动事件拒绝）",
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/events/batch-delete": {
+      "post": {
+        "operationId": "FinanceController_batchDelete",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FinanceEventBatchDeleteBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FinanceEventBatchDeleteResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "批量删除手工事件（软删除；自动事件与不存在行静默跳过）",
+        "tags": [
+          "finance"
+        ]
+      }
+    },
     "/api/v1/sale-orders": {
       "get": {
         "operationId": "OrderController_list",
@@ -1017,6 +1322,339 @@
           "deleted"
         ]
       },
+      "FinanceEventSummaryDto": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "string",
+            "description": "金额合计（有符号，筛选全量）"
+          }
+        },
+        "required": [
+          "amount"
+        ]
+      },
+      "FinanceEventListItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "description": "事件编号（年月+当月流水）"
+          },
+          "occurredDate": {
+            "type": "string",
+            "description": "发生日期"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "sales_revenue",
+              "other_revenue",
+              "purchase_cost",
+              "labor_cost",
+              "other_expense"
+            ],
+            "description": "分类"
+          },
+          "amount": {
+            "type": "string",
+            "description": "金额（有符号：收入正、支出负）"
+          },
+          "note": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "manual"
+            ],
+            "description": "来源：自动 / 手工"
+          },
+          "sourceType": {
+            "type": "string",
+            "nullable": true,
+            "description": "源单类型（如 sale_order）"
+          },
+          "sourceId": {
+            "type": "string",
+            "nullable": true,
+            "description": "源单 id"
+          },
+          "sourceCode": {
+            "type": "string",
+            "nullable": true,
+            "description": "源单编号"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "occurredDate",
+          "category",
+          "amount",
+          "note",
+          "source"
+        ]
+      },
+      "FinanceEventListDto": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "number",
+            "description": "总数"
+          },
+          "summary": {
+            "description": "筛选全量汇总（合计行）",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FinanceEventSummaryDto"
+              }
+            ]
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FinanceEventListItemDto"
+            }
+          }
+        },
+        "required": [
+          "total",
+          "summary",
+          "items"
+        ]
+      },
+      "FinanceCategorySubtotalDto": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "type": "string",
+            "enum": [
+              "sales_revenue",
+              "other_revenue",
+              "purchase_cost",
+              "labor_cost",
+              "other_expense"
+            ]
+          },
+          "income": {
+            "type": "string",
+            "description": "收入小计"
+          },
+          "cost": {
+            "type": "string",
+            "description": "成本小计（绝对值）"
+          },
+          "net": {
+            "type": "string",
+            "description": "净额（收入 − 成本）"
+          }
+        },
+        "required": [
+          "category",
+          "income",
+          "cost",
+          "net"
+        ]
+      },
+      "FinanceSummaryDto": {
+        "type": "object",
+        "properties": {
+          "totalIncome": {
+            "type": "string",
+            "description": "总收入"
+          },
+          "totalCost": {
+            "type": "string",
+            "description": "总成本（绝对值）"
+          },
+          "netProfit": {
+            "type": "string",
+            "description": "净利润 = 总收入 − 总成本"
+          },
+          "eventCount": {
+            "type": "number",
+            "description": "事件条数"
+          },
+          "categories": {
+            "description": "分类小计（五类固定输出）",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FinanceCategorySubtotalDto"
+            }
+          }
+        },
+        "required": [
+          "totalIncome",
+          "totalCost",
+          "netProfit",
+          "eventCount",
+          "categories"
+        ]
+      },
+      "FinanceEventDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "description": "事件编号（年月+当月流水）"
+          },
+          "occurredDate": {
+            "type": "string",
+            "description": "发生日期"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "sales_revenue",
+              "other_revenue",
+              "purchase_cost",
+              "labor_cost",
+              "other_expense"
+            ],
+            "description": "分类"
+          },
+          "amount": {
+            "type": "string",
+            "description": "金额（有符号：收入正、支出负）"
+          },
+          "note": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "manual"
+            ],
+            "description": "来源：自动 / 手工"
+          },
+          "sourceType": {
+            "type": "string",
+            "nullable": true,
+            "description": "源单类型（如 sale_order）"
+          },
+          "sourceId": {
+            "type": "string",
+            "nullable": true,
+            "description": "源单 id"
+          },
+          "sourceCode": {
+            "type": "string",
+            "nullable": true,
+            "description": "源单编号"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "occurredDate",
+          "category",
+          "amount",
+          "note",
+          "source"
+        ]
+      },
+      "FinanceEventBodyDto": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "type": "string",
+            "enum": [
+              "other_revenue",
+              "other_expense"
+            ],
+            "description": "分类：手工记账仅允许 other_revenue（其他收入）/ other_expense（其他支出）"
+          },
+          "occurredDate": {
+            "type": "string",
+            "description": "发生日期",
+            "example": "2026-11-10"
+          },
+          "amount": {
+            "type": "string",
+            "description": "金额（按正数提交、最多 2 位小数；符号由分类决定）",
+            "example": "350.25"
+          },
+          "note": {
+            "type": "string",
+            "description": "备注（具体事由）",
+            "default": ""
+          }
+        },
+        "required": [
+          "category",
+          "occurredDate",
+          "amount"
+        ]
+      },
+      "FinanceEventUpdateBodyDto": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "type": "string",
+            "enum": [
+              "other_revenue",
+              "other_expense"
+            ],
+            "description": "分类：手工记账仅允许 other_revenue（其他收入）/ other_expense（其他支出）"
+          },
+          "occurredDate": {
+            "type": "string",
+            "description": "发生日期",
+            "example": "2026-11-10"
+          },
+          "amount": {
+            "type": "string",
+            "description": "金额（按正数提交、最多 2 位小数；符号由分类决定）",
+            "example": "350.25"
+          },
+          "note": {
+            "type": "string",
+            "description": "备注（具体事由）",
+            "default": ""
+          }
+        },
+        "required": [
+          "category",
+          "occurredDate",
+          "amount"
+        ]
+      },
+      "FinanceEventBatchDeleteBodyDto": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "description": "要删除的事件 id 列表（1~200，仅手工事件）",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "ids"
+        ]
+      },
+      "FinanceEventBatchDeleteResponseDto": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "number",
+            "description": "实际删除（软删除）条数"
+          }
+        },
+        "required": [
+          "deleted"
+        ]
+      },
       "SaleOrderSummaryDto": {
         "type": "object",
         "properties": {
@@ -1189,17 +1827,17 @@
             ],
             "description": "计价方式：volume 按方量 / piece 按根数"
           },
-          "thicknessMm": {
+          "lengthMm": {
             "type": "number",
-            "description": "厚度（整数毫米）"
+            "description": "长度（整数毫米）"
           },
           "widthMm": {
             "type": "number",
             "description": "宽度（整数毫米）"
           },
-          "lengthMm": {
+          "heightMm": {
             "type": "number",
-            "description": "长度（整数毫米）"
+            "description": "高度（整数毫米，即原厚度）"
           },
           "pieces": {
             "type": "number",
@@ -1232,9 +1870,9 @@
           "code",
           "productType",
           "pricingMode",
-          "thicknessMm",
-          "widthMm",
           "lengthMm",
+          "widthMm",
+          "heightMm",
           "pieces",
           "volumeM3",
           "price",
@@ -1314,20 +1952,20 @@
       "SaleOrderItemBodyDto": {
         "type": "object",
         "properties": {
-          "thicknessMm": {
+          "lengthMm": {
             "type": "number",
-            "description": "厚度（整数毫米）",
-            "example": 20
+            "description": "长度（整数毫米）",
+            "example": 3000
           },
           "widthMm": {
             "type": "number",
             "description": "宽度（整数毫米）",
             "example": 100
           },
-          "lengthMm": {
+          "heightMm": {
             "type": "number",
-            "description": "长度（整数毫米）",
-            "example": 3000
+            "description": "高度（整数毫米，即原厚度）",
+            "example": 20
           },
           "pieces": {
             "type": "number",
@@ -1360,9 +1998,9 @@
           }
         },
         "required": [
-          "thicknessMm",
-          "widthMm",
           "lengthMm",
+          "widthMm",
+          "heightMm",
           "pieces",
           "pricingMode",
           "price"
@@ -1407,20 +2045,20 @@
       "SaleOrderItemUpdateBodyDto": {
         "type": "object",
         "properties": {
-          "thicknessMm": {
+          "lengthMm": {
             "type": "number",
-            "description": "厚度（整数毫米）",
-            "example": 20
+            "description": "长度（整数毫米）",
+            "example": 3000
           },
           "widthMm": {
             "type": "number",
             "description": "宽度（整数毫米）",
             "example": 100
           },
-          "lengthMm": {
+          "heightMm": {
             "type": "number",
-            "description": "长度（整数毫米）",
-            "example": 3000
+            "description": "高度（整数毫米，即原厚度）",
+            "example": 20
           },
           "pieces": {
             "type": "number",
@@ -1457,9 +2095,9 @@
           }
         },
         "required": [
-          "thicknessMm",
-          "widthMm",
           "lengthMm",
+          "widthMm",
+          "heightMm",
           "pieces",
           "pricingMode",
           "price"

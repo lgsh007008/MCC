@@ -118,9 +118,9 @@ describe('客户接口（契约/集成）', () => {
       note: '',
       items: [
         {
-          thicknessMm: 20,
-          widthMm: 80,
           lengthMm: 300,
+          widthMm: 80,
+          heightMm: 20,
           pieces: 3,
           pricingMode: 'volume',
           price: '550.25',
@@ -144,9 +144,9 @@ describe('客户接口（契约/集成）', () => {
       note: '',
       items: [
         {
-          thicknessMm: 20,
-          widthMm: 80,
           lengthMm: 300,
+          widthMm: 80,
+          heightMm: 20,
           pieces: 3,
           pricingMode: 'volume',
           price: '550.25',
@@ -240,9 +240,9 @@ describe('客户接口（契约/集成）', () => {
       note: '',
       items: [
         {
-          thicknessMm: 20,
-          widthMm: 80,
           lengthMm: 300,
+          widthMm: 80,
+          heightMm: 20,
           pieces: 3,
           pricingMode: 'volume',
           price: '550.25',
@@ -274,9 +274,9 @@ describe('客户接口（契约/集成）', () => {
       note: '',
       items: [
         {
-          thicknessMm: 20,
-          widthMm: 80,
           lengthMm: 300,
+          widthMm: 80,
+          heightMm: 20,
           pieces: 3,
           pricingMode: 'volume',
           price: '550.25',

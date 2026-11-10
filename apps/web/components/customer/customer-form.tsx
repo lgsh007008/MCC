@@ -111,16 +111,17 @@ export function CustomerForm({
       <section className="rounded-lg border border-border bg-card p-4">
         <h2 className="text-sm font-semibold">客户</h2>
         <div className="mt-3 grid gap-3 xl:grid-cols-2">
-          <Field label="客户编号" htmlFor="customerCode">
-            <Input
-              id="customerCode"
-              value={initial?.code ?? ''}
-              placeholder="系统生成"
-              readOnly
-              disabled
-              className="h-8 w-40"
-            />
-          </Field>
+          {initial?.code ? (
+            <Field label="客户编号" htmlFor="customerCode">
+              <Input
+                id="customerCode"
+                value={initial.code}
+                readOnly
+                disabled
+                className="h-8 w-40"
+              />
+            </Field>
+          ) : null}
           <Field label="客户名称" htmlFor="customerName">
             <div className="w-full max-w-72">
               <Input

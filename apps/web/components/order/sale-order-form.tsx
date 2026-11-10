@@ -28,15 +28,15 @@ import { cn } from '@/lib/utils';
 
 // 销售单表单（product/order.md R-订单-001；页面模式规范见 product/平台布局.md）：
 // 新建与编辑共用。产品类型固定方木、不在表单出现；计价方式行级选择（默认按方量）。
-// 尺寸为整数毫米，方量两种计价方式下都实时计算（工资依据）。实时计算与落账同源（design/order.md §7）。
+// 尺寸为整数毫米，录入顺序为长、宽、高；方量两种计价方式下都实时计算（工资依据）。实时计算与落账同源（design/order.md §7）。
 
 const MAX_ROWS = 200;
 
 interface FormRow {
   id?: string;
-  thicknessMm: string;
-  widthMm: string;
   lengthMm: string;
+  widthMm: string;
+  heightMm: string;
   pieces: string;
   pricingMode: 'volume' | 'piece';
   price: string;
@@ -53,9 +53,9 @@ export interface SaleOrderFormInitial {
   note: string;
   items: Array<{
     id: string;
-    thicknessMm: number;
-    widthMm: number;
     lengthMm: number;
+    widthMm: number;
+    heightMm: number;
     pieces: number;
     pricingMode: 'volume' | 'piece';
     price: string;
@@ -81,9 +81,9 @@ interface CustomerOption {
 }
 
 const emptyRow = (): FormRow => ({
-  thicknessMm: '',
-  widthMm: '',
   lengthMm: '',
+  widthMm: '',
+  heightMm: '',
   pieces: '',
   pricingMode: 'volume',
   price: '',
@@ -127,9 +127,9 @@ export function SaleOrderForm({
     initial
       ? initial.items.map((item) => ({
           id: item.id,
-          thicknessMm: String(item.thicknessMm),
-          widthMm: String(item.widthMm),
           lengthMm: String(item.lengthMm),
+          widthMm: String(item.widthMm),
+          heightMm: String(item.heightMm),
           pieces: String(item.pieces),
           pricingMode: item.pricingMode,
           price: item.price,
@@ -218,18 +218,18 @@ export function SaleOrderForm({
   // 方量：整数毫米、两种计价方式都计算；行金额由计价方式决定
   const rowCalc = (row: FormRow): { volume?: string; line?: string } => {
     if (
-      !intOk(row.thicknessMm) ||
-      !intOk(row.widthMm) ||
       !intOk(row.lengthMm) ||
+      !intOk(row.widthMm) ||
+      !intOk(row.heightMm) ||
       !intOk(row.pieces) ||
       !decimalOk(row.price, 2)
     ) {
       return {};
     }
     const volume = calcVolumeM3(
-      Number(row.thicknessMm),
-      Number(row.widthMm),
       Number(row.lengthMm),
+      Number(row.widthMm),
+      Number(row.heightMm),
       Number(row.pieces),
     );
     return {
@@ -260,9 +260,9 @@ export function SaleOrderForm({
       note,
       items: items.map((row) => ({
         id: row.id,
-        thicknessMm: row.thicknessMm,
-        widthMm: row.widthMm,
         lengthMm: row.lengthMm,
+        widthMm: row.widthMm,
+        heightMm: row.heightMm,
         pieces: row.pieces === '' ? undefined : Number(row.pieces),
         pricingMode: row.pricingMode,
         price: row.price,
@@ -382,9 +382,9 @@ export function SaleOrderForm({
           <Table containerRef={detailScrollRef} containerClassName="max-h-[420px] overflow-y-auto">
             <TableHeader className="sticky top-0 z-10 [&_th]:bg-muted">
               <TableRow>
-                <TableHead>厚度(mm)</TableHead>
-                <TableHead>宽度(mm)</TableHead>
                 <TableHead>长度(mm)</TableHead>
+                <TableHead>宽度(mm)</TableHead>
+                <TableHead>高度(mm)</TableHead>
                 <TableHead>根数</TableHead>
                 <TableHead>计价方式</TableHead>
                 <TableHead className="text-right">方量(m³)</TableHead>
@@ -403,8 +403,8 @@ export function SaleOrderForm({
                     <TableCell>
                       <Input
                         inputMode="numeric"
-                        value={row.thicknessMm}
-                        onChange={(e) => patchRow(index, { thicknessMm: e.target.value })}
+                        value={row.lengthMm}
+                        onChange={(e) => patchRow(index, { lengthMm: e.target.value })}
                         className="h-8 w-20 text-right tabular-nums"
                       />
                     </TableCell>
@@ -419,8 +419,8 @@ export function SaleOrderForm({
                     <TableCell>
                       <Input
                         inputMode="numeric"
-                        value={row.lengthMm}
-                        onChange={(e) => patchRow(index, { lengthMm: e.target.value })}
+                        value={row.heightMm}
+                        onChange={(e) => patchRow(index, { heightMm: e.target.value })}
                         className="h-8 w-20 text-right tabular-nums"
                       />
                     </TableCell>

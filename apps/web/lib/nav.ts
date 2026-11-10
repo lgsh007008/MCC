@@ -1,9 +1,12 @@
 import {
+  BarChart3Icon,
   ContactIcon,
   FileTextIcon,
   HomeIcon,
+  ReceiptTextIcon,
   ShoppingCartIcon,
   UsersIcon,
+  WalletIcon,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -51,6 +54,15 @@ export const navGroups: NavGroup[] = [
     domain: 'customer',
     icon: ContactIcon,
     items: [{ title: '客户档案', icon: UsersIcon, href: '/admin/customers' }],
+  },
+  {
+    label: '财务',
+    domain: 'finance',
+    icon: WalletIcon,
+    items: [
+      { title: '财务台账', icon: ReceiptTextIcon, href: '/admin/finance/events' },
+      { title: '收支汇总', icon: BarChart3Icon, href: '/admin/finance/summary' },
+    ],
   },
 ];
 

@@ -177,6 +177,77 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/finance/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 财务事件列表：筛选（发生日期区间、分类、来源）+ 排序 + 分页 */
+        get: operations["FinanceController_list"];
+        put?: never;
+        /** 手工记账（仅其他收入 / 其他支出；金额按正数提交） */
+        post: operations["FinanceController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/finance/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 收支汇总（日期区间实时聚合：总收入 / 总成本 / 净利润 / 分类小计） */
+        get: operations["FinanceController_summary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/finance/events/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 财务事件详情 */
+        get: operations["FinanceController_detail"];
+        /** 更新手工事件（自动生成的事件不可编辑） */
+        put: operations["FinanceController_update"];
+        post?: never;
+        /** 删除手工事件（软删除；自动事件拒绝） */
+        delete: operations["FinanceController_remove"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/finance/events/batch-delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 批量删除手工事件（软删除；自动事件与不存在行静默跳过） */
+        post: operations["FinanceController_batchDelete"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/sale-orders": {
         parameters: {
             query?: never;
@@ -361,6 +432,143 @@ export interface components {
             /** @description 实际删除（软删除）条数 */
             deleted: number;
         };
+        FinanceEventSummaryDto: {
+            /** @description 金额合计（有符号，筛选全量） */
+            amount: string;
+        };
+        FinanceEventListItemDto: {
+            id: string;
+            /** @description 事件编号（年月+当月流水） */
+            code: string;
+            /** @description 发生日期 */
+            occurredDate: string;
+            /**
+             * @description 分类
+             * @enum {string}
+             */
+            category: "sales_revenue" | "other_revenue" | "purchase_cost" | "labor_cost" | "other_expense";
+            /** @description 金额（有符号：收入正、支出负） */
+            amount: string;
+            note: string;
+            /**
+             * @description 来源：自动 / 手工
+             * @enum {string}
+             */
+            source: "auto" | "manual";
+            /** @description 源单类型（如 sale_order） */
+            sourceType?: string | null;
+            /** @description 源单 id */
+            sourceId?: string | null;
+            /** @description 源单编号 */
+            sourceCode?: string | null;
+        };
+        FinanceEventListDto: {
+            /** @description 总数 */
+            total: number;
+            /** @description 筛选全量汇总（合计行） */
+            summary: components["schemas"]["FinanceEventSummaryDto"];
+            items: components["schemas"]["FinanceEventListItemDto"][];
+        };
+        FinanceCategorySubtotalDto: {
+            /** @enum {string} */
+            category: "sales_revenue" | "other_revenue" | "purchase_cost" | "labor_cost" | "other_expense";
+            /** @description 收入小计 */
+            income: string;
+            /** @description 成本小计（绝对值） */
+            cost: string;
+            /** @description 净额（收入 − 成本） */
+            net: string;
+        };
+        FinanceSummaryDto: {
+            /** @description 总收入 */
+            totalIncome: string;
+            /** @description 总成本（绝对值） */
+            totalCost: string;
+            /** @description 净利润 = 总收入 − 总成本 */
+            netProfit: string;
+            /** @description 事件条数 */
+            eventCount: number;
+            /** @description 分类小计（五类固定输出） */
+            categories: components["schemas"]["FinanceCategorySubtotalDto"][];
+        };
+        FinanceEventDto: {
+            id: string;
+            /** @description 事件编号（年月+当月流水） */
+            code: string;
+            /** @description 发生日期 */
+            occurredDate: string;
+            /**
+             * @description 分类
+             * @enum {string}
+             */
+            category: "sales_revenue" | "other_revenue" | "purchase_cost" | "labor_cost" | "other_expense";
+            /** @description 金额（有符号：收入正、支出负） */
+            amount: string;
+            note: string;
+            /**
+             * @description 来源：自动 / 手工
+             * @enum {string}
+             */
+            source: "auto" | "manual";
+            /** @description 源单类型（如 sale_order） */
+            sourceType?: string | null;
+            /** @description 源单 id */
+            sourceId?: string | null;
+            /** @description 源单编号 */
+            sourceCode?: string | null;
+        };
+        FinanceEventBodyDto: {
+            /**
+             * @description 分类：手工记账仅允许 other_revenue（其他收入）/ other_expense（其他支出）
+             * @enum {string}
+             */
+            category: "other_revenue" | "other_expense";
+            /**
+             * @description 发生日期
+             * @example 2026-11-10
+             */
+            occurredDate: string;
+            /**
+             * @description 金额（按正数提交、最多 2 位小数；符号由分类决定）
+             * @example 350.25
+             */
+            amount: string;
+            /**
+             * @description 备注（具体事由）
+             * @default
+             */
+            note: string;
+        };
+        FinanceEventUpdateBodyDto: {
+            /**
+             * @description 分类：手工记账仅允许 other_revenue（其他收入）/ other_expense（其他支出）
+             * @enum {string}
+             */
+            category: "other_revenue" | "other_expense";
+            /**
+             * @description 发生日期
+             * @example 2026-11-10
+             */
+            occurredDate: string;
+            /**
+             * @description 金额（按正数提交、最多 2 位小数；符号由分类决定）
+             * @example 350.25
+             */
+            amount: string;
+            /**
+             * @description 备注（具体事由）
+             * @default
+             */
+            note: string;
+        };
+        FinanceEventBatchDeleteBodyDto: {
+            /** @description 要删除的事件 id 列表（1~200，仅手工事件） */
+            ids: string[];
+        };
+        FinanceEventBatchDeleteResponseDto: {
+            /** @description 实际删除（软删除）条数 */
+            deleted: number;
+        };
         SaleOrderSummaryDto: {
             /** @description 合计方量（筛选全量） */
             totalVolume: string;
@@ -422,12 +630,12 @@ export interface components {
              * @enum {string}
              */
             pricingMode: "volume" | "piece";
-            /** @description 厚度（整数毫米） */
-            thicknessMm: number;
-            /** @description 宽度（整数毫米） */
-            widthMm: number;
             /** @description 长度（整数毫米） */
             lengthMm: number;
+            /** @description 宽度（整数毫米） */
+            widthMm: number;
+            /** @description 高度（整数毫米，即原厚度） */
+            heightMm: number;
             /** @description 根数 */
             pieces: number;
             /** @description 方量（m³，4 位小数；所有行都计算） */
@@ -464,20 +672,20 @@ export interface components {
         };
         SaleOrderItemBodyDto: {
             /**
-             * @description 厚度（整数毫米）
-             * @example 20
+             * @description 长度（整数毫米）
+             * @example 3000
              */
-            thicknessMm: number;
+            lengthMm: number;
             /**
              * @description 宽度（整数毫米）
              * @example 100
              */
             widthMm: number;
             /**
-             * @description 长度（整数毫米）
-             * @example 3000
+             * @description 高度（整数毫米，即原厚度）
+             * @example 20
              */
-            lengthMm: number;
+            heightMm: number;
             /**
              * @description 根数（正整数）
              * @example 10
@@ -528,20 +736,20 @@ export interface components {
         };
         SaleOrderItemUpdateBodyDto: {
             /**
-             * @description 厚度（整数毫米）
-             * @example 20
+             * @description 长度（整数毫米）
+             * @example 3000
              */
-            thicknessMm: number;
+            lengthMm: number;
             /**
              * @description 宽度（整数毫米）
              * @example 100
              */
             widthMm: number;
             /**
-             * @description 长度（整数毫米）
-             * @example 3000
+             * @description 高度（整数毫米，即原厚度）
+             * @example 20
              */
-            lengthMm: number;
+            heightMm: number;
             /**
              * @description 根数（正整数）
              * @example 10
@@ -902,6 +1110,173 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CustomerBatchDeleteResponseDto"];
+                };
+            };
+        };
+    };
+    FinanceController_list: {
+        parameters: {
+            query?: {
+                sortOrder?: "asc" | "desc";
+                sortBy?: "occurredDate" | "amount";
+                /** @description 每页条数，默认 20（最大 100） */
+                pageSize?: number;
+                /** @description 页码，默认 1 */
+                page?: number;
+                source?: "auto" | "manual";
+                category?: "sales_revenue" | "other_revenue" | "purchase_cost" | "labor_cost" | "other_expense";
+                /** @description 发生日期止（YYYY-MM-DD） */
+                dateTo?: string;
+                /** @description 发生日期起（YYYY-MM-DD） */
+                dateFrom?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FinanceEventListDto"];
+                };
+            };
+        };
+    };
+    FinanceController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FinanceEventBodyDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FinanceEventDto"];
+                };
+            };
+        };
+    };
+    FinanceController_summary: {
+        parameters: {
+            query?: {
+                /** @description 发生日期止（YYYY-MM-DD） */
+                dateTo?: string;
+                /** @description 发生日期起（YYYY-MM-DD） */
+                dateFrom?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FinanceSummaryDto"];
+                };
+            };
+        };
+    };
+    FinanceController_detail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FinanceEventDto"];
+                };
+            };
+        };
+    };
+    FinanceController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FinanceEventUpdateBodyDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FinanceEventDto"];
+                };
+            };
+        };
+    };
+    FinanceController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    FinanceController_batchDelete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FinanceEventBatchDeleteBodyDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FinanceEventBatchDeleteResponseDto"];
                 };
             };
         };

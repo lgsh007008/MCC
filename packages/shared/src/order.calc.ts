@@ -31,16 +31,16 @@ function divRoundHalfUp(numerator: bigint, divisor: bigint): bigint {
   return remainder * 2n >= divisor ? quotient + 1n : quotient;
 }
 
-// 方量：thicknessMm/widthMm/lengthMm 为整数毫米，pieces 为整数根数。
+// 方量：lengthMm/widthMm/heightMm 为整数毫米，pieces 为整数根数。
 // 返回 4 位小数 m³ 字符串；每一行都计算（工资依据）。
 export function calcVolumeM3(
-  thicknessMm: number,
-  widthMm: number,
   lengthMm: number,
+  widthMm: number,
+  heightMm: number,
   pieces: number,
 ): string {
   const numerator =
-    BigInt(thicknessMm) * BigInt(widthMm) * BigInt(lengthMm) * BigInt(pieces);
+    BigInt(lengthMm) * BigInt(widthMm) * BigInt(heightMm) * BigInt(pieces);
   return fromScaled(divRoundHalfUp(numerator, VOLUME_ROUND_DIVISOR), VOLUME_SCALE);
 }
 

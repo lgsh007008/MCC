@@ -23,9 +23,9 @@ interface SaleOrderItemDetail {
   code: string;
   productType: string;
   pricingMode: 'volume' | 'piece';
-  thicknessMm: number;
-  widthMm: number;
   lengthMm: number;
+  widthMm: number;
+  heightMm: number;
   pieces: number;
   volumeM3: string;
   price: string;
@@ -117,9 +117,9 @@ export default function SaleOrderDetailPage(): React.ReactElement {
           <TableHeader>
             <TableRow>
               <TableHead>编码</TableHead>
-              <TableHead className="text-right">厚度(mm)</TableHead>
-              <TableHead className="text-right">宽度(mm)</TableHead>
               <TableHead className="text-right">长度(mm)</TableHead>
+              <TableHead className="text-right">宽度(mm)</TableHead>
+              <TableHead className="text-right">高度(mm)</TableHead>
               <TableHead className="text-right">根数</TableHead>
               <TableHead className="text-right">方量(m³)</TableHead>
               <TableHead className="text-right">单价</TableHead>
@@ -132,9 +132,9 @@ export default function SaleOrderDetailPage(): React.ReactElement {
             {order.items.map((item) => (
               <TableRow key={item.id}>
                 <TableCell>{item.code}</TableCell>
-                <TableCell className="text-right tabular-nums">{item.thicknessMm}</TableCell>
-                <TableCell className="text-right tabular-nums">{item.widthMm}</TableCell>
                 <TableCell className="text-right tabular-nums">{item.lengthMm}</TableCell>
+                <TableCell className="text-right tabular-nums">{item.widthMm}</TableCell>
+                <TableCell className="text-right tabular-nums">{item.heightMm}</TableCell>
                 <TableCell className="text-right tabular-nums">{item.pieces}</TableCell>
                 <TableCell className="text-right tabular-nums">{item.volumeM3}</TableCell>
                 <TableCell className="text-right tabular-nums">

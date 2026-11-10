@@ -12,21 +12,21 @@ import {
 // 订单计算纯函数用例（design/order.md §3，最高优先级单测）：
 // 覆盖整数毫米方量、两种计价方式、四舍五入与整单汇总。
 describe('方量计算 calcVolumeM3（整数毫米）', () => {
-  it('按 厚 × 宽 × 长 × 根数 ÷ 10⁹ 计算', () => {
-    expect(calcVolumeM3(20, 100, 200, 50)).toBe('0.0200');
-    expect(calcVolumeM3(20, 80, 300, 3)).toBe('0.0014');
-    expect(calcVolumeM3(20, 100, 300, 10)).toBe('0.0060');
+  it('按 长 × 宽 × 高 × 根数 ÷ 10⁹ 计算', () => {
+    expect(calcVolumeM3(200, 100, 20, 50)).toBe('0.0200');
+    expect(calcVolumeM3(300, 80, 20, 3)).toBe('0.0014');
+    expect(calcVolumeM3(300, 100, 20, 10)).toBe('0.0060');
   });
 
   it('保留 4 位小数，四舍五入（round half up）', () => {
-    // 2×5×5000×1 = 50,000 mm³ = 0.00005 m³ → 0.0001；49,990 → 0.0000
-    expect(calcVolumeM3(2, 5, 5000, 1)).toBe('0.0001');
-    expect(calcVolumeM3(2, 5, 4999, 1)).toBe('0.0000');
+    // 5000×5×2×1 = 50,000 mm³ = 0.00005 m³ → 0.0001；49,990 → 0.0000
+    expect(calcVolumeM3(5000, 5, 2, 1)).toBe('0.0001');
+    expect(calcVolumeM3(4999, 5, 2, 1)).toBe('0.0000');
   });
 
   it('根数放大线性成立', () => {
-    expect(calcVolumeM3(20, 100, 200, 1)).toBe('0.0004');
-    expect(calcVolumeM3(20, 100, 200, 50)).toBe('0.0200');
+    expect(calcVolumeM3(200, 100, 20, 1)).toBe('0.0004');
+    expect(calcVolumeM3(200, 100, 20, 50)).toBe('0.0200');
   });
 });
 
@@ -52,7 +52,7 @@ describe('按根数计价 calcPieceLineAmount', () => {
 
 describe('统一行金额入口 calcLineAmount', () => {
   it('按计价方式选择公式，方量两种方式都参与汇总', () => {
-    const volume = calcVolumeM3(20, 100, 3000, 10); // 0.0600
+    const volume = calcVolumeM3(3000, 100, 20, 10); // 0.0600
     expect(calcLineAmount('volume', volume, 10, '600.00')).toBe('36.00');
     expect(calcLineAmount('piece', volume, 10, '40.00')).toBe('400.00');
   });

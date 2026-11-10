@@ -47,7 +47,7 @@ export default function LoginPage(): React.ReactElement {
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-muted/40 p-6">
-      <div className="w-full max-w-sm rounded-xl border border-border bg-card p-8 shadow-sm">
+      <div className="w-full max-w-sm rounded-lg border border-border bg-card p-8">
         <h1 className="text-xl font-semibold">登录</h1>
         <p className="mt-1 text-sm text-muted-foreground">梅好木业数字化系统</p>
 

@@ -23,9 +23,9 @@ const positiveMm = (label: string, max: number) =>
     .max(max, `${label}超出合理范围`);
 
 export const saleOrderItemSchema = z.object({
-  thicknessMm: positiveMm('厚度', 1000),
-  widthMm: positiveMm('宽度', 5000),
   lengthMm: positiveMm('长度', 20000),
+  widthMm: positiveMm('宽度', 5000),
+  heightMm: positiveMm('高度', 1000),
   pieces: z.coerce.number().int().min(1).max(100_000),
   pricingMode: z.enum(['volume', 'piece']).default('volume'),
   price: z.string().regex(decimal2Re, '单价须为非负数、最多 2 位小数'),

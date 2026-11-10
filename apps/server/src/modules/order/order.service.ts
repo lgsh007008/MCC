@@ -15,6 +15,7 @@ import {
 import { problem } from '../../common/http-problem.js';
 import { PrismaService } from '../../common/prisma.service.js';
 import { CustomerService } from '../customer/index.js';
+import { FinanceService } from '../finance/index.js';
 import type {
   SaleOrderDto,
   SaleOrderItemResponseDto,
@@ -38,9 +39,9 @@ type RawItem = SaleOrderItemInput | SaleOrderItemUpdateInput;
 interface ComputedItem {
   productType: 'SQUARE_TIMBER';
   pricingMode: 'VOLUME' | 'PIECE';
-  thicknessMm: number;
-  widthMm: number;
   lengthMm: number;
+  widthMm: number;
+  heightMm: number;
   pieces: number;
   volumeM3: string;
   price: string;
@@ -51,14 +52,14 @@ interface ComputedItem {
 
 // 方量对所有行必算（工资依据）；行金额由计价方式决定（product/order.md R-订单-001）。
 function computeItem(raw: RawItem): ComputedItem {
-  const volumeM3 = calcVolumeM3(raw.thicknessMm, raw.widthMm, raw.lengthMm, raw.pieces);
+  const volumeM3 = calcVolumeM3(raw.lengthMm, raw.widthMm, raw.heightMm, raw.pieces);
   const pricingMode = raw.pricingMode === 'piece' ? 'PIECE' : 'VOLUME';
   return {
     productType: 'SQUARE_TIMBER',
     pricingMode,
-    thicknessMm: raw.thicknessMm,
-    widthMm: raw.widthMm,
     lengthMm: raw.lengthMm,
+    widthMm: raw.widthMm,
+    heightMm: raw.heightMm,
     pieces: raw.pieces,
     volumeM3,
     price: money(raw.price),
@@ -88,9 +89,9 @@ interface DetailOrder extends ListRow {
     seq: number;
     productType: 'SQUARE_TIMBER';
     pricingMode: 'VOLUME' | 'PIECE';
-    thicknessMm: number;
-    widthMm: number;
     lengthMm: number;
+    widthMm: number;
+    heightMm: number;
     pieces: number;
     volumeM3: Prisma.Decimal;
     price: Prisma.Decimal;
@@ -105,6 +106,7 @@ export class OrderService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly customers: CustomerService,
+    private readonly finance: FinanceService,
   ) {}
 
   // 编号：年月（取销售日期）+ 当月流水，如 202611-0001（design/order.md §4）。
@@ -145,9 +147,9 @@ export class OrderService {
       code: `${order.code}-${String(item.seq).padStart(2, '0')}`,
       productType: 'square_timber',
       pricingMode: item.pricingMode === 'PIECE' ? 'piece' : 'volume',
-      thicknessMm: item.thicknessMm,
-      widthMm: item.widthMm,
       lengthMm: item.lengthMm,
+      widthMm: item.widthMm,
+      heightMm: item.heightMm,
       pieces: item.pieces,
       volumeM3: volume(item.volumeM3.toString()),
       price: money(item.price.toString()),
@@ -280,9 +282,9 @@ export class OrderService {
               seq: index + 1,
               productType: item.productType,
               pricingMode: item.pricingMode,
-              thicknessMm: item.thicknessMm,
-              widthMm: item.widthMm,
               lengthMm: item.lengthMm,
+              widthMm: item.widthMm,
+              heightMm: item.heightMm,
               pieces: item.pieces,
               volumeM3: item.volumeM3,
               price: item.price,
@@ -290,6 +292,14 @@ export class OrderService {
               otherAmount: item.otherAmount,
               note: item.note,
             })),
+          });
+          // 财务联动（design/finance.md §6）：同事务内生成销售收入事件，失败则整单回滚
+          await this.finance.syncSaleOrderEvent(tx, {
+            orderId: created.id,
+            code: created.code,
+            saleDate: input.saleDate,
+            totalAmount: totals.totalAmount,
+            customerName: customer.name,
           });
           return created;
         });
@@ -312,7 +322,14 @@ export class OrderService {
     const existing = await this.prisma.client.saleOrder.findUnique({
       where: { id },
       // 租户扩展的 findUnique 钩子按 tenantId 校验归属，select 必须带出该列，否则异租户误判
-      select: { id: true, deletedAt: true, tenantId: true, customerId: true, customerName: true },
+      select: {
+        id: true,
+        code: true,
+        deletedAt: true,
+        tenantId: true,
+        customerId: true,
+        customerName: true,
+      },
     });
     if (!existing || existing.deletedAt !== null) {
       throw problem(404, 'NOT_FOUND', '销售单不存在');
@@ -337,9 +354,9 @@ export class OrderService {
     const itemData = (item: ComputedItem) => ({
       productType: item.productType,
       pricingMode: item.pricingMode,
-      thicknessMm: item.thicknessMm,
-      widthMm: item.widthMm,
       lengthMm: item.lengthMm,
+      widthMm: item.widthMm,
+      heightMm: item.heightMm,
       pieces: item.pieces,
       volumeM3: item.volumeM3,
       price: item.price,
@@ -393,6 +410,15 @@ export class OrderService {
           data: { deletedAt: new Date() },
         });
       }
+
+      // 财务联动（design/finance.md §6）：销售单编辑同步收入事件的日期 / 金额 / 备注
+      await this.finance.syncSaleOrderEvent(tx, {
+        orderId: id,
+        code: existing.code,
+        saleDate: input.saleDate,
+        totalAmount: totals.totalAmount,
+        customerName: customer.name,
+      });
     });
 
     return this.detail(id);
@@ -427,11 +453,17 @@ export class OrderService {
     };
   }
 
-  // 删除 = 软删除（技术方案 §5.1）：编号不回收，列表默认不可见
+  // 删除 = 软删除（技术方案 §5.1）：编号不回收，列表默认不可见；财务事件一并软删（同事务）
   async remove(id: string): Promise<void> {
-    const result = await this.prisma.client.saleOrder.updateMany({
-      where: { id, deletedAt: null },
-      data: { deletedAt: new Date() },
+    const result = await this.prisma.client.$transaction(async (tx) => {
+      const updated = await tx.saleOrder.updateMany({
+        where: { id, deletedAt: null },
+        data: { deletedAt: new Date() },
+      });
+      if (updated.count > 0) {
+        await this.finance.syncSaleOrderRemoval(tx, [id]);
+      }
+      return updated;
     });
     if (result.count === 0) {
       throw problem(404, 'NOT_FOUND', '销售单不存在');
@@ -440,10 +472,20 @@ export class OrderService {
 
   // 批量删除：仅命中未删行，不存在 / 已删行静默跳过（页面模式规范：多选 + 批量操作）
   async removeMany(ids: string[]): Promise<{ deleted: number }> {
-    const result = await this.prisma.client.saleOrder.updateMany({
-      where: { id: { in: ids }, deletedAt: null },
-      data: { deletedAt: new Date() },
+    return this.prisma.client.$transaction(async (tx) => {
+      const result = await tx.saleOrder.updateMany({
+        where: { id: { in: ids }, deletedAt: null },
+        data: { deletedAt: new Date() },
+      });
+      const deletedIds = await tx.saleOrder.findMany({
+        where: { id: { in: ids }, deletedAt: { not: null } },
+        select: { id: true },
+      });
+      await this.finance.syncSaleOrderRemoval(
+        tx,
+        deletedIds.map((row) => row.id),
+      );
+      return { deleted: result.count };
     });
-    return { deleted: result.count };
   }
 }
