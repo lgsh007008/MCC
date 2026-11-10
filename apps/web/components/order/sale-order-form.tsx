@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { CopyIcon, Trash2Icon } from 'lucide-react';
 import {
-  calcBoardLineAmount,
+  calcLineAmount,
   calcOrderTotals,
   calcVolumeM3,
   saleOrderUpdateSchema,
@@ -27,20 +27,19 @@ import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 // 销售单表单（product/order.md R-订单-001；页面模式规范见 product/平台布局.md）：
-// 新建与编辑共用。Label 与控件左右并排；明细按钮组在标题下方左侧；明细限制行数与高度、
-// 超出在明细区内滚动（页面级禁止横向滚动）。实时计算与落账同源（design/order.md §7）。
+// 新建与编辑共用。产品类型固定方木、不在表单出现；计价方式行级选择（默认按方量）。
+// 尺寸为整数毫米，方量两种计价方式下都实时计算（工资依据）。实时计算与落账同源（design/order.md §7）。
 
 const MAX_ROWS = 200;
 
 interface FormRow {
   id?: string;
-  productType: 'board' | 'other';
-  thicknessCm: string;
-  widthCm: string;
-  lengthCm: string;
+  thicknessMm: string;
+  widthMm: string;
+  lengthMm: string;
   pieces: string;
+  pricingMode: 'volume' | 'piece';
   price: string;
-  lineAmount: string;
   otherAmount: string;
   note: string;
 }
@@ -54,13 +53,12 @@ export interface SaleOrderFormInitial {
   note: string;
   items: Array<{
     id: string;
-    productType: string;
-    thicknessCm?: string | null;
-    widthCm?: string | null;
-    lengthCm?: string | null;
-    pieces?: number | null;
-    price?: string | null;
-    lineAmount: string;
+    thicknessMm: number;
+    widthMm: number;
+    lengthMm: number;
+    pieces: number;
+    pricingMode: 'volume' | 'piece';
+    price: string;
     otherAmount: string;
     note: string;
   }>;
@@ -73,6 +71,7 @@ const localToday = (): string => {
 };
 const decimalOk = (value: string, scale: number): boolean =>
   new RegExp(`^\\d+(\\.\\d{1,${scale}})?$`).test(value);
+const intOk = (value: string): boolean => /^[1-9]\d*$/.test(value);
 
 interface CustomerOption {
   id: string;
@@ -81,18 +80,16 @@ interface CustomerOption {
   status: string;
 }
 
-const emptyBoardRow = (): FormRow => ({
-  productType: 'board',
-  thicknessCm: '',
-  widthCm: '',
-  lengthCm: '',
+const emptyRow = (): FormRow => ({
+  thicknessMm: '',
+  widthMm: '',
+  lengthMm: '',
   pieces: '',
+  pricingMode: 'volume',
   price: '',
-  lineAmount: '',
   otherAmount: '0',
   note: '',
 });
-const emptyOtherRow = (): FormRow => ({ ...emptyBoardRow(), productType: 'other' });
 
 function Field({
   label,
@@ -130,17 +127,16 @@ export function SaleOrderForm({
     initial
       ? initial.items.map((item) => ({
           id: item.id,
-          productType: item.productType === 'other' ? 'other' : 'board',
-          thicknessCm: item.thicknessCm ?? '',
-          widthCm: item.widthCm ?? '',
-          lengthCm: item.lengthCm ?? '',
-          pieces: item.pieces === null || item.pieces === undefined ? '' : String(item.pieces),
-          price: item.price ?? '',
-          lineAmount: item.lineAmount,
+          thicknessMm: String(item.thicknessMm),
+          widthMm: String(item.widthMm),
+          lengthMm: String(item.lengthMm),
+          pieces: String(item.pieces),
+          pricingMode: item.pricingMode,
+          price: item.price,
           otherAmount: item.otherAmount,
           note: item.note,
         }))
-      : [emptyBoardRow()],
+      : [emptyRow()],
   );
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -219,32 +215,35 @@ export function SaleOrderForm({
     scrollDetailToEnd();
   };
 
-  const boardCalc = (row: FormRow): { volume?: string; line?: string } => {
+  // 方量：整数毫米、两种计价方式都计算；行金额由计价方式决定
+  const rowCalc = (row: FormRow): { volume?: string; line?: string } => {
     if (
-      row.productType !== 'board' ||
-      !decimalOk(row.thicknessCm, 3) ||
-      !decimalOk(row.widthCm, 3) ||
-      !decimalOk(row.lengthCm, 3) ||
-      !/^[1-9]\d*$/.test(row.pieces) ||
+      !intOk(row.thicknessMm) ||
+      !intOk(row.widthMm) ||
+      !intOk(row.lengthMm) ||
+      !intOk(row.pieces) ||
       !decimalOk(row.price, 2)
     ) {
       return {};
     }
-    const volume = calcVolumeM3(row.thicknessCm, row.widthCm, row.lengthCm, Number(row.pieces));
-    return { volume, line: calcBoardLineAmount(volume, row.price) };
+    const volume = calcVolumeM3(
+      Number(row.thicknessMm),
+      Number(row.widthMm),
+      Number(row.lengthMm),
+      Number(row.pieces),
+    );
+    return {
+      volume,
+      line: calcLineAmount(row.pricingMode, volume, Number(row.pieces), row.price),
+    };
   };
 
   const totals = calcOrderTotals(
     items.map((row) => {
-      const { volume, line } = boardCalc(row);
+      const { volume, line } = rowCalc(row);
       return {
-        volumeM3: row.productType === 'board' ? (volume ?? null) : null,
-        lineAmount:
-          row.productType === 'board'
-            ? (line ?? '0.00')
-            : decimalOk(row.lineAmount, 2)
-              ? row.lineAmount
-              : '0.00',
+        volumeM3: volume ?? '0.0000',
+        lineAmount: line ?? '0.00',
         otherAmount: decimalOk(row.otherAmount, 2) ? row.otherAmount : '0.00',
       };
     }),
@@ -259,25 +258,17 @@ export function SaleOrderForm({
       customerId,
       otherAmount,
       note,
-      items: items.map((row) => {
-        const base = {
-          id: row.id,
-          productType: row.productType,
-          otherAmount: row.otherAmount,
-          note: row.note,
-        };
-        if (row.productType === 'board') {
-          return {
-            ...base,
-            thicknessCm: row.thicknessCm,
-            widthCm: row.widthCm,
-            lengthCm: row.lengthCm,
-            pieces: row.pieces === '' ? undefined : Number(row.pieces),
-            price: row.price,
-          };
-        }
-        return { ...base, lineAmount: row.lineAmount };
-      }),
+      items: items.map((row) => ({
+        id: row.id,
+        thicknessMm: row.thicknessMm,
+        widthMm: row.widthMm,
+        lengthMm: row.lengthMm,
+        pieces: row.pieces === '' ? undefined : Number(row.pieces),
+        pricingMode: row.pricingMode,
+        price: row.price,
+        otherAmount: row.otherAmount,
+        note: row.note,
+      })),
     };
     const parsed = saleOrderUpdateSchema.safeParse(payload);
     if (!parsed.success) {
@@ -378,18 +369,9 @@ export function SaleOrderForm({
             variant="outline"
             size="sm"
             disabled={rowFull}
-            onClick={() => addRow(emptyBoardRow())}
+            onClick={() => addRow(emptyRow())}
           >
-            添加板材行
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={rowFull}
-            onClick={() => addRow(emptyOtherRow())}
-          >
-            添加其他行
+            添加明细行
           </Button>
           <span className="text-xs text-muted-foreground">
             共 {items.length} / {MAX_ROWS} 行
@@ -400,13 +382,13 @@ export function SaleOrderForm({
           <Table containerRef={detailScrollRef} containerClassName="max-h-[420px] overflow-y-auto">
             <TableHeader className="sticky top-0 z-10 [&_th]:bg-muted">
               <TableRow>
-                <TableHead>类型</TableHead>
-                <TableHead>厚度(cm)</TableHead>
-                <TableHead>宽度(cm)</TableHead>
-                <TableHead>长度(cm)</TableHead>
+                <TableHead>厚度(mm)</TableHead>
+                <TableHead>宽度(mm)</TableHead>
+                <TableHead>长度(mm)</TableHead>
                 <TableHead>根数</TableHead>
+                <TableHead>计价方式</TableHead>
                 <TableHead className="text-right">方量(m³)</TableHead>
-                <TableHead>单价(元/m³)</TableHead>
+                <TableHead>单价</TableHead>
                 <TableHead className="text-right">小计金额</TableHead>
                 <TableHead>其他金额</TableHead>
                 <TableHead>备注</TableHead>
@@ -415,75 +397,65 @@ export function SaleOrderForm({
             </TableHeader>
             <TableBody>
               {items.map((row, index) => {
-                const { volume, line } = boardCalc(row);
-                const disableSpec = row.productType !== 'board';
+                const { volume, line } = rowCalc(row);
                 return (
                   <TableRow key={index}>
                     <TableCell>
+                      <Input
+                        inputMode="numeric"
+                        value={row.thicknessMm}
+                        onChange={(e) => patchRow(index, { thicknessMm: e.target.value })}
+                        className="h-8 w-20 text-right tabular-nums"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        inputMode="numeric"
+                        value={row.widthMm}
+                        onChange={(e) => patchRow(index, { widthMm: e.target.value })}
+                        className="h-8 w-20 text-right tabular-nums"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        inputMode="numeric"
+                        value={row.lengthMm}
+                        onChange={(e) => patchRow(index, { lengthMm: e.target.value })}
+                        className="h-8 w-20 text-right tabular-nums"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        inputMode="numeric"
+                        value={row.pieces}
+                        onChange={(e) => patchRow(index, { pieces: e.target.value })}
+                        className="h-8 w-20 text-right tabular-nums"
+                      />
+                    </TableCell>
+                    <TableCell>
                       <Select
-                        value={row.productType}
-                        onChange={(value) => patchRow(index, { productType: value as 'board' | 'other' })}
+                        value={row.pricingMode}
+                        onChange={(value) =>
+                          patchRow(index, { pricingMode: value as 'volume' | 'piece' })
+                        }
                         options={[
-                          { value: 'board', label: '板材' },
-                          { value: 'other', label: '其他' },
+                          { value: 'volume', label: '按方量' },
+                          { value: 'piece', label: '按根数' },
                         ]}
                         className="w-24"
                       />
                     </TableCell>
+                    <TableCell className="text-right tabular-nums">{volume ?? '—'}</TableCell>
                     <TableCell>
                       <Input
-                        disabled={disableSpec}
-                        value={row.thicknessCm}
-                        onChange={(e) => patchRow(index, { thicknessCm: e.target.value })}
-                        className={cn('h-8 w-20 text-right tabular-nums', disableSpec && 'opacity-50')}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        disabled={disableSpec}
-                        value={row.widthCm}
-                        onChange={(e) => patchRow(index, { widthCm: e.target.value })}
-                        className={cn('h-8 w-20 text-right tabular-nums', disableSpec && 'opacity-50')}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        disabled={disableSpec}
-                        value={row.lengthCm}
-                        onChange={(e) => patchRow(index, { lengthCm: e.target.value })}
-                        className={cn('h-8 w-20 text-right tabular-nums', disableSpec && 'opacity-50')}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        disabled={disableSpec}
-                        inputMode="numeric"
-                        value={row.pieces}
-                        onChange={(e) => patchRow(index, { pieces: e.target.value })}
-                        className={cn('h-8 w-20 text-right tabular-nums', disableSpec && 'opacity-50')}
-                      />
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {disableSpec ? '—' : (volume ?? '—')}
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        disabled={disableSpec}
                         value={row.price}
                         onChange={(e) => patchRow(index, { price: e.target.value })}
-                        className={cn('h-8 w-20 text-right tabular-nums', disableSpec && 'opacity-50')}
+                        className="h-8 w-20 text-right tabular-nums"
+                        placeholder={row.pricingMode === 'piece' ? '元/根' : '元/m³'}
                       />
                     </TableCell>
                     <TableCell className="text-right">
-                      {disableSpec ? (
-                        <Input
-                          value={row.lineAmount}
-                          onChange={(e) => patchRow(index, { lineAmount: e.target.value })}
-                          className="h-8 w-20 text-right tabular-nums"
-                        />
-                      ) : (
-                        <span className="inline-block w-20 tabular-nums">{line ?? '—'}</span>
-                      )}
+                      <span className={cn('inline-block w-20 tabular-nums')}>{line ?? '—'}</span>
                     </TableCell>
                     <TableCell>
                       <Input
@@ -496,7 +468,7 @@ export function SaleOrderForm({
                       <Input
                         value={row.note}
                         onChange={(e) => patchRow(index, { note: e.target.value })}
-                        className="h-8 w-32"
+                        className="h-8 w-36"
                       />
                     </TableCell>
                     <TableCell>

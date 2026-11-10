@@ -5,9 +5,7 @@ import { paginationQuerySchema } from './pagination.schemas';
 // 金额/尺寸以字符串承载（禁浮点，技术方案 §5.1），服务层以 ZodValidationPipe 落地。
 
 const decimal2Re = /^\d+(\.\d{1,2})?$/; // 金额：非负、最多 2 位小数
-const decimal3Re = /^\d+(\.\d{1,3})?$/; // 尺寸（cm）：非负、最多 3 位小数
 const dateRe = /^\d{4}-\d{2}-\d{2}$/;
-const zeroRe = /^0+(\.0+)?$/;
 
 const saleDateSchema = z
   .string()
@@ -16,43 +14,30 @@ const saleDateSchema = z
     message: '销售日期不是有效日期',
   });
 
-const positiveCm = (label: string) =>
-  z
-    .string()
-    .regex(decimal3Re, `${label}须为非负数、最多 3 位小数`)
-    .refine((value) => !zeroRe.test(value), { message: `${label}必须大于 0` });
+// 尺寸：整数毫米（product/order.md R-订单-001）
+const positiveMm = (label: string, max: number) =>
+  z.coerce
+    .number()
+    .int(`${label}须为整数毫米`)
+    .min(1, `${label}必须大于 0`)
+    .max(max, `${label}超出合理范围`);
 
-export const saleOrderItemBoardSchema = z.object({
-  productType: z.literal('board'),
-  thicknessCm: positiveCm('厚度'),
-  widthCm: positiveCm('宽度'),
-  lengthCm: positiveCm('长度'),
-  pieces: z.coerce.number().int().min(1).max(1_000_000),
+export const saleOrderItemSchema = z.object({
+  thicknessMm: positiveMm('厚度', 1000),
+  widthMm: positiveMm('宽度', 5000),
+  lengthMm: positiveMm('长度', 20000),
+  pieces: z.coerce.number().int().min(1).max(100_000),
+  pricingMode: z.enum(['volume', 'piece']).default('volume'),
   price: z.string().regex(decimal2Re, '单价须为非负数、最多 2 位小数'),
   otherAmount: z.string().regex(decimal2Re).default('0'),
   note: z.string().trim().max(200).default(''),
 });
-export type SaleOrderItemBoardInput = z.infer<typeof saleOrderItemBoardSchema>;
-
-export const saleOrderItemOtherSchema = z.object({
-  productType: z.literal('other'),
-  lineAmount: z.string().regex(decimal2Re, '行金额须为非负数、最多 2 位小数'),
-  otherAmount: z.string().regex(decimal2Re).default('0'),
-  note: z.string().trim().max(200).default(''),
-});
-export type SaleOrderItemOtherInput = z.infer<typeof saleOrderItemOtherSchema>;
-
-export const saleOrderItemSchema = z.discriminatedUnion('productType', [
-  saleOrderItemBoardSchema,
-  saleOrderItemOtherSchema,
-]);
 export type SaleOrderItemInput = z.infer<typeof saleOrderItemSchema>;
 
 // 编辑明细行：形状同新建行，另带可选 id（已有行原位更新，design/order.md §2）
-export const saleOrderItemUpdateSchema = z.union([
-  saleOrderItemBoardSchema.extend({ id: z.string().uuid().optional() }),
-  saleOrderItemOtherSchema.extend({ id: z.string().uuid().optional() }),
-]);
+export const saleOrderItemUpdateSchema = saleOrderItemSchema.extend({
+  id: z.string().uuid().optional(),
+});
 export type SaleOrderItemUpdateInput = z.infer<typeof saleOrderItemUpdateSchema>;
 
 const saleOrderBaseFields = {

@@ -87,11 +87,11 @@ test('登录 → 首页 → 订单菜单 → 销售单列表 → 退出 → 未�
   const row = page.locator('tbody tr').first();
   const cellInput = (index: number): ReturnType<typeof row.locator> =>
     row.locator('td').nth(index).locator('input');
-  await cellInput(1).fill('2.000');
-  await cellInput(2).fill('80.000');
-  await cellInput(3).fill('300.000');
-  await cellInput(4).fill('3');
-  await cellInput(6).fill('550.25');
+  await cellInput(0).fill('20');
+  await cellInput(1).fill('100');
+  await cellInput(2).fill('3000');
+  await cellInput(3).fill('10');
+  await cellInput(6).fill('600.00');
   await page.getByRole('button', { name: '保存' }).click();
 
   await expect(page).toHaveURL(/\/admin\/sale-orders\/[0-9a-f-]{36}$/);

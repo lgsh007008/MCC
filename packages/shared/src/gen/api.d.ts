@@ -412,20 +412,28 @@ export interface components {
             seq: number;
             /** @description 销售明细编码 = 主单编号-行序 */
             code: string;
-            /** @description 产品类型 */
-            productType: string;
-            /** @description 厚度（cm） */
-            thicknessCm?: string | null;
-            /** @description 宽度（cm） */
-            widthCm?: string | null;
-            /** @description 长度（cm） */
-            lengthCm?: string | null;
+            /**
+             * @description 产品类型（当前固定方木，服务端写入）
+             * @enum {string}
+             */
+            productType: "square_timber";
+            /**
+             * @description 计价方式：volume 按方量 / piece 按根数
+             * @enum {string}
+             */
+            pricingMode: "volume" | "piece";
+            /** @description 厚度（整数毫米） */
+            thicknessMm: number;
+            /** @description 宽度（整数毫米） */
+            widthMm: number;
+            /** @description 长度（整数毫米） */
+            lengthMm: number;
             /** @description 根数 */
-            pieces?: number | null;
-            /** @description 方量（m³） */
-            volumeM3?: string | null;
-            /** @description 单价（元/m³） */
-            price?: string | null;
+            pieces: number;
+            /** @description 方量（m³，4 位小数；所有行都计算） */
+            volumeM3: string;
+            /** @description 单价（按方量为元/m³，按根数为元/根） */
+            price: string;
             /** @description 行小计金额 */
             lineAmount: string;
             /** @description 行其他金额 */
@@ -456,47 +464,43 @@ export interface components {
         };
         SaleOrderItemBodyDto: {
             /**
-             * @description 产品类型：board 板材 / other 其他
+             * @description 厚度（整数毫米）
+             * @example 20
+             */
+            thicknessMm: number;
+            /**
+             * @description 宽度（整数毫米）
+             * @example 100
+             */
+            widthMm: number;
+            /**
+             * @description 长度（整数毫米）
+             * @example 3000
+             */
+            lengthMm: number;
+            /**
+             * @description 根数（正整数）
+             * @example 10
+             */
+            pieces: number;
+            /**
+             * @description 计价方式：volume 按方量（默认）/ piece 按根数
+             * @default volume
              * @enum {string}
              */
-            productType: "board" | "other";
+            pricingMode: "volume" | "piece";
             /**
-             * @description 厚度（cm，3 位小数），板材必填
-             * @example 2.000
+             * @description 单价（2 位小数）：按方量为元/m³，按根数为元/根
+             * @example 600.00
              */
-            thicknessCm?: string;
+            price: string;
             /**
-             * @description 宽度（cm，3 位小数），板材必填
-             * @example 80.000
-             */
-            widthCm?: string;
-            /**
-             * @description 长度（cm，3 位小数），板材必填
-             * @example 300.000
-             */
-            lengthCm?: string;
-            /**
-             * @description 根数（整数），板材必填
-             * @example 3
-             */
-            pieces?: number;
-            /**
-             * @description 单价（元/m³，2 位小数），板材必填
-             * @example 550.25
-             */
-            price?: string;
-            /**
-             * @description 行金额（其他类型手填，2 位小数）
-             * @example 50.00
-             */
-            lineAmount?: string;
-            /**
-             * @description 行其他金额（两类型通用兜底），默认 0
+             * @description 行其他金额（行级人工调整），默认 0
              * @default 0
              */
             otherAmount: string;
             /**
-             * @description 行备注
+             * @description 行备注（产品描述）
              * @default
              */
             note: string;
@@ -524,47 +528,43 @@ export interface components {
         };
         SaleOrderItemUpdateBodyDto: {
             /**
-             * @description 产品类型：board 板材 / other 其他
+             * @description 厚度（整数毫米）
+             * @example 20
+             */
+            thicknessMm: number;
+            /**
+             * @description 宽度（整数毫米）
+             * @example 100
+             */
+            widthMm: number;
+            /**
+             * @description 长度（整数毫米）
+             * @example 3000
+             */
+            lengthMm: number;
+            /**
+             * @description 根数（正整数）
+             * @example 10
+             */
+            pieces: number;
+            /**
+             * @description 计价方式：volume 按方量（默认）/ piece 按根数
+             * @default volume
              * @enum {string}
              */
-            productType: "board" | "other";
+            pricingMode: "volume" | "piece";
             /**
-             * @description 厚度（cm，3 位小数），板材必填
-             * @example 2.000
+             * @description 单价（2 位小数）：按方量为元/m³，按根数为元/根
+             * @example 600.00
              */
-            thicknessCm?: string;
+            price: string;
             /**
-             * @description 宽度（cm，3 位小数），板材必填
-             * @example 80.000
-             */
-            widthCm?: string;
-            /**
-             * @description 长度（cm，3 位小数），板材必填
-             * @example 300.000
-             */
-            lengthCm?: string;
-            /**
-             * @description 根数（整数），板材必填
-             * @example 3
-             */
-            pieces?: number;
-            /**
-             * @description 单价（元/m³，2 位小数），板材必填
-             * @example 550.25
-             */
-            price?: string;
-            /**
-             * @description 行金额（其他类型手填，2 位小数）
-             * @example 50.00
-             */
-            lineAmount?: string;
-            /**
-             * @description 行其他金额（两类型通用兜底），默认 0
+             * @description 行其他金额（行级人工调整），默认 0
              * @default 0
              */
             otherAmount: string;
             /**
-             * @description 行备注
+             * @description 行备注（产品描述）
              * @default
              */
             note: string;

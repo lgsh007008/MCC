@@ -1176,37 +1176,42 @@
           },
           "productType": {
             "type": "string",
-            "description": "产品类型"
+            "enum": [
+              "square_timber"
+            ],
+            "description": "产品类型（当前固定方木，服务端写入）"
           },
-          "thicknessCm": {
+          "pricingMode": {
             "type": "string",
-            "nullable": true,
-            "description": "厚度（cm）"
+            "enum": [
+              "volume",
+              "piece"
+            ],
+            "description": "计价方式：volume 按方量 / piece 按根数"
           },
-          "widthCm": {
-            "type": "string",
-            "nullable": true,
-            "description": "宽度（cm）"
+          "thicknessMm": {
+            "type": "number",
+            "description": "厚度（整数毫米）"
           },
-          "lengthCm": {
-            "type": "string",
-            "nullable": true,
-            "description": "长度（cm）"
+          "widthMm": {
+            "type": "number",
+            "description": "宽度（整数毫米）"
+          },
+          "lengthMm": {
+            "type": "number",
+            "description": "长度（整数毫米）"
           },
           "pieces": {
             "type": "number",
-            "nullable": true,
             "description": "根数"
           },
           "volumeM3": {
             "type": "string",
-            "nullable": true,
-            "description": "方量（m³）"
+            "description": "方量（m³，4 位小数；所有行都计算）"
           },
           "price": {
             "type": "string",
-            "nullable": true,
-            "description": "单价（元/m³）"
+            "description": "单价（按方量为元/m³，按根数为元/根）"
           },
           "lineAmount": {
             "type": "string",
@@ -1226,6 +1231,13 @@
           "seq",
           "code",
           "productType",
+          "pricingMode",
+          "thicknessMm",
+          "widthMm",
+          "lengthMm",
+          "pieces",
+          "volumeM3",
+          "price",
           "lineAmount",
           "otherAmount",
           "note"
@@ -1302,57 +1314,58 @@
       "SaleOrderItemBodyDto": {
         "type": "object",
         "properties": {
-          "productType": {
-            "type": "string",
-            "enum": [
-              "board",
-              "other"
-            ],
-            "description": "产品类型：board 板材 / other 其他"
+          "thicknessMm": {
+            "type": "number",
+            "description": "厚度（整数毫米）",
+            "example": 20
           },
-          "thicknessCm": {
-            "type": "string",
-            "description": "厚度（cm，3 位小数），板材必填",
-            "example": "2.000"
+          "widthMm": {
+            "type": "number",
+            "description": "宽度（整数毫米）",
+            "example": 100
           },
-          "widthCm": {
-            "type": "string",
-            "description": "宽度（cm，3 位小数），板材必填",
-            "example": "80.000"
-          },
-          "lengthCm": {
-            "type": "string",
-            "description": "长度（cm，3 位小数），板材必填",
-            "example": "300.000"
+          "lengthMm": {
+            "type": "number",
+            "description": "长度（整数毫米）",
+            "example": 3000
           },
           "pieces": {
             "type": "number",
-            "description": "根数（整数），板材必填",
-            "example": 3
+            "description": "根数（正整数）",
+            "example": 10
+          },
+          "pricingMode": {
+            "type": "string",
+            "enum": [
+              "volume",
+              "piece"
+            ],
+            "description": "计价方式：volume 按方量（默认）/ piece 按根数",
+            "default": "volume"
           },
           "price": {
             "type": "string",
-            "description": "单价（元/m³，2 位小数），板材必填",
-            "example": "550.25"
-          },
-          "lineAmount": {
-            "type": "string",
-            "description": "行金额（其他类型手填，2 位小数）",
-            "example": "50.00"
+            "description": "单价（2 位小数）：按方量为元/m³，按根数为元/根",
+            "example": "600.00"
           },
           "otherAmount": {
             "type": "string",
-            "description": "行其他金额（两类型通用兜底），默认 0",
+            "description": "行其他金额（行级人工调整），默认 0",
             "default": "0"
           },
           "note": {
             "type": "string",
-            "description": "行备注",
+            "description": "行备注（产品描述）",
             "default": ""
           }
         },
         "required": [
-          "productType"
+          "thicknessMm",
+          "widthMm",
+          "lengthMm",
+          "pieces",
+          "pricingMode",
+          "price"
         ]
       },
       "SaleOrderBodyDto": {
@@ -1394,52 +1407,48 @@
       "SaleOrderItemUpdateBodyDto": {
         "type": "object",
         "properties": {
-          "productType": {
-            "type": "string",
-            "enum": [
-              "board",
-              "other"
-            ],
-            "description": "产品类型：board 板材 / other 其他"
+          "thicknessMm": {
+            "type": "number",
+            "description": "厚度（整数毫米）",
+            "example": 20
           },
-          "thicknessCm": {
-            "type": "string",
-            "description": "厚度（cm，3 位小数），板材必填",
-            "example": "2.000"
+          "widthMm": {
+            "type": "number",
+            "description": "宽度（整数毫米）",
+            "example": 100
           },
-          "widthCm": {
-            "type": "string",
-            "description": "宽度（cm，3 位小数），板材必填",
-            "example": "80.000"
-          },
-          "lengthCm": {
-            "type": "string",
-            "description": "长度（cm，3 位小数），板材必填",
-            "example": "300.000"
+          "lengthMm": {
+            "type": "number",
+            "description": "长度（整数毫米）",
+            "example": 3000
           },
           "pieces": {
             "type": "number",
-            "description": "根数（整数），板材必填",
-            "example": 3
+            "description": "根数（正整数）",
+            "example": 10
+          },
+          "pricingMode": {
+            "type": "string",
+            "enum": [
+              "volume",
+              "piece"
+            ],
+            "description": "计价方式：volume 按方量（默认）/ piece 按根数",
+            "default": "volume"
           },
           "price": {
             "type": "string",
-            "description": "单价（元/m³，2 位小数），板材必填",
-            "example": "550.25"
-          },
-          "lineAmount": {
-            "type": "string",
-            "description": "行金额（其他类型手填，2 位小数）",
-            "example": "50.00"
+            "description": "单价（2 位小数）：按方量为元/m³，按根数为元/根",
+            "example": "600.00"
           },
           "otherAmount": {
             "type": "string",
-            "description": "行其他金额（两类型通用兜底），默认 0",
+            "description": "行其他金额（行级人工调整），默认 0",
             "default": "0"
           },
           "note": {
             "type": "string",
-            "description": "行备注",
+            "description": "行备注（产品描述）",
             "default": ""
           },
           "id": {
@@ -1448,7 +1457,12 @@
           }
         },
         "required": [
-          "productType"
+          "thicknessMm",
+          "widthMm",
+          "lengthMm",
+          "pieces",
+          "pricingMode",
+          "price"
         ]
       },
       "SaleOrderUpdateBodyDto": {

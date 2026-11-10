@@ -22,12 +22,13 @@ interface SaleOrderItemDetail {
   seq: number;
   code: string;
   productType: string;
-  thicknessCm?: string | null;
-  widthCm?: string | null;
-  lengthCm?: string | null;
-  pieces?: number | null;
-  volumeM3?: string | null;
-  price?: string | null;
+  pricingMode: 'volume' | 'piece';
+  thicknessMm: number;
+  widthMm: number;
+  lengthMm: number;
+  pieces: number;
+  volumeM3: string;
+  price: string;
   lineAmount: string;
   otherAmount: string;
   note: string;
@@ -94,6 +95,9 @@ export default function SaleOrderDetailPage(): React.ReactElement {
           {order.customerDeleted ? '（已删除）' : ''}
         </span>
         <span>
+          产品类型：<strong>方木</strong>
+        </span>
+        <span>
           合计方量：<strong>{order.totalVolume}</strong> m³
         </span>
         <span>
@@ -113,13 +117,12 @@ export default function SaleOrderDetailPage(): React.ReactElement {
           <TableHeader>
             <TableRow>
               <TableHead>编码</TableHead>
-              <TableHead>类型</TableHead>
-              <TableHead className="text-right">厚度(cm)</TableHead>
-              <TableHead className="text-right">宽度(cm)</TableHead>
-              <TableHead className="text-right">长度(cm)</TableHead>
+              <TableHead className="text-right">厚度(mm)</TableHead>
+              <TableHead className="text-right">宽度(mm)</TableHead>
+              <TableHead className="text-right">长度(mm)</TableHead>
               <TableHead className="text-right">根数</TableHead>
               <TableHead className="text-right">方量(m³)</TableHead>
-              <TableHead className="text-right">单价(元/m³)</TableHead>
+              <TableHead className="text-right">单价</TableHead>
               <TableHead className="text-right">小计金额</TableHead>
               <TableHead className="text-right">其他金额</TableHead>
               <TableHead>备注</TableHead>
@@ -129,13 +132,17 @@ export default function SaleOrderDetailPage(): React.ReactElement {
             {order.items.map((item) => (
               <TableRow key={item.id}>
                 <TableCell>{item.code}</TableCell>
-                <TableCell>{item.productType === 'board' ? '板材' : '其他'}</TableCell>
-                <TableCell className="text-right tabular-nums">{item.thicknessCm ?? '—'}</TableCell>
-                <TableCell className="text-right tabular-nums">{item.widthCm ?? '—'}</TableCell>
-                <TableCell className="text-right tabular-nums">{item.lengthCm ?? '—'}</TableCell>
-                <TableCell className="text-right tabular-nums">{item.pieces ?? '—'}</TableCell>
-                <TableCell className="text-right tabular-nums">{item.volumeM3 ?? '—'}</TableCell>
-                <TableCell className="text-right tabular-nums">{item.price ?? '—'}</TableCell>
+                <TableCell className="text-right tabular-nums">{item.thicknessMm}</TableCell>
+                <TableCell className="text-right tabular-nums">{item.widthMm}</TableCell>
+                <TableCell className="text-right tabular-nums">{item.lengthMm}</TableCell>
+                <TableCell className="text-right tabular-nums">{item.pieces}</TableCell>
+                <TableCell className="text-right tabular-nums">{item.volumeM3}</TableCell>
+                <TableCell className="text-right tabular-nums">
+                  {item.price}
+                  <span className="ml-1 text-xs text-muted-foreground">
+                    {item.pricingMode === 'piece' ? '元/根' : '元/m³'}
+                  </span>
+                </TableCell>
                 <TableCell className="text-right tabular-nums">{item.lineAmount}</TableCell>
                 <TableCell className="text-right tabular-nums">{item.otherAmount}</TableCell>
                 <TableCell>{item.note}</TableCell>

@@ -118,11 +118,11 @@ describe('客户接口（契约/集成）', () => {
       note: '',
       items: [
         {
-          productType: 'board',
-          thicknessCm: '2.000',
-          widthCm: '80.000',
-          lengthCm: '300.000',
+          thicknessMm: 20,
+          widthMm: 80,
+          lengthMm: 300,
           pieces: 3,
+          pricingMode: 'volume',
           price: '550.25',
           otherAmount: '0',
           note: '',
@@ -144,8 +144,12 @@ describe('客户接口（契约/集成）', () => {
       note: '',
       items: [
         {
-          productType: 'other',
-          lineAmount: '1.00',
+          thicknessMm: 20,
+          widthMm: 80,
+          lengthMm: 300,
+          pieces: 3,
+          pricingMode: 'volume',
+          price: '550.25',
           otherAmount: '0',
           note: '',
         },
@@ -202,7 +206,7 @@ describe('客户接口（契约/集成）', () => {
       customerIds: customerId,
     });
     expect(summary.status).toBe(200);
-    expect(summary.body.items).toEqual([{ customerId, totalVolume: '0.1440', orderCount: 1 }]);
+    expect(summary.body.items).toEqual([{ customerId, totalVolume: '0.0014', orderCount: 1 }]);
 
     const orders = await auth(http().get(`/${API_PREFIX}/sale-orders`)).query({
       customerId,
@@ -236,11 +240,11 @@ describe('客户接口（契约/集成）', () => {
       note: '',
       items: [
         {
-          productType: 'board',
-          thicknessCm: '2.000',
-          widthCm: '80.000',
-          lengthCm: '300.000',
+          thicknessMm: 20,
+          widthMm: 80,
+          lengthMm: 300,
           pieces: 3,
+          pricingMode: 'volume',
           price: '550.25',
           otherAmount: '0',
           note: '',
@@ -268,7 +272,18 @@ describe('客户接口（契约/集成）', () => {
       customerId: targetId,
       otherAmount: '0',
       note: '',
-      items: [{ productType: 'other', lineAmount: '1.00', otherAmount: '0', note: '' }],
+      items: [
+        {
+          thicknessMm: 20,
+          widthMm: 80,
+          lengthMm: 300,
+          pieces: 3,
+          pricingMode: 'volume',
+          price: '550.25',
+          otherAmount: '0',
+          note: '',
+        },
+      ],
     });
     expect(rejected.status).toBe(400);
     expect(rejected.body.code).toBe('CUSTOMER_NOT_FOUND');

@@ -5,7 +5,7 @@ import { hash } from '@node-rs/argon2';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
-  calcBoardLineAmount,
+  calcLineAmount,
   calcOrderTotals,
   calcVolumeM3,
   type SaleOrderInput,
@@ -15,7 +15,7 @@ import { API_PREFIX } from '../src/common/api-prefix.js';
 import { PrismaService } from '../src/common/prisma.service.js';
 
 // 订单接口关键路径（契约/集成层，技术方案 §10）：
-// 守卫 401 / 新建（计算落账、编号、幂等）/ 详情 / 列表筛选 / 更新重算 / 参数校验 / 软删除。
+// 守卫 401 / 新建（两种计价、计算落账、编号、幂等）/ 详情 / 列表筛选 / 更新重算 / 参数校验 / 软删除。
 // 使用一次性测试账号（it- 前缀）与客户名（it-order- 前缀），测试结束清理。
 
 describe('订单接口（契约/集成）', () => {
@@ -27,7 +27,8 @@ describe('订单接口（契约/集成）', () => {
   const password = 'Secret#12345';
   const customerName = `it-order-customer-${Date.now()}`;
 
-  const boardVolume = calcVolumeM3('2.000', '80.000', '300.000', 3);
+  const volumeLine = calcVolumeM3(20, 80, 300, 3);
+  const pieceVolume = calcVolumeM3(20, 100, 3000, 10);
 
   const body = (): SaleOrderInput => ({
     saleDate: '2026-11-09',
@@ -36,16 +37,25 @@ describe('订单接口（契约/集成）', () => {
     note: '集成测试单',
     items: [
       {
-        productType: 'board',
-        thicknessCm: '2.000',
-        widthCm: '80.000',
-        lengthCm: '300.000',
+        thicknessMm: 20,
+        widthMm: 80,
+        lengthMm: 300,
         pieces: 3,
+        pricingMode: 'volume',
         price: '550.25',
         otherAmount: '0.50',
         note: '',
       },
-      { productType: 'other', lineAmount: '5.00', otherAmount: '0', note: '托盘' },
+      {
+        thicknessMm: 20,
+        widthMm: 100,
+        lengthMm: 3000,
+        pieces: 10,
+        pricingMode: 'piece',
+        price: '40.00',
+        otherAmount: '0',
+        note: '按根数',
+      },
     ],
   });
 
@@ -89,7 +99,7 @@ describe('订单接口（契约/集成）', () => {
 
   let created: { id: string; code: string };
 
-  it('新建：方量与金额自动落账、编号按月流水、明细编码 = 主单号-行序', async () => {
+  it('新建：两种计价混用、方量都计算、金额按计价方式落账、编号按月流水', async () => {
     const res = await http()
       .post(`/${API_PREFIX}/sale-orders`)
       .set('Authorization', `Bearer ${accessToken}`)
@@ -97,21 +107,33 @@ describe('订单接口（契约/集成）', () => {
     expect(res.status).toBe(201);
     expect(String(res.body.code)).toMatch(/^202611-\d{4}$/);
     expect(res.body.customerName).toBe(customerName);
-    expect(res.body.totalVolume).toBe('0.1440');
+
+    const line1 = calcLineAmount('volume', volumeLine, 3, '550.25');
+    const line2 = calcLineAmount('piece', pieceVolume, 10, '40.00');
+    expect(res.body.totalVolume).toBe(calcOrderTotals(
+      [
+        { volumeM3: volumeLine, lineAmount: line1, otherAmount: '0.50' },
+        { volumeM3: pieceVolume, lineAmount: line2, otherAmount: '0.00' },
+      ],
+      '0.00',
+    ).totalVolume);
     expect(res.body.totalAmount).toBe(
       calcOrderTotals(
         [
-          { volumeM3: boardVolume, lineAmount: calcBoardLineAmount(boardVolume, '550.25'), otherAmount: '0.50' },
-          { volumeM3: null, lineAmount: '5.00', otherAmount: '0.00' },
+          { volumeM3: volumeLine, lineAmount: line1, otherAmount: '0.50' },
+          { volumeM3: pieceVolume, lineAmount: line2, otherAmount: '0.00' },
         ],
         '0.00',
       ).totalAmount,
     );
     expect(res.body.items).toHaveLength(2);
     expect(res.body.items[0].code).toBe(`${res.body.code}-01`);
-    expect(res.body.items[0].volumeM3).toBe('0.1440');
-    expect(res.body.items[1].productType).toBe('other');
-    expect(res.body.items[1].lineAmount).toBe('5.00');
+    expect(res.body.items[0].productType).toBe('square_timber');
+    expect(res.body.items[0].pricingMode).toBe('volume');
+    expect(res.body.items[0].volumeM3).toBe(volumeLine);
+    expect(res.body.items[1].pricingMode).toBe('piece');
+    expect(res.body.items[1].volumeM3).toBe(pieceVolume);
+    expect(res.body.items[1].lineAmount).toBe(line2);
     created = { id: res.body.id, code: res.body.code };
   });
 
@@ -149,11 +171,11 @@ describe('订单接口（契约/集成）', () => {
     });
   });
 
-  it('更新：明细重算、移除行软删', async () => {
+  it('更新：明细重算、计价方式可切换、移除行软删', async () => {
     const detail = await http()
       .get(`/${API_PREFIX}/sale-orders/${created.id}`)
       .set('Authorization', `Bearer ${accessToken}`);
-    const boardRow = detail.body.items.find((item: { productType: string }) => item.productType === 'board');
+    const firstRow = detail.body.items[0];
     const res = await http()
       .put(`/${API_PREFIX}/sale-orders/${created.id}`)
       .set('Authorization', `Bearer ${accessToken}`)
@@ -164,13 +186,13 @@ describe('订单接口（契约/集成）', () => {
         note: '集成测试单（改）',
         items: [
           {
-            id: boardRow.id,
-            productType: 'board',
-            thicknessCm: '2.000',
-            widthCm: '80.000',
-            lengthCm: '300.000',
+            id: firstRow.id,
+            thicknessMm: 20,
+            widthMm: 80,
+            lengthMm: 300,
             pieces: 4,
-            price: '550.25',
+            pricingMode: 'piece',
+            price: '12.50',
             otherAmount: '0.50',
             note: '',
           },
@@ -178,14 +200,16 @@ describe('订单接口（契约/集成）', () => {
       });
     expect(res.status).toBe(200);
     expect(res.body.items).toHaveLength(1);
-    const volume4 = calcVolumeM3('2.000', '80.000', '300.000', 4);
+    const volume4 = calcVolumeM3(20, 80, 300, 4);
     expect(res.body.items[0].volumeM3).toBe(volume4);
+    expect(res.body.items[0].pricingMode).toBe('piece');
+    expect(res.body.items[0].lineAmount).toBe(calcLineAmount('piece', volume4, 4, '12.50'));
     expect(res.body.totalAmount).toBe(
       calcOrderTotals(
         [
           {
             volumeM3: volume4,
-            lineAmount: calcBoardLineAmount(volume4, '550.25'),
+            lineAmount: calcLineAmount('piece', volume4, 4, '12.50'),
             otherAmount: '0.50',
           },
         ],
@@ -215,13 +239,23 @@ describe('订单接口（契约/集成）', () => {
     expect(detail.status).toBe(404);
   });
 
-  it('参数校验：明细为空拒绝', async () => {
-    const res = await http()
+  it('参数校验：明细为空、尺寸非整数均拒绝', async () => {
+    const empty = await http()
       .post(`/${API_PREFIX}/sale-orders`)
       .set('Authorization', `Bearer ${accessToken}`)
       .send({ ...body(), items: [] });
-    expect(res.status).toBe(400);
-    expect(res.body.code).toBe('VALIDATION_FAILED');
+    expect(empty.status).toBe(400);
+    expect(empty.body.code).toBe('VALIDATION_FAILED');
+
+    const decimalMm = await http()
+      .post(`/${API_PREFIX}/sale-orders`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        ...body(),
+        items: [{ ...body().items[0], thicknessMm: 20.5 }],
+      });
+    expect(decimalMm.status).toBe(400);
+    expect(decimalMm.body.code).toBe('VALIDATION_FAILED');
   });
 
   it('删除：软删除后详情与后续删除均为 404', async () => {

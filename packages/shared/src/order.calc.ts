@@ -5,10 +5,9 @@
 
 const MONEY_SCALE = 2;
 const VOLUME_SCALE = 4;
-const CM_SCALE = 3;
-// 方量 = 厚/100 × 宽/100 × 长/100 × 根数（m³）；长宽厚各自放大 10^3（3 位小数），
-// 分母 = (10^3 × 10^2)^3 = 10^15；再 ×10^4 保留 4 位小数 → 除 10^11
-const VOLUME_ROUND_DIVISOR = 10n ** 11n;
+// 方量 = 厚mm × 宽mm × 长mm × 根数 ÷ 10^9（m³）；
+// 再 ×10^4 保留 4 位小数 → 分母 10^5
+const VOLUME_ROUND_DIVISOR = 10n ** 5n;
 
 // 把非负小数字符串放大 10^scale 转为 BigInt（小数位不足补零）
 function toScaled(value: string, scale: number): bigint {
@@ -32,27 +31,41 @@ function divRoundHalfUp(numerator: bigint, divisor: bigint): bigint {
   return remainder * 2n >= divisor ? quotient + 1n : quotient;
 }
 
-// 方量（板材行）：thicknessCm/widthCm/lengthCm 为 3 位小数 cm 字符串，pieces 为整数根数。
-// 返回 4 位小数 m³ 字符串。
+// 方量：thicknessMm/widthMm/lengthMm 为整数毫米，pieces 为整数根数。
+// 返回 4 位小数 m³ 字符串；每一行都计算（工资依据）。
 export function calcVolumeM3(
-  thicknessCm: string,
-  widthCm: string,
-  lengthCm: string,
+  thicknessMm: number,
+  widthMm: number,
+  lengthMm: number,
   pieces: number,
 ): string {
   const numerator =
-    toScaled(thicknessCm, CM_SCALE) *
-    toScaled(widthCm, CM_SCALE) *
-    toScaled(lengthCm, CM_SCALE) *
-    BigInt(pieces);
+    BigInt(thicknessMm) * BigInt(widthMm) * BigInt(lengthMm) * BigInt(pieces);
   return fromScaled(divRoundHalfUp(numerator, VOLUME_ROUND_DIVISOR), VOLUME_SCALE);
 }
 
-// 板材行小计金额 = 方量（4 位小数）× 单价（2 位小数），返回 2 位小数金额字符串。
-export function calcBoardLineAmount(volumeM3: string, price: string): string {
-  // 产品放大 10^6；四舍五入保留 2 位 → 除 10^4
+// 按方量计价：行金额 = 方量（4 位小数）× 单价（2 位小数），返回 2 位小数。
+export function calcVolumeLineAmount(volumeM3: string, price: string): string {
+  // 乘积放大 10^6；四舍五入保留 2 位 → 除 10^4
   const product = toScaled(volumeM3, VOLUME_SCALE) * toScaled(price, MONEY_SCALE);
   return fromScaled(divRoundHalfUp(product, 10n ** 4n), MONEY_SCALE);
+}
+
+// 按根数计价：行金额 = 根数 × 单价（2 位小数），天然 2 位。
+export function calcPieceLineAmount(pieces: number, price: string): string {
+  return fromScaled(BigInt(pieces) * toScaled(price, MONEY_SCALE), MONEY_SCALE);
+}
+
+// 统一行金额入口：计价方式决定公式，方量两种方式下都已计算。
+export function calcLineAmount(
+  pricingMode: 'volume' | 'piece',
+  volumeM3: string,
+  pieces: number,
+  price: string,
+): string {
+  return pricingMode === 'piece'
+    ? calcPieceLineAmount(pieces, price)
+    : calcVolumeLineAmount(volumeM3, price);
 }
 
 // 金额相加（2 位小数字符串，任意项）
@@ -70,7 +83,7 @@ export function sumVolumes(values: string[]): string {
 export interface OrderTotalsLine {
   lineAmount: string;
   otherAmount: string;
-  volumeM3: string | null;
+  volumeM3: string;
 }
 
 // 整单汇总：合计方量、主表小计金额（Σ单行金额）、主表合计金额（小计 + 主表其他金额）。
@@ -80,9 +93,7 @@ export function calcOrderTotals(
   orderOtherAmount: string,
 ): { totalVolume: string; subtotalAmount: string; totalAmount: string } {
   const lineTotals = items.map((item) => addAmounts(item.lineAmount, item.otherAmount));
-  const volumes = items
-    .filter((item): item is OrderTotalsLine & { volumeM3: string } => item.volumeM3 !== null)
-    .map((item) => item.volumeM3);
+  const volumes = items.map((item) => item.volumeM3);
   const subtotalAmount = lineTotals.length > 0 ? addAmounts(...lineTotals) : '0.00';
   return {
     totalVolume: sumVolumes(volumes),

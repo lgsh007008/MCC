@@ -2,11 +2,13 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@mcc/db';
 import {
   addAmounts,
-  calcBoardLineAmount,
+  calcLineAmount,
   calcOrderTotals,
   calcVolumeM3,
   sumVolumes,
   type SaleOrderInput,
+  type SaleOrderItemInput,
+  type SaleOrderItemUpdateInput,
   type SaleOrderListQuery,
   type SaleOrderUpdateInput,
 } from '@mcc/shared';
@@ -25,67 +27,43 @@ import type {
 
 const money = (value: string): string => addAmounts(value, '0.00');
 const volume = (value: string): string => sumVolumes([value]);
-// 尺寸展示：固定 3 位小数（仅展示格式化，不参与计算）
-const cm = (value: string): string => Number(value).toFixed(3);
 const isoDate = (value: Date): string => value.toISOString().slice(0, 10);
 // Prisma 的 Date 列不接受纯日期字符串，取 UTC 午夜构造（业务日期为日历日，读回即原值）
 const toDate = (value: string): Date => new Date(`${value}T00:00:00.000Z`);
 
 const CODE_RETRY_LIMIT = 3;
 
-interface RawItem {
-  productType: 'board' | 'other';
-  thicknessCm?: string;
-  widthCm?: string;
-  lengthCm?: string;
-  pieces?: number;
-  price?: string;
-  lineAmount?: string;
-  otherAmount: string;
-  note: string;
-}
+type RawItem = SaleOrderItemInput | SaleOrderItemUpdateInput;
 
 interface ComputedItem {
-  productType: 'BOARD' | 'OTHER';
-  thicknessCm: string | null;
-  widthCm: string | null;
-  lengthCm: string | null;
-  pieces: number | null;
-  volumeM3: string | null;
-  price: string | null;
+  productType: 'SQUARE_TIMBER';
+  pricingMode: 'VOLUME' | 'PIECE';
+  thicknessMm: number;
+  widthMm: number;
+  lengthMm: number;
+  pieces: number;
+  volumeM3: string;
+  price: string;
   lineAmount: string;
   otherAmount: string;
   note: string;
 }
 
-// 板材行：方量自动、小计 = 方量×单价；其他行：金额手填（product/order.md R-订单-001）。
+// 方量对所有行必算（工资依据）；行金额由计价方式决定（product/order.md R-订单-001）。
 function computeItem(raw: RawItem): ComputedItem {
-  const otherAmount = money(raw.otherAmount);
-  if (raw.productType === 'board') {
-    const volumeM3 = calcVolumeM3(raw.thicknessCm!, raw.widthCm!, raw.lengthCm!, raw.pieces!);
-    return {
-      productType: 'BOARD',
-      thicknessCm: raw.thicknessCm!,
-      widthCm: raw.widthCm!,
-      lengthCm: raw.lengthCm!,
-      pieces: raw.pieces!,
-      volumeM3,
-      price: money(raw.price!),
-      lineAmount: calcBoardLineAmount(volumeM3, raw.price!),
-      otherAmount,
-      note: raw.note,
-    };
-  }
+  const volumeM3 = calcVolumeM3(raw.thicknessMm, raw.widthMm, raw.lengthMm, raw.pieces);
+  const pricingMode = raw.pricingMode === 'piece' ? 'PIECE' : 'VOLUME';
   return {
-    productType: 'OTHER',
-    thicknessCm: null,
-    widthCm: null,
-    lengthCm: null,
-    pieces: null,
-    volumeM3: null,
-    price: null,
-    lineAmount: money(raw.lineAmount!),
-    otherAmount,
+    productType: 'SQUARE_TIMBER',
+    pricingMode,
+    thicknessMm: raw.thicknessMm,
+    widthMm: raw.widthMm,
+    lengthMm: raw.lengthMm,
+    pieces: raw.pieces,
+    volumeM3,
+    price: money(raw.price),
+    lineAmount: calcLineAmount(raw.pricingMode ?? 'volume', volumeM3, raw.pieces, raw.price),
+    otherAmount: money(raw.otherAmount),
     note: raw.note,
   };
 }
@@ -108,13 +86,14 @@ interface DetailOrder extends ListRow {
   items: Array<{
     id: string;
     seq: number;
-    productType: 'BOARD' | 'OTHER';
-    thicknessCm: Prisma.Decimal | null;
-    widthCm: Prisma.Decimal | null;
-    lengthCm: Prisma.Decimal | null;
-    pieces: number | null;
-    volumeM3: Prisma.Decimal | null;
-    price: Prisma.Decimal | null;
+    productType: 'SQUARE_TIMBER';
+    pricingMode: 'VOLUME' | 'PIECE';
+    thicknessMm: number;
+    widthMm: number;
+    lengthMm: number;
+    pieces: number;
+    volumeM3: Prisma.Decimal;
+    price: Prisma.Decimal;
     lineAmount: Prisma.Decimal;
     otherAmount: Prisma.Decimal;
     note: string;
@@ -164,13 +143,14 @@ export class OrderService {
       id: item.id,
       seq: item.seq,
       code: `${order.code}-${String(item.seq).padStart(2, '0')}`,
-      productType: item.productType.toLowerCase(),
-      thicknessCm: item.thicknessCm ? cm(item.thicknessCm.toString()) : null,
-      widthCm: item.widthCm ? cm(item.widthCm.toString()) : null,
-      lengthCm: item.lengthCm ? cm(item.lengthCm.toString()) : null,
+      productType: 'square_timber',
+      pricingMode: item.pricingMode === 'PIECE' ? 'piece' : 'volume',
+      thicknessMm: item.thicknessMm,
+      widthMm: item.widthMm,
+      lengthMm: item.lengthMm,
       pieces: item.pieces,
-      volumeM3: item.volumeM3 ? volume(item.volumeM3.toString()) : null,
-      price: item.price ? money(item.price.toString()) : null,
+      volumeM3: volume(item.volumeM3.toString()),
+      price: money(item.price.toString()),
       lineAmount: money(item.lineAmount.toString()),
       otherAmount: money(item.otherAmount.toString()),
       note: item.note,
@@ -299,9 +279,10 @@ export class OrderService {
               orderId: created.id,
               seq: index + 1,
               productType: item.productType,
-              thicknessCm: item.thicknessCm,
-              widthCm: item.widthCm,
-              lengthCm: item.lengthCm,
+              pricingMode: item.pricingMode,
+              thicknessMm: item.thicknessMm,
+              widthMm: item.widthMm,
+              lengthMm: item.lengthMm,
               pieces: item.pieces,
               volumeM3: item.volumeM3,
               price: item.price,
@@ -355,9 +336,10 @@ export class OrderService {
 
     const itemData = (item: ComputedItem) => ({
       productType: item.productType,
-      thicknessCm: item.thicknessCm,
-      widthCm: item.widthCm,
-      lengthCm: item.lengthCm,
+      pricingMode: item.pricingMode,
+      thicknessMm: item.thicknessMm,
+      widthMm: item.widthMm,
+      lengthMm: item.lengthMm,
       pieces: item.pieces,
       volumeM3: item.volumeM3,
       price: item.price,
@@ -417,7 +399,7 @@ export class OrderService {
   }
 
   // 客户维度累计方量（product/customer.md 累计下单方量；design/order.md §5）：
-  // 未软删销售单按 customer_id 汇总；含「其他」类型（其他行无方量，贡献 0）。
+  // 未软删销售单按 customer_id 汇总；每一行都有方量（工资依据），不再有「其他」类型例外。
   // 用 findMany 后本地汇总而非 groupBy：租户条件由数据访问层统一附加，groupBy 不在扩展钩子内。
   async customerVolumeSummary(customerIds: string[]): Promise<{
     items: Array<{ customerId: string; totalVolume: string; orderCount: number }>;

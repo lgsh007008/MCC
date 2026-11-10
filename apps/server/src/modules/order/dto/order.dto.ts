@@ -7,31 +7,37 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 // ── 请求体 ──────────────────────────────────────────────
 
 export class SaleOrderItemBodyDto {
-  @ApiProperty({ type: String, enum: ['board', 'other'], description: '产品类型：board 板材 / other 其他' })
-  productType!: 'board' | 'other';
+  @ApiProperty({ type: Number, description: '厚度（整数毫米）', example: 20 })
+  thicknessMm!: number;
 
-  @ApiPropertyOptional({ type: String, description: '厚度（cm，3 位小数），板材必填', example: '2.000' })
-  thicknessCm?: string;
+  @ApiProperty({ type: Number, description: '宽度（整数毫米）', example: 100 })
+  widthMm!: number;
 
-  @ApiPropertyOptional({ type: String, description: '宽度（cm，3 位小数），板材必填', example: '80.000' })
-  widthCm?: string;
+  @ApiProperty({ type: Number, description: '长度（整数毫米）', example: 3000 })
+  lengthMm!: number;
 
-  @ApiPropertyOptional({ type: String, description: '长度（cm，3 位小数），板材必填', example: '300.000' })
-  lengthCm?: string;
+  @ApiProperty({ type: Number, description: '根数（正整数）', example: 10 })
+  pieces!: number;
 
-  @ApiPropertyOptional({ type: Number, description: '根数（整数），板材必填', example: 3 })
-  pieces?: number;
+  @ApiProperty({
+    type: String,
+    enum: ['volume', 'piece'],
+    description: '计价方式：volume 按方量（默认）/ piece 按根数',
+    default: 'volume',
+  })
+  pricingMode?: 'volume' | 'piece';
 
-  @ApiPropertyOptional({ type: String, description: '单价（元/m³，2 位小数），板材必填', example: '550.25' })
-  price?: string;
+  @ApiProperty({
+    type: String,
+    description: '单价（2 位小数）：按方量为元/m³，按根数为元/根',
+    example: '600.00',
+  })
+  price!: string;
 
-  @ApiPropertyOptional({ type: String, description: '行金额（其他类型手填，2 位小数）', example: '50.00' })
-  lineAmount?: string;
-
-  @ApiPropertyOptional({ type: String, description: '行其他金额（两类型通用兜底），默认 0', default: '0' })
+  @ApiPropertyOptional({ type: String, description: '行其他金额（行级人工调整），默认 0', default: '0' })
   otherAmount?: string;
 
-  @ApiPropertyOptional({ type: String, description: '行备注', default: '' })
+  @ApiPropertyOptional({ type: String, description: '行备注（产品描述）', default: '' })
   note?: string;
 }
 
@@ -86,26 +92,29 @@ export class SaleOrderItemResponseDto {
   @ApiProperty({ type: String, description: '销售明细编码 = 主单编号-行序' })
   code!: string;
 
-  @ApiProperty({ type: String, description: '产品类型' })
-  productType!: string;
+  @ApiProperty({ type: String, enum: ['square_timber'], description: '产品类型（当前固定方木，服务端写入）' })
+  productType!: 'square_timber';
 
-  @ApiPropertyOptional({ type: String, nullable: true, description: '厚度（cm）' })
-  thicknessCm!: string | null;
+  @ApiProperty({ type: String, enum: ['volume', 'piece'], description: '计价方式：volume 按方量 / piece 按根数' })
+  pricingMode!: 'volume' | 'piece';
 
-  @ApiPropertyOptional({ type: String, nullable: true, description: '宽度（cm）' })
-  widthCm!: string | null;
+  @ApiProperty({ type: Number, description: '厚度（整数毫米）' })
+  thicknessMm!: number;
 
-  @ApiPropertyOptional({ type: String, nullable: true, description: '长度（cm）' })
-  lengthCm!: string | null;
+  @ApiProperty({ type: Number, description: '宽度（整数毫米）' })
+  widthMm!: number;
 
-  @ApiPropertyOptional({ type: Number, nullable: true, description: '根数' })
-  pieces!: number | null;
+  @ApiProperty({ type: Number, description: '长度（整数毫米）' })
+  lengthMm!: number;
 
-  @ApiPropertyOptional({ type: String, nullable: true, description: '方量（m³）' })
-  volumeM3!: string | null;
+  @ApiProperty({ type: Number, description: '根数' })
+  pieces!: number;
 
-  @ApiPropertyOptional({ type: String, nullable: true, description: '单价（元/m³）' })
-  price!: string | null;
+  @ApiProperty({ type: String, description: '方量（m³，4 位小数；所有行都计算）' })
+  volumeM3!: string;
+
+  @ApiProperty({ type: String, description: '单价（按方量为元/m³，按根数为元/根）' })
+  price!: string;
 
   @ApiProperty({ type: String, description: '行小计金额' })
   lineAmount!: string;
