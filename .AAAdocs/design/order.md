@@ -89,7 +89,7 @@ modules/order/
 - 表单页：客户为下拉选择（数据源 customer 列表接口，只列启用客户；编辑历史单且其客户已停用或已删除时，用单据自带的 `customerId + customerName` 快照补一个选项并保持选中，不再请求客户档案，否则单据无法保存）；明细行动态增删（行操作 = 复制 / 删除，图标按钮）；复制为深拷贝当前行（去行 id，追加末尾，达 200 行禁用，新增行滚动到可见）；尺寸列顺序为长度、宽度、高度，均用文本输入 + `inputMode="numeric"`（整数毫米、不显示步进器），根数同样文本输入，计价方式下拉（按方量 / 按根数，最小宽度 `w-24`），单价标签随计价方式切换为「元/m³」或「元/根」；小计金额两种方式下均只读；输入时实时调用 `packages/shared` 计算纯函数显示方量 / 小计 / 合计（与服务端落账同源）；面包屑标识经 `usePageCrumb` 注入壳（新建 =「新建」；编辑 =「单号 / 编辑」，单号链接回详情）
 - 保存：整单提交（主表 + 明细，明细不含 `productType`），服务端固定写入方木、重算校验后落账并回传；服务端经 customer 公开接口校验客户启用态，客户未变更的更新不校验
 - 详情页：只读展示 + 编辑入口；信息条展示客户编号与名称快照、产品类型（方木）；客户档案已删除时编号后缀标注「已删除」；明细单价按行标注「元/m³」或「元/根」，不单列计价方式；面包屑标识经 `usePageCrumb` 注入壳（单号）
-- 移动页（移动 Web `/m`，ADR-011）：路由 `/m`（入口卡片）、`/m/sale-orders`（卡片列表 + 加载更多）、`/m/sale-orders/new`、`/m/sale-orders/[id]`（详情）、`/m/sale-orders/[id]/edit`；壳用 `components/mobile/mobile-shell.tsx`（`data-mode="mobile"`，无侧边栏 / 标签页 / 面包屑），页面自带底部固定操作条；表单组件 `components/mobile/sale-order-form.tsx` 为新建 / 编辑共用，状态与校验沿用 PC 表单口径（`saleOrderUpdateSchema`、`calcVolumeM3` / `calcLineAmount` / `calcOrderTotals` 同源），明细逐行卡片、行内两列栅格、数字字段 `inputMode="numeric"`；保存成功跳 `/m/sale-orders/{id}`；不新增后端接口
+- 移动页（移动 Web `/m`，ADR-011）：路由 `/m`（入口卡片）、`/m/sale-orders`（卡片列表 + 加载更多；卡片层级 = 销售日期大号 + 客户名称在上、编号小字 + 合计金额在下）、`/m/sale-orders/new`、`/m/sale-orders/[id]`（详情）、`/m/sale-orders/[id]/edit`；壳用 `components/mobile/mobile-shell.tsx`（`data-mode="mobile"`，无侧边栏 / 标签页 / 面包屑），页面自带底部固定操作条；表单组件 `components/mobile/sale-order-form.tsx` 为新建 / 编辑共用，状态与校验沿用 PC 表单口径（`saleOrderUpdateSchema`、`calcVolumeM3` / `calcLineAmount` / `calcOrderTotals` 同源），明细逐行卡片、行内两列栅格、数字字段 `inputMode="numeric"`；保存成功跳 `/m/sale-orders/{id}`；不新增后端接口
 
 ## 8. 打印实现（web）
 
@@ -139,6 +139,7 @@ modules/order/
 | 8 打印实现 | 新增 | — | 新增打印实现节：A4 单联模板组件、打印预览弹窗（左侧缩放预览 + 右侧操作栏）、隐藏 iframe + 样式复制 + `createRoot` + `print()` 的打印隔离、复用详情数据不重算、E2E 与人工打印验收 | 落地 R-订单-002；预览与打印共用同一模板，打印样式不污染主文档 |
 | 8 打印实现 | 修改 | 签字栏为制单 / 司机 / 客户；未说明浏览器页眉页脚 | 签字栏固定为「客户」；操作栏提示“如出现浏览器页眉页脚，在打印对话框中取消勾选”，不用 CSS 关闭页眉页脚 | 用户确认仅需客户签字；浏览器页眉页脚不可由页面关闭，需明示提示与取舍 |
 | 7 前端实现节 | 新增 | 无移动端实现落点 | 补移动页（`/m`）实现：路由清单、`MobileShell`、新建/编辑共用移动表单、明细行卡片与数字键盘、保存跳转移动详情、复用 shared 校验与计算纯函数、不新增后端接口 | 落地产品文档新增的销售单移动页（ADR-011），明确实现路径与复用边界 |
+| 7 前端实现节 · 移动列表 | 修改 | 移动卡片未写层级口径 | 补「卡片层级 = 销售日期大号 + 客户名称在上、编号小字 + 合计金额在下」 | 与产品文档移动页列表对调主次信息同步，避免实现再按旧层级写 |
 
 ---
 

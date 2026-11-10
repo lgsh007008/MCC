@@ -88,13 +88,13 @@ export default function MobileSaleOrdersPage(): React.ReactElement {
           >
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-lg font-medium tabular-nums">{order.code}</p>
+                <p className="text-lg font-medium tabular-nums">{order.saleDate}</p>
                 <p className="mt-1 truncate text-base">{order.customerName}</p>
               </div>
               <ChevronRightIcon className="mt-1 size-5 shrink-0 text-muted-foreground" />
             </div>
             <div className="mt-3 flex items-end justify-between gap-3">
-              <span className="text-sm text-muted-foreground">{order.saleDate}</span>
+              <span className="text-sm text-muted-foreground tabular-nums">{order.code}</span>
               <span className="text-xl font-semibold tabular-nums">{order.totalAmount} 元</span>
             </div>
             <p className="mt-1 text-right text-xs text-muted-foreground">
