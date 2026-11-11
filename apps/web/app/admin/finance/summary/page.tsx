@@ -72,6 +72,12 @@ export default function FinanceSummaryPage(): React.ReactElement {
     { label: '净利润', value: data?.netProfit ?? '0.00' },
   ];
 
+  const resetFilters = (): void => {
+    const defaults = { dateFrom: monthStart(), dateTo: localToday() };
+    setFilters(defaults);
+    setApplied(defaults);
+  };
+
   return (
     <div className="flex h-full min-h-0 flex-col gap-4">
       <form
@@ -101,6 +107,9 @@ export default function FinanceSummaryPage(): React.ReactElement {
         </div>
         <Button type="submit" variant="secondary">
           查询
+        </Button>
+        <Button type="button" variant="outline" onClick={resetFilters}>
+          重置
         </Button>
       </form>
 

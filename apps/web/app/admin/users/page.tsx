@@ -112,6 +112,13 @@ export default function UsersPage(): React.ReactElement {
     void load(1, keyword);
   };
 
+  const resetFilters = (): void => {
+    setKeyword('');
+    setAppliedKeyword('');
+    setPage(1);
+    void load(1, '');
+  };
+
   async function handleCreate(event: React.FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     setNotice(null);
@@ -239,6 +246,9 @@ export default function UsersPage(): React.ReactElement {
         </div>
         <Button type="submit" variant="secondary">
           查询
+        </Button>
+        <Button type="button" variant="outline" onClick={resetFilters}>
+          重置
         </Button>
       </form>
 

@@ -243,6 +243,14 @@ export default function FinanceEventsPage(): React.ReactElement {
 
   const totalPages = Math.max(1, Math.ceil(data.total / PAGE_SIZE));
 
+  const resetFilters = (): void => {
+    const empty = { dateFrom: '', dateTo: '', category: '', source: '' };
+    setFilters(empty);
+    setApplied(empty);
+    setPage(1);
+    setSelected(new Set());
+  };
+
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
       <form
@@ -295,6 +303,9 @@ export default function FinanceEventsPage(): React.ReactElement {
         </div>
         <Button type="submit" variant="secondary">
           查询
+        </Button>
+        <Button type="button" variant="outline" onClick={resetFilters}>
+          重置
         </Button>
       </form>
 
