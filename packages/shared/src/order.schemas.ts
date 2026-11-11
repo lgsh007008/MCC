@@ -65,6 +65,8 @@ export type SaleOrderSortField = z.infer<typeof saleOrderSortFieldSchema>;
 
 export const saleOrderListQuerySchema = paginationQuerySchema.extend({
   customerId: z.string().uuid().optional(),
+  // 移动端按客户名称模糊搜索（查的是单据里的名称快照）
+  customerName: z.string().trim().max(100).optional(),
   dateFrom: saleDateSchema.optional(),
   dateTo: saleDateSchema.optional(),
   sortBy: saleOrderSortFieldSchema.optional(),

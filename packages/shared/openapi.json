@@ -1021,6 +1021,15 @@
             }
           },
           {
+            "name": "customerName",
+            "required": false,
+            "in": "query",
+            "description": "客户名称快照模糊",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "customerId",
             "required": false,
             "in": "query",

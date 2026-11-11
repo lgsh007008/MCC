@@ -75,6 +75,17 @@ test('手机登录 → 移动入口 → 开单 → 详情 → 列表', async ({ 
     await expect(page).toHaveURL(/\/m\/sale-orders$/);
     await expect(page.getByText(customerName).first()).toBeVisible();
 
+    // 列表搜索：按客户名称模糊，回车即查；空结果提示；清除后回全量
+    const search = page.getByPlaceholder('搜索客户名称');
+    await search.fill(customerName);
+    await search.press('Enter');
+    await expect(page.getByText(customerName)).toHaveCount(1);
+    await search.fill(`不存在-${Date.now()}`);
+    await search.press('Enter');
+    await expect(page.getByText('暂无销售单')).toBeVisible();
+    await page.getByRole('button', { name: '清除搜索' }).click();
+    await expect(page.getByText(customerName)).toBeVisible();
+
     // 移动页无横向滚动（全站硬约束）
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,

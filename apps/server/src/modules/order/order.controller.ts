@@ -56,6 +56,7 @@ export class OrderController {
   @RequireScopes('order:view')
   @ApiOperation({ summary: '销售单列表：筛选（销售日期区间、客户）+ 排序 + 分页' })
   @ApiQuery({ name: 'customerId', required: false, type: String, description: '客户 id' })
+  @ApiQuery({ name: 'customerName', required: false, type: String, description: '客户名称快照模糊' })
   @ApiQuery({ name: 'dateFrom', required: false, type: String, description: '销售日期起（YYYY-MM-DD）' })
   @ApiQuery({ name: 'dateTo', required: false, type: String, description: '销售日期止（YYYY-MM-DD）' })
   @ApiQuery({ name: 'page', required: false, type: Number, description: '页码，默认 1' })

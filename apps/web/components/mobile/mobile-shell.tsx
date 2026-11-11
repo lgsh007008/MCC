@@ -15,13 +15,20 @@ import { authSession, currentRole } from '@/lib/auth/session';
 // 根节点 data-mode="mobile" 挂载移动令牌作用域（适老化基线，不做用户开关）。
 
 // 移动路由 → scope（与 PC 共用同一套权限，不按端拆分）
-const MOBILE_MANAGE_PATH = /^\/m\/sale-orders\/(new|[^/]+\/edit)$/;
+const MOBILE_ORDER_MANAGE_PATH = /^\/m\/sale-orders\/(new|[^/]+\/edit)$/;
+const MOBILE_CUSTOMER_MANAGE_PATH = /^\/m\/customers\/(new|[^/]+\/edit)$/;
 function scopeForMobilePath(pathname: string): Scope | null {
-  if (MOBILE_MANAGE_PATH.test(pathname)) {
+  if (MOBILE_ORDER_MANAGE_PATH.test(pathname)) {
     return 'order:manage';
   }
   if (pathname.startsWith('/m/sale-orders')) {
     return 'order:view';
+  }
+  if (MOBILE_CUSTOMER_MANAGE_PATH.test(pathname)) {
+    return 'customer:manage';
+  }
+  if (pathname.startsWith('/m/customers')) {
+    return 'customer:view';
   }
   return null;
 }

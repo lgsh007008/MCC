@@ -7,10 +7,5 @@ import { SaleOrderForm } from '@/components/order/sale-order-form';
 // 面包屑页面标识 =「新建」。
 export default function SaleOrderNewPage(): React.ReactElement {
   usePageCrumb([{ title: '新建' }]);
-  return (
-    <div className="space-y-4">
-      <h1 className="text-xl font-semibold">新建销售单</h1>
-      <SaleOrderForm />
-    </div>
-  );
+  return <SaleOrderForm title="新建销售单" />;
 }

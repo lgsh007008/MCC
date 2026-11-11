@@ -10,6 +10,7 @@ import {
   saleOrderUpdateSchema,
 } from '@mcc/shared';
 import { Button } from '@/components/ui/button';
+import { PageFrame } from '@/components/admin/page-frame';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -115,9 +116,11 @@ function Field({
 }
 
 export function SaleOrderForm({
+  title,
   orderId,
   initial,
 }: {
+  title: React.ReactNode;
   orderId?: string;
   initial?: SaleOrderFormInitial;
 }): React.ReactElement {
@@ -314,7 +317,30 @@ export function SaleOrderForm({
   const rowFull = items.length >= MAX_ROWS;
 
   return (
-    <form className="space-y-6" onSubmit={handleSubmit}>
+    <form className="h-full min-h-0" onSubmit={handleSubmit}>
+      <PageFrame
+        title={title}
+        actions={
+          <div className="w-full">
+            {error ? <p className="mb-2 text-sm text-destructive">{error}</p> : null}
+            <div className="flex gap-2">
+              <Button type="submit" disabled={submitting}>
+                {submitting ? '保存中…' : '保存'}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() =>
+                  router.push(orderId ? `/admin/sale-orders/${orderId}` : '/admin/sale-orders')
+                }
+              >
+                取消
+              </Button>
+            </div>
+          </div>
+        }
+      >
+        <div className="space-y-6">
       <section className="rounded-lg border border-border bg-card p-4">
         <h2 className="text-sm font-semibold">销售单</h2>
         <div className="mt-3 grid gap-3 xl:grid-cols-2">
@@ -521,20 +547,8 @@ export function SaleOrderForm({
         </div>
       </section>
 
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
-
-      <div className="flex gap-2">
-        <Button type="submit" disabled={submitting}>
-          {submitting ? '保存中…' : '保存'}
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => router.push(orderId ? `/admin/sale-orders/${orderId}` : '/admin/sale-orders')}
-        >
-          取消
-        </Button>
-      </div>
+        </div>
+      </PageFrame>
     </form>
   );
 }

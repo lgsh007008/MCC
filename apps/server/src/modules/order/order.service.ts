@@ -166,6 +166,9 @@ export class OrderService {
     if (query.customerId) {
       where.customerId = query.customerId;
     }
+    if (query.customerName) {
+      where.customerName = { contains: query.customerName };
+    }
     if (query.dateFrom || query.dateTo) {
       where.saleDate = {};
       if (query.dateFrom) {

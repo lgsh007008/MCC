@@ -1550,6 +1550,8 @@ export interface operations {
                 dateTo?: string;
                 /** @description 销售日期起（YYYY-MM-DD） */
                 dateFrom?: string;
+                /** @description 客户名称快照模糊 */
+                customerName?: string;
                 /** @description 客户 id */
                 customerId?: string;
             };

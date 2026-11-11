@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { customerInputSchema } from '@mcc/shared';
+import { PageFrame } from '@/components/admin/page-frame';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -39,9 +40,11 @@ function Field({
 }
 
 export function CustomerForm({
+  title,
   customerId,
   initial,
 }: {
+  title: React.ReactNode;
   customerId?: string;
   initial?: CustomerFormInitial;
 }): React.ReactElement {
@@ -107,7 +110,29 @@ export function CustomerForm({
   }
 
   return (
-    <form className="space-y-6" onSubmit={handleSubmit}>
+    <form className="h-full min-h-0" onSubmit={handleSubmit}>
+      <PageFrame
+        title={title}
+        actions={
+          <div className="w-full">
+            {error ? <p className="mb-2 text-sm text-destructive">{error}</p> : null}
+            <div className="flex gap-2">
+              <Button type="submit" disabled={submitting}>
+                {submitting ? '保存中…' : '保存'}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() =>
+                  router.push(customerId ? `/admin/customers/${customerId}` : '/admin/customers')
+                }
+              >
+                取消
+              </Button>
+            </div>
+          </div>
+        }
+      >
       <section className="rounded-lg border border-border bg-card p-4">
         <h2 className="text-sm font-semibold">客户</h2>
         <div className="mt-3 grid gap-3 xl:grid-cols-2">
@@ -156,23 +181,7 @@ export function CustomerForm({
           </Field>
         </div>
       </section>
-
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
-
-      <div className="flex gap-2">
-        <Button type="submit" disabled={submitting}>
-          {submitting ? '保存中…' : '保存'}
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() =>
-            router.push(customerId ? `/admin/customers/${customerId}` : '/admin/customers')
-          }
-        >
-          取消
-        </Button>
-      </div>
+      </PageFrame>
     </form>
   );
 }

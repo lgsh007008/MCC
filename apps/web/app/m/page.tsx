@@ -2,15 +2,44 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { ChevronRightIcon, LogOutIcon, ReceiptTextIcon } from 'lucide-react';
+import { ChevronRightIcon, LogOutIcon, ReceiptTextIcon, UsersIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useCan } from '@/components/auth/permission-context';
 import { MobileHeader } from '@/components/mobile/mobile-shell';
 import { api } from '@/lib/api';
 import { authSession } from '@/lib/auth/session';
 
-// 移动入口页（product/平台布局.md「移动页」）：大卡片功能入口，当前只有成品销售单开单。
-// 退出登录放在标题行右侧动作槽：调登出接口、清会话、回登录页（与 PC 同口径，不弹确认）。
+// 移动入口页（product/平台布局.md「移动页」）：按角色 scope 挂业务卡片；
+// 当前有成品销售单与客户档案；退出登录在标题行右侧动作槽（不弹确认）。
+function EntryCard({
+  href,
+  icon: Icon,
+  title,
+  description,
+}: {
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  description: string;
+}): React.ReactElement {
+  return (
+    <Link
+      href={href}
+      className="flex min-h-20 items-center gap-4 rounded-xl border border-border bg-card p-5 hover:bg-muted/60"
+    >
+      <Icon className="size-8 shrink-0" />
+      <span className="min-w-0 flex-1">
+        <span className="block text-lg font-medium">{title}</span>
+        <span className="mt-1 block text-sm text-muted-foreground">{description}</span>
+      </span>
+      <ChevronRightIcon className="size-5 shrink-0 text-muted-foreground" />
+    </Link>
+  );
+}
+
 export default function MobileHomePage(): React.ReactElement {
+  const canOrder = useCan('order:view');
+  const canCustomer = useCan('customer:view');
   const [loggingOut, setLoggingOut] = useState(false);
 
   async function handleLogout(): Promise<void> {
@@ -45,17 +74,22 @@ export default function MobileHomePage(): React.ReactElement {
       />
       <div className="space-y-4 p-4">
         <p className="text-sm text-muted-foreground">选择要办理的业务</p>
-        <Link
-          href="/m/sale-orders"
-          className="flex min-h-20 items-center gap-4 rounded-xl border border-border bg-card p-5 hover:bg-muted/60"
-        >
-          <ReceiptTextIcon className="size-8 shrink-0" />
-          <span className="min-w-0 flex-1">
-            <span className="block text-lg font-medium">成品销售单</span>
-            <span className="mt-1 block text-sm text-muted-foreground">开单 / 查单</span>
-          </span>
-          <ChevronRightIcon className="size-5 shrink-0 text-muted-foreground" />
-        </Link>
+        {canOrder ? (
+          <EntryCard
+            href="/m/sale-orders"
+            icon={ReceiptTextIcon}
+            title="成品销售单"
+            description="开单 / 查单"
+          />
+        ) : null}
+        {canCustomer ? (
+          <EntryCard
+            href="/m/customers"
+            icon={UsersIcon}
+            title="客户档案"
+            description="查客户 / 维护资料"
+          />
+        ) : null}
       </div>
     </div>
   );

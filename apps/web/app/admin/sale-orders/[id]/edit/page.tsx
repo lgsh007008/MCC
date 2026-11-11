@@ -38,10 +38,5 @@ export default function SaleOrderEditPage(): React.ReactElement {
     return <p className="text-sm text-muted-foreground">加载中…</p>;
   }
 
-  return (
-    <div className="space-y-4">
-      <h1 className="text-xl font-semibold">编辑销售单 {initial.code}</h1>
-      <SaleOrderForm orderId={params.id} initial={initial} />
-    </div>
-  );
+  return <SaleOrderForm title={`编辑销售单 ${initial.code}`} orderId={params.id} initial={initial} />;
 }

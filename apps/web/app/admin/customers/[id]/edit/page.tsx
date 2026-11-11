@@ -52,9 +52,10 @@ export default function CustomerEditPage(): React.ReactElement {
   }
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-xl font-semibold">编辑客户 {initial.code}</h1>
-      <CustomerForm customerId={params.id} initial={initial} />
-    </div>
+    <CustomerForm
+      title={`编辑客户 ${initial.code}`}
+      customerId={params.id}
+      initial={initial}
+    />
   );
 }

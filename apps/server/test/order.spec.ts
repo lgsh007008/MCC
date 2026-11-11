@@ -180,6 +180,27 @@ describe('订单接口（契约/集成）', () => {
     });
   });
 
+  it('列表：按客户名称快照模糊筛选（移动端搜索）', async () => {
+    const hit = await http()
+      .get(`/${API_PREFIX}/sale-orders`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .query({ customerName, page: 1, pageSize: 50 });
+    expect(hit.status).toBe(200);
+    expect(Number(hit.body.total)).toBeGreaterThanOrEqual(1);
+    expect(
+      hit.body.items.every((item: { customerName: string }) =>
+        item.customerName.includes(customerName),
+      ),
+    ).toBe(true);
+
+    const miss = await http()
+      .get(`/${API_PREFIX}/sale-orders`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .query({ customerName: `不存在-${Date.now()}`, page: 1, pageSize: 50 });
+    expect(miss.status).toBe(200);
+    expect(Number(miss.body.total)).toBe(0);
+  });
+
   it('更新：明细重算、计价方式可切换、移除行软删', async () => {
     const detail = await http()
       .get(`/${API_PREFIX}/sale-orders/${created.id}`)

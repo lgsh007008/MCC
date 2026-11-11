@@ -7,10 +7,5 @@ import { CustomerForm } from '@/components/customer/customer-form';
 // 面包屑页面标识 =「新建」。
 export default function CustomerNewPage(): React.ReactElement {
   usePageCrumb([{ title: '新建' }]);
-  return (
-    <div className="space-y-4">
-      <h1 className="text-xl font-semibold">新建客户</h1>
-      <CustomerForm />
-    </div>
-  );
+  return <CustomerForm title="新建客户" />;
 }

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { buttonVariants } from '@/components/ui/button';
 import { useCan } from '@/components/auth/permission-context';
+import { PageFrame } from '@/components/admin/page-frame';
 import { usePageCrumb } from '@/components/admin/page-breadcrumb';
 import { api } from '@/lib/api';
 
@@ -85,12 +86,29 @@ export default function CustomerDetailPage(): React.ReactElement {
   }
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-xl font-semibold">
-        {customer.name}
-        <span className="ml-3 text-sm font-normal text-muted-foreground">（{customer.code}）</span>
-      </h1>
-
+    <PageFrame
+      title={
+        <>
+          {customer.name}
+          <span className="ml-3 text-xs font-normal text-muted-foreground">
+            （{customer.code}）
+          </span>
+        </>
+      }
+      actions={
+        <>
+          {canManage ? (
+            <Link href={`/admin/customers/${customer.id}/edit`} className={buttonVariants()}>
+              编辑
+            </Link>
+          ) : null}
+          <Link href="/admin/customers" className={buttonVariants({ variant: 'outline' })}>
+            返回列表
+          </Link>
+        </>
+      }
+    >
+      <div className="space-y-4">
       <div className="flex flex-wrap gap-6 rounded-lg border border-border bg-card p-4 text-sm">
         <span>
           客户编号：<strong>{customer.code}</strong>
@@ -117,16 +135,7 @@ export default function CustomerDetailPage(): React.ReactElement {
         </div>
       </div>
 
-      <div className="flex gap-2">
-        {canManage ? (
-          <Link href={`/admin/customers/${customer.id}/edit`} className={buttonVariants()}>
-            编辑
-          </Link>
-        ) : null}
-        <Link href="/admin/customers" className={buttonVariants({ variant: 'outline' })}>
-          返回列表
-        </Link>
       </div>
-    </div>
+    </PageFrame>
   );
 }
