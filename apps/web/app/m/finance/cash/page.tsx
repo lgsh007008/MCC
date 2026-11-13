@@ -198,6 +198,7 @@ export default function MobileFinanceCashPage(): React.ReactElement {
             <span className="text-mobile-label text-muted-foreground">方向</span>
             <Segmented
               ariaLabel="方向"
+              columns={2}
               value={filters.direction}
               options={[
                 { value: '', label: '全部' },

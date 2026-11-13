@@ -1,41 +1,16 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
-import { ChevronRightIcon, LogOutIcon, ReceiptTextIcon, UsersIcon, WalletIcon } from 'lucide-react';
+import { LogOutIcon, ReceiptTextIcon, UsersIcon, WalletIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCan } from '@/components/auth/permission-context';
+import { MobileEntryCard } from '@/components/mobile/entry-card';
 import { MobileHeader } from '@/components/mobile/mobile-shell';
 import { api } from '@/lib/api';
 import { authSession } from '@/lib/auth/session';
 
 // 移动入口页（product/平台布局.md「移动页」）：按角色 scope 挂业务卡片；
 // 当前有成品销售单与客户档案；退出登录在标题行右侧动作槽（不弹确认）。
-function EntryCard({
-  href,
-  icon: Icon,
-  title,
-  description,
-}: {
-  href: string;
-  icon: React.ComponentType<{ className?: string }>;
-  title: string;
-  description: string;
-}): React.ReactElement {
-  return (
-    <Link
-      href={href}
-      className="flex min-h-20 items-center gap-4 rounded-xl border border-border bg-card p-5 hover:bg-muted/60"
-    >
-      <Icon className="size-8 shrink-0" />
-      <span className="min-w-0 flex-1">
-        <span className="block text-mobile-title font-medium">{title}</span>
-        <span className="mt-1 block text-mobile-body text-muted-foreground">{description}</span>
-      </span>
-      <ChevronRightIcon className="size-5 shrink-0 text-muted-foreground" />
-    </Link>
-  );
-}
 
 export default function MobileHomePage(): React.ReactElement {
   const canOrder = useCan('order:view');
@@ -76,7 +51,7 @@ export default function MobileHomePage(): React.ReactElement {
       <div className="space-y-4 p-4">
         <p className="text-mobile-body text-muted-foreground">选择要办理的业务</p>
         {canOrder ? (
-          <EntryCard
+          <MobileEntryCard
             href="/m/sale-orders"
             icon={ReceiptTextIcon}
             title="成品销售单"
@@ -84,7 +59,7 @@ export default function MobileHomePage(): React.ReactElement {
           />
         ) : null}
         {canCustomer ? (
-          <EntryCard
+          <MobileEntryCard
             href="/m/customers"
             icon={UsersIcon}
             title="客户档案"
@@ -92,7 +67,7 @@ export default function MobileHomePage(): React.ReactElement {
           />
         ) : null}
         {canFinance ? (
-          <EntryCard
+          <MobileEntryCard
             href="/m/finance"
             icon={WalletIcon}
             title="资金"

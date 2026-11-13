@@ -189,4 +189,66 @@ test('移动字号与控件尺寸取自 tokens 角色', async ({ page }) => {
   expect(await fieldLabel.evaluate((el) => getComputedStyle(el).fontSize)).toBe(label);
   const nameInput = page.getByLabel('客户名称');
   expect(await nameInput.evaluate((el) => getComputedStyle(el).height)).toBe(control);
+
+  // 资金二级入口沿用卡片（product/平台布局.md 移动页 · 入口）：
+  // 两个入口都是整块可点的链接卡片、标题取 title 角色，不得退回按钮形态
+  await page.goto('/m/finance');
+  const cashEntry = page.getByRole('link', { name: /资金流水/ });
+  const summaryEntry = page.getByRole('link', { name: /收支汇总/ });
+  await expect(cashEntry).toBeVisible();
+  await expect(summaryEntry).toBeVisible();
+  expect(
+    await cashEntry
+      .locator('span.text-mobile-title')
+      .evaluate((el) => getComputedStyle(el).fontSize),
+  ).toBe(title);
+});
+
+// 主色按钮的文字色与分段控件排布（design/平台布局.md §1.8）：
+// text-mobile-* 若未在 cn 合并引擎登记为字号，会被当作颜色类删掉 text-primary-foreground，
+// 表现为绿底近黑字；四选一分段在窄屏会折行溢出 48px 按钮。两条都在此兜底。
+test('移动主色按钮文字取近白、四选一分段不溢出', async ({ page }) => {
+  await page.goto('/login');
+  await page.getByPlaceholder('请输入账号').fill('admin');
+  await page.getByPlaceholder('请输入密码').fill('Mcc@2026');
+  await page.getByRole('button', { name: '登录' }).click();
+  await expect(page).toHaveURL(/\/m$/);
+
+  const foreground = await page.evaluate(() => {
+    const probe = document.createElement('span');
+    probe.style.color = 'var(--primary-foreground)';
+    document.body.appendChild(probe);
+    const color = getComputedStyle(probe).color;
+    probe.remove();
+    return color;
+  });
+
+  // 主色按钮（列表底栏「新建销售单」）文字必须等于 --primary-foreground
+  await page.goto('/m/sale-orders');
+  const newOrder = page.getByRole('link', { name: '新建销售单' });
+  expect(await newOrder.evaluate((el) => getComputedStyle(el).color)).toBe(foreground);
+
+  // 四选一分段（资金流水方向）每个按钮不折行、不溢出，高度仍是控件高度
+  await page.goto('/m/finance/cash');
+  const control = await page.evaluate(() => {
+    const root = document.querySelector('[data-mode="mobile"]');
+    return root ? getComputedStyle(root).getPropertyValue('--mcc-control-h').trim() : '';
+  });
+  const radios = page.getByRole('radiogroup', { name: '方向' }).getByRole('radio');
+  expect(await radios.count()).toBe(4);
+  const boxes = await radios.evaluateAll((els) =>
+    els.map((el) => ({
+      text: el.textContent?.trim(),
+      w: el.clientWidth,
+      scrollW: el.scrollWidth,
+      h: Math.round(el.getBoundingClientRect().height),
+      innerH: el.clientHeight,
+      scrollH: el.scrollHeight,
+    })),
+  );
+  for (const box of boxes) {
+    expect(box.scrollW, `${box.text} 横向溢出`).toBeLessThanOrEqual(box.w + 1);
+    expect(box.scrollH, `${box.text} 纵向溢出`).toBeLessThanOrEqual(box.innerH + 1);
+    expect(`${box.h}px`).toBe(control);
+  }
 });
