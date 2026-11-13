@@ -18,6 +18,7 @@ export interface MobileCustomerFormInitial {
   code?: string;
   name: string;
   contact: string;
+  openingDebt: string;
   note: string;
 }
 
@@ -50,6 +51,7 @@ export function MobileCustomerForm({
   const router = useRouter();
   const [name, setName] = useState(initial?.name ?? '');
   const [contact, setContact] = useState(initial?.contact ?? '');
+  const [openingDebt, setOpeningDebt] = useState(initial?.openingDebt ?? '0.00');
   const [note, setNote] = useState(initial?.note ?? '');
   const [duplicateName, setDuplicateName] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -73,7 +75,7 @@ export function MobileCustomerForm({
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     setError(null);
-    const parsed = customerInputSchema.safeParse({ name, contact, note });
+    const parsed = customerInputSchema.safeParse({ name, contact, openingDebt, note });
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message ?? '输入不合法');
       return;
@@ -130,6 +132,20 @@ export function MobileCustomerForm({
                 placeholder="电话等，可分行填写"
                 className="h-12 text-mobile-body"
               />
+            </MobileField>
+
+            <MobileField label="期初欠款" htmlFor="mobileCustomerOpeningDebt">
+              <Input
+                id="mobileCustomerOpeningDebt"
+                value={openingDebt}
+                onChange={(event) => setOpeningDebt(event.target.value)}
+                inputMode="decimal"
+                placeholder="0.00"
+                className="h-12 text-mobile-body"
+              />
+              <p className="text-mobile-caption text-muted-foreground">
+                系统上线前已发生的净欠款；上线后的回款照常登记销售回款
+              </p>
             </MobileField>
 
             <MobileField label="备注" htmlFor="mobileCustomerNote">

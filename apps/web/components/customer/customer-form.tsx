@@ -17,6 +17,7 @@ export interface CustomerFormInitial {
   code: string;
   name: string;
   contact: string;
+  openingDebt: string;
   note: string;
 }
 
@@ -51,6 +52,7 @@ export function CustomerForm({
   const router = useRouter();
   const [name, setName] = useState(initial?.name ?? '');
   const [contact, setContact] = useState(initial?.contact ?? '');
+  const [openingDebt, setOpeningDebt] = useState(initial?.openingDebt ?? '0.00');
   const [note, setNote] = useState(initial?.note ?? '');
   const [duplicateName, setDuplicateName] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -75,7 +77,7 @@ export function CustomerForm({
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     setError(null);
-    const parsed = customerInputSchema.safeParse({ name, contact, note });
+    const parsed = customerInputSchema.safeParse({ name, contact, openingDebt, note });
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message ?? '输入不合法');
       return;
@@ -168,6 +170,21 @@ export function CustomerForm({
               placeholder="电话等"
               className="min-h-8 w-full max-w-72"
             />
+          </Field>
+          <Field label="期初欠款" htmlFor="customerOpeningDebt">
+            <div className="w-full max-w-72">
+              <Input
+                id="customerOpeningDebt"
+                value={openingDebt}
+                onChange={(e) => setOpeningDebt(e.target.value)}
+                inputMode="decimal"
+                placeholder="0.00"
+                className="h-8 w-full"
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                系统上线前已发生的净欠款；上线后的回款照常登记销售回款
+              </p>
+            </div>
           </Field>
           <Field label="备注" htmlFor="customerNote">
             <Textarea

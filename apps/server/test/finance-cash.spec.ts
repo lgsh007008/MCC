@@ -272,4 +272,36 @@ describe('资金收付（契约/集成）', () => {
     const removed = await auth(http().delete(`/${API_PREFIX}/sale-orders/${created.body.id}`));
     expect(removed.status).toBe(204);
   });
+
+  it('应收：期初欠款计入欠款基数，清零后恢复', async () => {
+    const before = await auth(http().get(`/${API_PREFIX}/finance/receivables`)).query({
+      customerIds: customerId,
+    });
+    expect(before.body.items[0].openingDebt).toBe('0.00');
+
+    const update = await auth(http().put(`/${API_PREFIX}/customers/${customerId}`)).send({
+      name: customerName,
+      openingDebt: '1000.00',
+    });
+    expect(update.status).toBe(200);
+
+    const withOpening = await auth(http().get(`/${API_PREFIX}/finance/receivables`)).query({
+      customerIds: customerId,
+    });
+    expect(withOpening.body.items[0]).toMatchObject({
+      openingDebt: '1000.00',
+      sales: '0.00',
+      receipts: '0.00',
+      outstanding: '1000.00',
+    });
+
+    await auth(http().put(`/${API_PREFIX}/customers/${customerId}`)).send({
+      name: customerName,
+      openingDebt: '0.00',
+    });
+    const after = await auth(http().get(`/${API_PREFIX}/finance/receivables`)).query({
+      customerIds: customerId,
+    });
+    expect(after.body.items[0].outstanding).toBe('0.00');
+  });
 });

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { zeroOrPositiveMoneySchema } from './finance.schemas';
 import { paginationQuerySchema } from './pagination.schemas';
 
 // 客户领域的边界校验（design/customer.md）：前后端共用同一份。
@@ -11,6 +12,8 @@ const noteSchema = z.string().trim().max(500, '备注最多 500 字').default(''
 export const customerInputSchema = z.object({
   name: customerNameSchema,
   contact: contactSchema,
+  // 期初欠款：上线前已发生的净欠款，只作欠款基数；默认 0、非负、最多 2 位小数
+  openingDebt: zeroOrPositiveMoneySchema.default('0.00'),
   note: noteSchema,
 });
 export type CustomerInput = z.infer<typeof customerInputSchema>;

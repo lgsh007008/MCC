@@ -30,6 +30,7 @@ interface CustomerRow {
   contact: string;
   status: 'ACTIVE' | 'INACTIVE';
   note: string;
+  openingDebt: Prisma.Decimal;
   createdAt: Date;
 }
 
@@ -40,6 +41,7 @@ const toDto = (row: CustomerRow): CustomerDto => ({
   contact: row.contact,
   status: row.status === 'ACTIVE' ? 'active' : 'inactive',
   note: row.note,
+  openingDebt: row.openingDebt.toFixed(2),
   createdAt: isoDate(row.createdAt),
 });
 
@@ -91,6 +93,7 @@ export class CustomerService {
           contact: true,
           status: true,
           note: true,
+          openingDebt: true,
           createdAt: true,
         },
       }),
@@ -108,6 +111,7 @@ export class CustomerService {
         contact: true,
         status: true,
         note: true,
+        openingDebt: true,
         createdAt: true,
       },
     });
@@ -127,6 +131,7 @@ export class CustomerService {
               code,
               name: input.name,
               contact: input.contact,
+              openingDebt: input.openingDebt,
               note: input.note,
             },
             select: {
@@ -136,6 +141,7 @@ export class CustomerService {
               contact: true,
               status: true,
               note: true,
+              openingDebt: true,
               createdAt: true,
             },
           });
@@ -158,7 +164,12 @@ export class CustomerService {
   async update(id: string, input: CustomerUpdateInput): Promise<CustomerDto> {
     const result = await this.prisma.client.customer.updateMany({
       where: { id, deletedAt: null },
-      data: { name: input.name, contact: input.contact, note: input.note },
+      data: {
+        name: input.name,
+        contact: input.contact,
+        openingDebt: input.openingDebt,
+        note: input.note,
+      },
     });
     if (result.count === 0) {
       throw problem(404, 'NOT_FOUND', '客户不存在');
@@ -258,5 +269,18 @@ export class CustomerService {
       status: row.status,
       deleted: row.deletedAt !== null,
     };
+  }
+
+  // 批量取期初欠款（供 finance 批量计算应收，design/customer.md §5）：
+  // 返回 id → 金额字符串；包含已软删记录，保证历史应收口径不因删除而漂移。
+  async findOpeningDebts(ids: string[]): Promise<Map<string, string>> {
+    if (ids.length === 0) {
+      return new Map();
+    }
+    const rows = await this.prisma.client.customer.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, openingDebt: true },
+    });
+    return new Map(rows.map((row) => [row.id, row.openingDebt.toFixed(2)]));
   }
 }

@@ -25,6 +25,7 @@ modules/finance/
 - 本域**不建会计科目表、不建凭证表、不建事件表**（需求口径：资金流水单轨制）。
 - 收款挂客户：客户校验与名称快照经 `CustomerService.findById`（customer 模块公开接口），不直读 customer 表；允许停用客户继续收款。
 - 应收的「累计销售」对 order 域 `sale_orders` 做**只读聚合**（不注入 OrderService，避免成环）；不写订单表；现结单按 `received_amount`、赊销单按 `total_amount` 计。
+- 应收的「期初欠款」为客户档案录入的上线前余额，经 `CustomerService.findOpeningDebts(ids)` 批量取得（customer 模块公开接口），不直读 customer 表。
 - **源单流水**：销售单现结派生的流水记录 `source_type` + `source_id` + `source_code`；源单流水在财务侧只读，只能回销售单修改或删除。
 - **一次录入**：销售单现结在订单事务内调用本模块公开方法生成 / 同步 / 软删收款流水，不出现两处手工录入。
 
@@ -54,7 +55,7 @@ modules/finance/
 - 经营收支汇总：销售收入 = 期间销售单（现结取 `received_amount`、赊销取 `total_amount`）；其他收入 = `OTHER_REVENUE` 收款流水合计；采购付款 = `PURCHASE_PAYMENT`、工资 = `LABOR_COST`、费用 = `OPERATING_EXPENSE` 付款流水合计；总收入 = 销售收入 + 其他收入，总支出 = 采购付款 + 工资 + 费用，净额 = 总收入 − 总支出；分类小计固定输出六项（无数据为 0）
 - 不计入经营收支的分类：`SALES_RECEIPT`、`LOAN_IN`、`LOAN_REPAY`、`ASSET_PURCHASE`、`TRANSFER`
 - 账户余额 `calcAccountBalance`：期初 + 收款 − 付款 + 转入 − 转出；转账按 `accountId` 减、`toAccountId` 加，**同一笔转账不重复计入同一账户**
-- 应收 `calcReceivable`：累计销售 − 累计收款；累计销售现结取实收、赊销取合计；累计收款只取挂该客户的 `SALES_RECEIPT` 流水；负数为预收，不截断
+- 应收 `calcReceivable`：期初欠款 + 累计销售 − 累计收款；期初欠款取客户档案录入值（默认 0），累计销售现结取实收、赊销取合计，累计收款只取挂该客户的 `SALES_RECEIPT` 流水，两者都只统计系统内数据；历史回款不补录（补录会流入资金账户、虚增账户余额与资金总额）；负数为预收，不截断
 - 资金汇总：期间收款 = Σ`IN`；期间付款 = Σ`OUT`；净流入 = 收款 − 付款；期末资金总额 = Σ各账户当前余额；`TRANSFER` 三项均不计
 - 金额运算以字符串 + BigInt 实现（含负数），禁浮点；纯函数单测为最高优先级（技术方案 §10）
 
@@ -80,7 +81,7 @@ modules/finance/
 | cash-update | `PUT /api/v1/finance/cash-entries/:id` | 更新手工流水（源单流水拒绝，400） |
 | cash-remove | `DELETE /api/v1/finance/cash-entries/:id` | 删除手工流水（软删除，余额回退；源单流水拒绝） |
 | cash-summary | `GET /api/v1/finance/cash-summary?dateFrom&dateTo` | 资金汇总：期间收款 / 付款 / 净流入 / 资金总额 / 各账户余额 |
-| receivables | `GET /api/v1/finance/receivables?customerIds=` | 批量应收（逗号分隔客户 id）：累计销售 / 累计收款 / 欠款 |
+| receivables | `GET /api/v1/finance/receivables?customerIds=` | 批量应收（逗号分隔客户 id）：期初欠款 / 累计销售 / 累计收款 / 欠款（期初欠款经 `findOpeningDebts` 取得） |
 
 ## 6. 与订单域的联动（跨模块边界）
 
@@ -160,6 +161,7 @@ modules/finance/
 | 7 前端实现节 · 资金收付口径弹窗 | 新增 | Tab 2 无口径说明入口 | 新增 `cash-summary-help-dialog.tsx`（三组：怎么算 / 净流入为什么不等于资金总额 / 哪些钱进哪些不进）；与经营收支弹窗共用 `summary-help-parts.tsx`，两弹窗均加 `max-h-[85vh] overflow-y-auto` | 两个 Tab 说明能力不对称；净流入与资金总额易被误认为同一个数 |
 | 7 前端实现节 · 移动页 / 路由与菜单 | 修改 | 财务仅 PC，不建移动页 | 新增 `/m/finance`、`/m/finance/cash`、`/m/finance/cash/new`、`/m/finance/cash/[id]`、`/m/finance/cash/[id]/edit`、`/m/finance/summary` 六路由与两个移动组件；入口按 `useCan('finance:view')` 裁剪；复用只读与写接口，另增单条详情接口（见下行） | 现场收付款与资金概览需要手机端可用 |
 | 5 接口清单 · cash-entries/:id | 新增 | 流水只有列表与写接口，单条详情由 PC 弹窗复用行数据 | 新增 `GET /api/v1/finance/cash-entries/:id`（含来源与 `editable`），供移动详情 / 编辑页加载；契约重建 | 移动端整页详情需要可刷新的单条取数 |
+| 1 模块结构 / 3 计算规则 / 5 接口清单 | 修改 | 应收 = 累计销售 − 累计收款，期初欠款不参与 | 应收 = 期初欠款 + 累计销售 − 累计收款；期初欠款经 `CustomerService.findOpeningDebts` 批量取得并随应收接口返回；累计销售 / 累计收款只统计系统内 | 客户历史欠款无法用系统内单据表达，需一个录入型基数让三项闭合；历史回款不补录以免虚增账户余额 |
 
 ### v20261112
 

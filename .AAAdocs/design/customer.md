@@ -20,6 +20,7 @@ modules/customer/
 
 - `customer` 表归本模块（数据所有权，技术方案 §4.2）。
 - **累计下单方量、累计销售、累计收款、欠款都不落在本模块**：方量由 order 域提供汇总接口，应收三项由 finance 域提供批量接口，本领域只在页面消费（见 §6 接口引用），不读对方表、不建冗余列。
+- **唯一例外：期初欠款**——它是上线前的**录入型余额**（数据源），不是应收派生值；存 `customer.opening_debt`，由 finance 计算欠款时经公开接口读取。除该列外客户表不出现任何金额列。
 
 ## 2. 数据模型概览
 
@@ -27,10 +28,11 @@ modules/customer/
 
 | 表 | 字段要点 | 备注 |
 | --- | --- | --- |
-| `customer` | 编号（唯一）、名称、联系信息、状态、备注 | 通用字段（主键、`tenant_id`、`created_at/updated_at`、`deleted_at`）按技术方案 §5.1；编号唯一约束按租户复合 `(tenant_id, code)` |
+| `customer` | 编号（唯一）、名称、联系信息、期初欠款、状态、备注 | 通用字段（主键、`tenant_id`、`created_at/updated_at`、`deleted_at`）按技术方案 §5.1；编号唯一约束按租户复合 `(tenant_id, code)` |
 
 - 客户名称**不建唯一索引**（需求：只做重名提示）；重名为服务层查询，命中即回提示，不阻断写入
 - 状态存可读字符串枚举 `active` / `inactive`（§6.5 禁魔法数字）
+- 期初欠款 `opening_debt` 为 `decimal(14,2)`，非空、默认 `0.00`、校验 ≥ 0；只作 finance 计算欠款的基数，不参与方量 / 销售 / 收款 / 经营收支的任何统计；新建与编辑都可在表单修改，修改后欠款随即重算
 - 创建日期即 `created_at`，不单列业务字段
 - 删除为软删除（`deleted_at` 落值），仅用于误建、重复与测试数据清理；编号不回收，历史单据靠名称快照保留（删除规则见 `product/customer.md`）
 
@@ -59,7 +61,7 @@ modules/customer/
 | list | `GET /api/v1/customers` | 列表（筛选：名称模糊、状态；排序：createdAt；分页） |
 | detail | `GET /api/v1/customers/:id` | 详情 |
 | create | `POST /api/v1/customers` | 新建（编号自动生成；重名仅回提示不阻断） |
-| update | `PUT /api/v1/customers/:id` | 更新（名称、联系信息、备注） |
+| update | `PUT /api/v1/customers/:id` | 更新（名称、联系信息、期初欠款、备注） |
 | set-status | `PATCH /api/v1/customers/:id/status` | 启用 / 停用（单条，行内操作） |
 | batch-status | `POST /api/v1/customers/batch-status` | 批量启用 / 停用：body `{ ids, status }`，只更新状态与目标不同的未删行，返回实际变更条数 `updated`；已处于目标状态或不存在/已删的静默跳过 |
 | remove | `DELETE /api/v1/customers/:id` | 删除（软删除，编号不回收；不存在/已删返回 404） |
@@ -70,11 +72,12 @@ modules/customer/
 
 - `assertSelectable(id)`：校验客户存在且为启用态；order 新建单或更换客户时调用，不满足则拒绝（已删客户视为不存在）
 - `findById(id)`：取客户基本信息（供需要展示当前客户名或编号的场景）；**包含已软删记录**并返回 `deleted` 标志，供历史订单详情标注「已删除」
+- `findOpeningDebts(ids)`：批量取客户的期初欠款（返回 `id → 金额字符串` 映射），供 finance 批量计算应收；不暴露其他客户字段
 
 ## 6. 前端实现节（web）
 
 - 列表页（`/admin/customers`）：筛选 / 排序 / 分页按列表页模式（组件拼装见 `design/平台布局.md` §1.5）；首列多选与表头本页全选，翻页 / 改筛选 / 改排序清空选择；行操作 = 查看 / 编辑 / 停用（启用）/ 删除；选中后批量操作区出现批量启用 / 批量停用 / 批量删除，按钮可用性按「将有变更的行数」计算（为 0 时禁用），动作经 `useConfirm` 确认并在弹层内执行（design/平台布局.md §1.7）；单条停用与删除确认、单条启用直接执行；删除确认文案中的销售单数量取自 order 方量汇总接口的 `orderCount`，历史保留与编号不回收写入正文
-- **应收取数（引用 finance）**：与方量同一批 id 并行调用 `GET /api/v1/finance/receivables?customerIds=`（每批 ≤200）；列表只取 `outstanding` 一列（右对齐，负数显示「金额（预收）」），详情取 `sales` / `receipts` / `outstanding` 三项；不参与排序、不改变分页策略；接口失败时显示 `0.00`，不阻断列表加载
+- **应收取数（引用 finance）**：与方量同一批 id 并行调用 `GET /api/v1/finance/receivables?customerIds=`（每批 ≤200）；列表只取 `outstanding` 一列（右对齐，负数显示「金额（预收）」），详情取 `sales` / `receipts` / `outstanding` 三项（期初欠款直接取客户本体字段，非 0 时展示）；不参与排序、不改变分页策略；接口失败时显示 `0.00`，不阻断列表加载
 - **累计方量排序的取数策略（受控例外，技术方案 §6.3）**：
   - 适用范围：仅客户列表页的「累计下单方量」列；其余列表页仍走服务端分页
   - 规模阈值：客户总数 ≤ 500 时，前端先探总数，再并行取全部页（每页 100），方量按每批 ≤200 个 id 调 order 汇总接口，合并后**客户端排序 + 客户端分页（20/页）**；排序对筛选后全量生效
@@ -89,7 +92,7 @@ modules/customer/
 ## 7. 与其他领域的边界
 
 - **order**：订单保存时经 customer 的公开接口 `assertSelectable` 校验客户存在且启用，不读 customer 表（技术方案 §4.2）；客户方量汇总接口由 order 提供（见 `design/order.md` 接口清单），customer 不重复实现
-- **finance**：应收（累计销售 / 累计收款 / 欠款）归 finance，经 `GET /api/v1/finance/receivables` 批量引用；customer 不预留金额列，避免出现第二份真相；收款挂客户的名称快照由 finance 经 `CustomerService.findById` 取得，不直读 customer 表
+- **finance**：应收（累计销售 / 累计收款 / 欠款）归 finance，经 `GET /api/v1/finance/receivables` 批量引用；customer 不预留金额列，唯一例外是**期初欠款**（上线前余额的录入源，finance 经 `findOpeningDebts` 读取）；收款挂客户的名称快照由 finance 经 `CustomerService.findById` 取得，不直读 customer 表
 
 ---
 
@@ -135,6 +138,7 @@ modules/customer/
 | --- | --- | --- | --- | --- |
 | 6 前端实现节 · 应收取数 | 修改 | 列表与详情都取 `sales` / `receipts` / `outstanding` 三列 | 列表只取 `outstanding` 一列；详情仍取三项 | 客户列表列过多，日常只看欠款 |
 | 6 前端实现节 · 移动详情 | 修改 | 移动详情只取客户本体，不展示累计方量与应收 | 并发取 `customer-volume-summary` 与 `finance/receivables`，展示累计方量 / 销售 / 收款 / 欠款四项；失败降级为 0 | 现场需要看到欠款与累计交易额 |
+| 1 模块结构 / 2 数据模型 / 5 接口 / 6 前端实现 / 7 边界 | 修改 | 客户表不出现任何金额列；欠款 = 累计销售 − 累计收款 | 唯一例外为「期初欠款」`opening_debt`（decimal(14,2)、非空、默认 0、≥ 0），作上线前净欠款的录入源；新增公开接口 `findOpeningDebts(ids)` 供 finance 批量取值；PC / 移动表单与详情展示期初欠款（为 0 不显示） | 历史欠款无法用系统内单据表达，需录入型基数让「期初 + 累计销售 − 累计收款 = 欠款」闭合 |
 
 ---
 

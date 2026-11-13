@@ -1899,6 +1899,11 @@
             "type": "string",
             "description": "状态：active 启用 / inactive 停用"
           },
+          "openingDebt": {
+            "type": "string",
+            "description": "期初欠款（上线前净欠款）",
+            "example": "0.00"
+          },
           "note": {
             "type": "string",
             "description": "备注"
@@ -1914,6 +1919,7 @@
           "name",
           "contact",
           "status",
+          "openingDebt",
           "note",
           "createdAt"
         ]
@@ -1961,6 +1967,11 @@
             "type": "string",
             "description": "联系信息（电话等）",
             "default": ""
+          },
+          "openingDebt": {
+            "type": "string",
+            "description": "期初欠款（上线前净欠款，非负、最多 2 位小数）",
+            "default": "0.00"
           },
           "note": {
             "type": "string",
@@ -2432,6 +2443,10 @@
           "customerId": {
             "type": "string"
           },
+          "openingDebt": {
+            "type": "string",
+            "description": "期初欠款（客户档案录入的上线前净欠款）"
+          },
           "sales": {
             "type": "string",
             "description": "累计销售（现结取实收、赊销取合计）"
@@ -2442,11 +2457,12 @@
           },
           "outstanding": {
             "type": "string",
-            "description": "欠款 = 销售 − 收款；负数为预收"
+            "description": "欠款 = 期初欠款 + 销售 − 收款；负数为预收"
           }
         },
         "required": [
           "customerId",
+          "openingDebt",
           "sales",
           "receipts",
           "outstanding"

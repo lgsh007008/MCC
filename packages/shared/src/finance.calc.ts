@@ -152,9 +152,19 @@ export const FINANCE_CASH_METHOD_LABELS: Record<FinanceCashMethod, string> = {
   acceptance: '承兑汇票',
 };
 
-// 客户欠款 = 累计销售 − 累计收款；负数为预收（不截断）
-export function calcReceivable(salesAmounts: string[], receiptAmounts: string[]): string {
-  return sumMoney([...salesAmounts, ...receiptAmounts.map((value) => `-${value}`)]);
+// 欠款 = 期初欠款 + 累计销售 − 累计收款（R-财务-002）：
+// 期初欠款是客户档案录入的上线前净欠款；累计销售 / 收款只统计系统内数据，历史回款不补录。
+// 负数为预收，不截断。
+export function calcReceivable(
+  salesAmounts: string[],
+  receiptAmounts: string[],
+  openingDebt = '0.00',
+): string {
+  return sumMoney([
+    openingDebt,
+    ...salesAmounts,
+    ...receiptAmounts.map((value) => `-${value}`),
+  ]);
 }
 
 // 结算差额 = 合计 − 实收：正数为折让 / 抹零，负数为预收；只作单据信息

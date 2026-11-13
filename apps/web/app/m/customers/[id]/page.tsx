@@ -22,6 +22,7 @@ interface CustomerDetail {
   contact: string;
   note: string;
   status: string;
+  openingDebt: string;
   createdAt: string;
 }
 
@@ -215,6 +216,9 @@ export default function MobileCustomerDetailPage(): React.ReactElement {
             <MobileInfoRow label="累计下单方量" value={`${accrual.volume} m³`} />
             <MobileInfoRow label="累计销售" value={`${accrual.sales} 元`} />
             <MobileInfoRow label="累计收款" value={`${accrual.receipts} 元`} />
+            {customer.openingDebt !== '0.00' ? (
+              <MobileInfoRow label="期初欠款" value={`${customer.openingDebt} 元`} />
+            ) : null}
             <MobileInfoRow
               label="欠款"
               value={

@@ -622,6 +622,11 @@ export interface components {
             contact: string;
             /** @description 状态：active 启用 / inactive 停用 */
             status: string;
+            /**
+             * @description 期初欠款（上线前净欠款）
+             * @example 0.00
+             */
+            openingDebt: string;
             /** @description 备注 */
             note: string;
             /** @description 创建日期（YYYY-MM-DD） */
@@ -647,6 +652,11 @@ export interface components {
              * @default
              */
             contact: string;
+            /**
+             * @description 期初欠款（上线前净欠款，非负、最多 2 位小数）
+             * @default 0.00
+             */
+            openingDebt: string;
             /**
              * @description 备注
              * @default
@@ -809,11 +819,13 @@ export interface components {
         };
         FinanceReceivableDto: {
             customerId: string;
+            /** @description 期初欠款（客户档案录入的上线前净欠款） */
+            openingDebt: string;
             /** @description 累计销售（现结取实收、赊销取合计） */
             sales: string;
             /** @description 累计收款（销售回款流水合计） */
             receipts: string;
-            /** @description 欠款 = 销售 − 收款；负数为预收 */
+            /** @description 欠款 = 期初欠款 + 销售 − 收款；负数为预收 */
             outstanding: string;
         };
         FinanceReceivableListDto: {

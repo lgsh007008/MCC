@@ -31,7 +31,7 @@ export type FinanceSummaryQuery = z.infer<typeof financeSummaryQuerySchema>;
 
 // ── 资金收付（R-财务-002）─────────────────────────────────
 
-const zeroOrPositiveMoneySchema = z
+export const zeroOrPositiveMoneySchema = z
   .string()
   .regex(positiveMoneyRe, '金额须为非负数、最多 2 位小数');
 

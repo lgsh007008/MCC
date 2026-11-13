@@ -752,7 +752,7 @@ export class FinanceService {
     if (ids.length === 0) {
       return { items: [] };
     }
-    const [orders, receipts] = await Promise.all([
+    const [orders, receipts, openingDebts] = await Promise.all([
       this.prisma.client.saleOrder.findMany({
         where: { customerId: { in: ids }, deletedAt: null },
         select: {
@@ -772,6 +772,7 @@ export class FinanceService {
         },
         _sum: { amount: true },
       }),
+      this.customerService.findOpeningDebts(ids),
     ]);
     // 现结单按实收计累计销售，赊销单按合计；现结后欠款为 0（抹零不留下尾差）
     const salesMap = new Map<string, string[]>();
@@ -787,13 +788,15 @@ export class FinanceService {
     );
     return {
       items: ids.map((customerId) => {
+        const openingDebt = openingDebts.get(customerId) ?? '0.00';
         const salesAmount = sumMoney(salesMap.get(customerId) ?? []);
         const receiptAmount = receiptMap.get(customerId) ?? '0.00';
         return {
           customerId,
+          openingDebt,
           sales: salesAmount,
           receipts: receiptAmount,
-          outstanding: calcReceivable([salesAmount], [receiptAmount]),
+          outstanding: calcReceivable([salesAmount], [receiptAmount], openingDebt),
         };
       }),
     };

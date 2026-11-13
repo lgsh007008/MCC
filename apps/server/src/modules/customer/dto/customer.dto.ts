@@ -12,6 +12,13 @@ export class CustomerBodyDto {
   @ApiPropertyOptional({ type: String, description: '联系信息（电话等）', default: '' })
   contact?: string;
 
+  @ApiPropertyOptional({
+    type: String,
+    description: '期初欠款（上线前净欠款，非负、最多 2 位小数）',
+    default: '0.00',
+  })
+  openingDebt?: string;
+
   @ApiPropertyOptional({ type: String, description: '备注', default: '' })
   note?: string;
 }
@@ -61,6 +68,9 @@ export class CustomerDto {
 
   @ApiProperty({ type: String, description: '状态：active 启用 / inactive 停用' })
   status!: string;
+
+  @ApiProperty({ type: String, description: '期初欠款（上线前净欠款）', example: '0.00' })
+  openingDebt!: string;
 
   @ApiProperty({ type: String, description: '备注' })
   note!: string;

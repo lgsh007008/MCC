@@ -22,7 +22,12 @@ describe('客户接口（契约/集成）', () => {
   const password = 'Secret#12345';
   const customerName = `it-customer-${Date.now()}`;
 
-  const body = (): CustomerInput => ({ name: customerName, contact: '13800000000', note: '集成测试' });
+  const body = (): CustomerInput => ({
+    name: customerName,
+    contact: '13800000000',
+    openingDebt: '0.00',
+    note: '集成测试',
+  });
 
   let customerId: string;
 
@@ -108,6 +113,32 @@ describe('客户接口（契约/集成）', () => {
     expect(res.status).toBe(200);
     expect(res.body.name).toBe(`${customerName}-改`);
     expect(res.body.contact).toBe('13900000000');
+  });
+
+  it('期初欠款：新建可填、更新可改、负数被拒绝', async () => {
+    const created = await auth(http().post(`/${API_PREFIX}/customers`)).send({
+      ...body(),
+      name: `${customerName}-期初`,
+      openingDebt: '100000.00',
+    });
+    expect(created.status).toBe(201);
+    expect(created.body.openingDebt).toBe('100000.00');
+
+    const updated = await auth(http().put(`/${API_PREFIX}/customers/${created.body.id}`)).send({
+      name: `${customerName}-期初`,
+      openingDebt: '80000.50',
+    });
+    expect(updated.status).toBe(200);
+    expect(updated.body.openingDebt).toBe('80000.50');
+
+    const invalid = await auth(http().put(`/${API_PREFIX}/customers/${created.body.id}`)).send({
+      name: `${customerName}-期初`,
+      openingDebt: '-1.00',
+    });
+    expect(invalid.status).toBe(400);
+
+    const detail = await auth(http().get(`/${API_PREFIX}/customers/${created.body.id}`));
+    expect(detail.body.openingDebt).toBe('80000.50');
   });
 
   it('停用：不可开新单；重新启用后可开单', async () => {

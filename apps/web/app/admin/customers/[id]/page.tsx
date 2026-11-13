@@ -21,6 +21,7 @@ interface CustomerDetail {
   contact: string;
   status: string;
   note: string;
+  openingDebt: string;
   createdAt: string;
 }
 
@@ -154,6 +155,11 @@ export default function CustomerDetailPage(): React.ReactElement {
         <span>
           累计收款：<strong>{receivable.receipts}</strong>
         </span>
+        {customer.openingDebt !== '0.00' ? (
+          <span>
+            期初欠款：<strong>{customer.openingDebt}</strong>
+          </span>
+        ) : null}
         <span>
           欠款：
           <strong>

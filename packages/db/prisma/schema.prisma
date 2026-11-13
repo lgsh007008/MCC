@@ -151,6 +151,10 @@ model Customer {
   status  CustomerStatus @default(ACTIVE)
   note    String         @default("") @map("note")
 
+  // 期初欠款：系统上线前已发生的净欠款（product/customer.md R-客户-001）。
+  // 只作 finance 计算欠款的基数，不计入累计销售 / 累计收款 / 经营收支；历史回款不补录。
+  openingDebt Decimal @default(0) @map("opening_debt") @db.Decimal(14, 2)
+
   saleOrders SaleOrder[]
 
   @@unique([tenantId, code])

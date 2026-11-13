@@ -140,9 +140,12 @@ export class FinanceCashSummaryDto {
 
 export class FinanceReceivableDto {
   @ApiProperty({ type: String }) customerId!: string;
+  @ApiProperty({ type: String, description: '期初欠款（客户档案录入的上线前净欠款）' })
+  openingDebt!: string;
   @ApiProperty({ type: String, description: '累计销售（现结取实收、赊销取合计）' }) sales!: string;
   @ApiProperty({ type: String, description: '累计收款（销售回款流水合计）' }) receipts!: string;
-  @ApiProperty({ type: String, description: '欠款 = 销售 − 收款；负数为预收' }) outstanding!: string;
+  @ApiProperty({ type: String, description: '欠款 = 期初欠款 + 销售 − 收款；负数为预收' })
+  outstanding!: string;
 }
 
 export class FinanceReceivableListDto {
