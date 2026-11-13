@@ -8,6 +8,7 @@ import { flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { api } from '@/lib/api';
 import {
   SALE_ORDER_PRINT_CSS,
   SaleOrderPrint,
@@ -22,10 +23,12 @@ export function PrintPreviewDialog({
   open,
   onOpenChange,
   order,
+  orderId,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   order: SaleOrderPrintData;
+  orderId: string;
 }): React.ReactElement {
   const previewRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
@@ -57,6 +60,12 @@ export function PrintPreviewDialog({
 
   // 打印隔离：隐藏 iframe + 复制主文档样式 + 注入打印规则，渲染同一模板后调 print()
   const handlePrint = (): void => {
+    // 打印审计（product/审计日志.md R-审计-001）：只记录触发，不阻塞打印。
+    void api
+      .POST('/api/v1/sale-orders/{id}/print-events', {
+        params: { path: { id: orderId } },
+      })
+      .catch(() => undefined);
     setPrinting(true);
     const iframe = document.createElement('iframe');
     iframe.setAttribute('aria-hidden', 'true');

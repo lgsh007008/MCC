@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ChevronRightIcon } from 'lucide-react';
 import { buttonVariants } from '@/components/ui/button';
 import {
   MobileListCard,
@@ -99,7 +98,7 @@ export default function MobileSaleOrdersPage(): React.ReactElement {
       action={
         <Link
           href="/m/sale-orders/new"
-          className={cn(buttonVariants(), 'h-12 flex-1 text-base')}
+          className={cn(buttonVariants(), 'h-12 flex-1 text-mobile-body')}
         >
           新建销售单
         </Link>
@@ -116,21 +115,14 @@ export default function MobileSaleOrdersPage(): React.ReactElement {
       ) : null}
 
       {items.map((order) => (
-        <MobileListCard key={order.id} href={`/m/sale-orders/${order.id}`}>
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-lg font-medium tabular-nums">{order.saleDate}</p>
-              <p className="mt-1 truncate text-base">{order.customerName}</p>
-            </div>
-            <ChevronRightIcon className="mt-1 size-5 shrink-0 text-muted-foreground" />
-          </div>
-          <div className="mt-3 flex items-end justify-between gap-3">
-            <span className="text-sm text-muted-foreground tabular-nums">
-              合计方量 {order.totalVolume} m³
-            </span>
-            <span className="text-xl font-semibold tabular-nums">{order.totalAmount} 元</span>
-          </div>
-        </MobileListCard>
+        <MobileListCard
+          key={order.id}
+          href={`/m/sale-orders/${order.id}`}
+          topLeft={order.saleDate}
+          title={order.customerName}
+          note={`合计方量 ${order.totalVolume} m³`}
+          amount={`${order.totalAmount} 元`}
+        />
       ))}
 
       {hasMore ? (

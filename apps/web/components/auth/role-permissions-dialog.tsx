@@ -38,6 +38,7 @@ const MODULES: Array<{
   { label: '客户', view: 'customer:view', manage: 'customer:manage' },
   { label: '财务', view: 'finance:view', manage: 'finance:manage' },
   { label: '账号管理', view: 'account:manage', manage: null },
+  { label: '审计日志', view: 'audit:view', manage: null },
 ];
 
 function cellText(role: UserRole, module: (typeof MODULES)[number]): string {
@@ -60,7 +61,7 @@ export function RolePermissionsDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="w-[min(760px,94vw)] max-w-none sm:max-w-none"
+        className="w-[min(860px,94vw)] max-w-none sm:max-w-none"
         data-testid="role-permissions-dialog"
       >
         <DialogHeader>
@@ -103,7 +104,7 @@ export function RolePermissionsDialog({
         </div>
 
         <ul className="space-y-1 text-xs text-muted-foreground">
-          <li>PC 与手机端共用同一套权限；手机端目前仅提供销售单页面，客户、财务与账号管理只在 PC 端使用。</li>
+          <li>PC 与手机端共用同一套权限；手机端目前仅提供销售单页面，客户、财务、账号管理与审计日志只在 PC 端使用。</li>
           <li>管理员可以有多个，但必须保留至少一个启用状态的管理员；不能停用自己或最后一个管理员。</li>
           <li>销售单的查看、打印属于查看权限；新建、编辑与删除需要维护权限。</li>
         </ul>

@@ -59,6 +59,15 @@ export class SaleOrderBodyDto {
   @ApiPropertyOptional({ type: String, description: '备注', default: '' })
   note?: string;
 
+  @ApiPropertyOptional({ type: String, enum: ['credit', 'settled'], description: '结算方式：赊销（默认）/ 现结', default: 'credit' })
+  settlementMode?: 'credit' | 'settled';
+
+  @ApiPropertyOptional({ type: String, nullable: true, description: '现结收款账户 id（现结必填）' })
+  settleAccountId?: string | null;
+
+  @ApiPropertyOptional({ type: String, nullable: true, description: '实收金额（现结默认等于合计，可抹零 / 约整）' })
+  receivedAmount?: string | null;
+
   @ApiProperty({ type: () => [SaleOrderItemBodyDto], description: '明细行（至少一行）' })
   items!: SaleOrderItemBodyDto[];
 }
@@ -75,6 +84,15 @@ export class SaleOrderUpdateBodyDto {
 
   @ApiPropertyOptional({ type: String, description: '备注', default: '' })
   note?: string;
+
+  @ApiPropertyOptional({ type: String, enum: ['credit', 'settled'], description: '结算方式：赊销（默认）/ 现结', default: 'credit' })
+  settlementMode?: 'credit' | 'settled';
+
+  @ApiPropertyOptional({ type: String, nullable: true, description: '现结收款账户 id（现结必填）' })
+  settleAccountId?: string | null;
+
+  @ApiPropertyOptional({ type: String, nullable: true, description: '实收金额（现结默认等于合计）' })
+  receivedAmount?: string | null;
 
   @ApiProperty({ type: () => [SaleOrderItemUpdateBodyDto], description: '明细行（至少一行；已有行带 id）' })
   items!: SaleOrderItemUpdateBodyDto[];
@@ -137,6 +155,11 @@ export class SaleOrderListItemDto {
   @ApiProperty({ type: String }) otherAmount!: string;
   @ApiProperty({ type: String }) totalAmount!: string;
   @ApiProperty({ type: String }) note!: string;
+  @ApiProperty({ type: String, enum: ['credit', 'settled'], description: '结算方式' })
+  settlementMode!: 'credit' | 'settled';
+  @ApiProperty({ type: String, description: '实收金额（赊销为 0）' }) receivedAmount!: string;
+  @ApiPropertyOptional({ type: String, nullable: true, description: '现结收款账户 id' })
+  settleAccountId!: string | null;
 }
 
 export class SaleOrderDto extends SaleOrderListItemDto {
@@ -148,6 +171,14 @@ export class SaleOrderDto extends SaleOrderListItemDto {
 
   @ApiProperty({ type: () => [SaleOrderItemResponseDto], description: '明细行' })
   items!: SaleOrderItemResponseDto[];
+}
+
+export class SaleOrderPrintEventDto {
+  @ApiProperty({ type: String, description: '销售单 id' })
+  id!: string;
+
+  @ApiProperty({ type: String, description: '销售单编号快照' })
+  code!: string;
 }
 
 export class SaleOrderSummaryDto {

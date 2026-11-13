@@ -5,7 +5,20 @@
   --color-fg: var(--mcc-color-fg);
   --color-primary: var(--mcc-color-primary);
   --color-border: var(--mcc-color-border);
-  --text-base: var(--mcc-font-size-base);
   --radius-base: var(--mcc-radius-base);
   --spacing: var(--mcc-space-unit);
+}
+
+/* 字号必须用 @theme inline：普通 @theme 会在 :root 计算一次再向下继承，
+   [data-mode='mobile'] 对 --mcc-text-* 的覆盖不会生效；
+   inline 让工具类直接带上 var()，在元素上按作用域取值。 */
+@theme inline {
+  --text-base: var(--mcc-font-size-base);
+  /* 移动端口径的字号角色（product/平台布局.md）：text-mobile-title / body / label / caption / numeric */
+  --text-mobile-title: var(--mcc-text-title);
+  --text-mobile-body: var(--mcc-text-body);
+  --text-mobile-label: var(--mcc-text-label);
+  --text-mobile-caption: var(--mcc-text-caption);
+  --text-mobile-numeric: var(--mcc-text-numeric);
+  --text-mobile-numeric-strong: var(--mcc-text-numeric-strong);
 }

@@ -5,6 +5,7 @@ import { SearchIcon, XIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { MobileActionBar, MobileHeader } from '@/components/mobile/mobile-shell';
+import { cn } from '@/lib/utils';
 
 // 移动列表共用件（design/平台布局.md §1.5 / §1.8）：销售单、客户档案等所有移动列表
 // 强制复用同一套页面骨架、搜索框、卡片、加载更多与空态，避免各页复制导致样式漂移。
@@ -63,7 +64,7 @@ export function MobileListSearch({
           placeholder={placeholder}
           aria-label={placeholder}
           enterKeyHint="search"
-          className="h-12 pr-11 pl-9 text-base"
+          className="h-12 pr-11 pl-9 text-mobile-body"
         />
         {value ? (
           <button
@@ -83,19 +84,73 @@ export function MobileListSearch({
   );
 }
 
+// 列表卡片（product/平台布局.md 移动页 · 字号角色）：结构固定，页面只传内容——
+// 顶行 = 次要文本（日期）+ 状态标签，第二行 = 主行（title 角色）+ 金额（numeric），
+// 其后为次行 / 备注 / 页脚；页面不写字号类，避免各页各写一套值。
 export function MobileListCard({
   href,
-  children,
+  topLeft,
+  topRight,
+  title,
+  subtitle,
+  note,
+  amount,
+  amountClassName,
+  footer,
 }: {
   href: string;
-  children: React.ReactNode;
+  topLeft?: React.ReactNode;
+  topRight?: React.ReactNode;
+  title: React.ReactNode;
+  subtitle?: React.ReactNode;
+  note?: React.ReactNode;
+  amount?: React.ReactNode;
+  amountClassName?: string;
+  footer?: React.ReactNode;
 }): React.ReactElement {
   return (
     <Link
       href={href}
-      className="block rounded-xl border border-border bg-card p-4 hover:bg-muted/60"
+      className="block rounded-xl border border-border bg-card p-4 active:bg-muted/60"
     >
-      {children}
+      {topLeft || topRight ? (
+        <div className="flex items-center justify-between gap-3">
+          {topLeft ? (
+            <span className="text-mobile-body tabular-nums text-muted-foreground">{topLeft}</span>
+          ) : (
+            <span />
+          )}
+          {topRight ? (
+            <span className="shrink-0 rounded border border-border px-2 py-0.5 text-mobile-caption text-muted-foreground">
+              {topRight}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+
+      <div className="mt-1 flex items-start justify-between gap-3">
+        <span className="min-w-0 flex-1 text-mobile-title">{title}</span>
+        {amount ? (
+          <span
+            className={cn(
+              'shrink-0 text-mobile-numeric font-semibold tabular-nums',
+              amountClassName,
+            )}
+          >
+            {amount}
+          </span>
+        ) : null}
+      </div>
+
+      {subtitle ? (
+        <p className="mt-1 truncate text-mobile-body text-muted-foreground">{subtitle}</p>
+      ) : null}
+      {note ? <p className="mt-1 text-mobile-body text-muted-foreground">{note}</p> : null}
+      {footer ? (
+        <p className="mt-2 whitespace-pre-wrap break-words text-mobile-body text-muted-foreground">
+          {footer}
+        </p>
+      ) : null}
     </Link>
   );
 }
@@ -111,7 +166,7 @@ export function MobileListLoadMore({
     <Button
       type="button"
       variant="outline"
-      className="h-12 w-full text-base"
+      className="h-12 w-full text-mobile-body"
       disabled={loading}
       onClick={onClick}
     >
@@ -131,8 +186,8 @@ export function MobileListState({
     <p
       className={
         tone === 'error'
-          ? 'py-6 text-center text-base text-destructive'
-          : 'py-6 text-center text-base text-muted-foreground'
+          ? 'py-6 text-center text-mobile-body text-destructive'
+          : 'py-6 text-center text-mobile-body text-muted-foreground'
       }
     >
       {children}

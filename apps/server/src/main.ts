@@ -14,6 +14,8 @@ async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule, { logger: new AppLogger() });
 
   app.setGlobalPrefix(API_PREFIX);
+  // 审计 IP 取 x-forwarded-for（design/审计日志.md §3）：生产经反向代理时信任一层代理头
+  app.getHttpAdapter().getInstance().set('trust proxy', 1);
   // 刷新令牌走 httpOnly Cookie（design/账号与权限.md §4），需解析 Cookie 请求头
   app.use(cookieParser());
 

@@ -66,7 +66,7 @@ export function MobileShell({ children }: { children: React.ReactNode }): React.
             {allowed ? (
               children
             ) : (
-              <p className="p-6 text-base text-muted-foreground">无权限访问该页面。</p>
+              <p className="p-6 text-mobile-body text-muted-foreground">无权限访问该页面。</p>
             )}
           </div>
         </div>
@@ -90,13 +90,13 @@ export function MobileHeader({
         <Link
           href={backHref}
           aria-label="返回"
-          className="inline-flex h-11 min-w-11 items-center justify-center gap-1 rounded-md px-2 text-base text-muted-foreground hover:bg-muted hover:text-foreground"
+          className="inline-flex h-11 min-w-11 items-center justify-center gap-1 rounded-md px-2 text-mobile-body text-muted-foreground hover:bg-muted hover:text-foreground"
         >
           <ArrowLeftIcon className="size-5" />
           <span>返回</span>
         </Link>
       ) : null}
-      <h1 className="min-w-0 flex-1 truncate px-1 text-lg font-semibold">{title}</h1>
+      <h1 className="min-w-0 flex-1 truncate px-1 text-mobile-title font-semibold">{title}</h1>
       {action ? <div className="shrink-0">{action}</div> : null}
     </header>
   );

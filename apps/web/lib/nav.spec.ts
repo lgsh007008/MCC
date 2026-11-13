@@ -35,6 +35,13 @@ describe('菜单可见性', () => {
   });
 });
 
+describe('平台机制页', () => {
+  it('审计日志入口仅 audit:view 可见', () => {
+    const audit = platformNavItems.find((item) => item.href === '/admin/audit-logs');
+    expect(audit?.scope).toBe('audit:view');
+  });
+});
+
 describe('路由 scope', () => {
   it('新建 / 编辑页要求 manage，列表与详情要求 view', () => {
     expect(scopeForPath('/admin/sale-orders')).toBe('order:view');
@@ -44,6 +51,7 @@ describe('路由 scope', () => {
     expect(scopeForPath('/admin/customers/new')).toBe('customer:manage');
     expect(scopeForPath('/admin/customers/abc/edit')).toBe('customer:manage');
     expect(scopeForPath('/admin/users')).toBe('account:manage');
+    expect(scopeForPath('/admin/audit-logs')).toBe('audit:view');
     expect(scopeForPath('/admin')).toBeNull();
   });
 });

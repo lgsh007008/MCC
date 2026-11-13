@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ArrowDownIcon, ArrowUpIcon, BanIcon, CircleCheckIcon, EyeIcon, PencilIcon, Trash2Icon } from 'lucide-react';
+import { absMoney } from '@mcc/shared';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { useCan } from '@/components/auth/permission-context';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -35,6 +36,9 @@ interface CustomerRow {
   createdAt: string;
   totalVolume: string;
   orderCount: number;
+  sales: string;
+  receipts: string;
+  outstanding: string;
 }
 
 type SortField = 'createdAt' | 'totalVolume';
@@ -63,6 +67,29 @@ async function fetchCustomerStats(
     if (response.ok && data) {
       for (const item of data.items) {
         map[item.customerId] = { totalVolume: item.totalVolume, orderCount: item.orderCount };
+      }
+    }
+  }
+  return map;
+}
+
+// 应收（finance 域派生值）：欠款 = 累计销售 − 累计收款，负数为预收
+async function fetchReceivables(
+  ids: string[],
+): Promise<Record<string, { sales: string; receipts: string; outstanding: string }>> {
+  const map: Record<string, { sales: string; receipts: string; outstanding: string }> = {};
+  for (let index = 0; index < ids.length; index += VOLUME_BATCH_SIZE) {
+    const batch = ids.slice(index, index + VOLUME_BATCH_SIZE);
+    const { data, response } = await api.GET('/api/v1/finance/receivables', {
+      params: { query: { customerIds: batch.join(',') } },
+    });
+    if (response.ok && data) {
+      for (const item of data.items) {
+        map[item.customerId] = {
+          sales: item.sales,
+          receipts: item.receipts,
+          outstanding: item.outstanding,
+        };
       }
     }
   }
@@ -138,11 +165,17 @@ export default function CustomersPage(): React.ReactElement {
             ),
           );
           const items = pageResults.flatMap((result) => result.data?.items ?? []);
-          const stats = await fetchCustomerStats(items.map((item) => item.id));
+          const [stats, receivables] = await Promise.all([
+            fetchCustomerStats(items.map((item) => item.id)),
+            fetchReceivables(items.map((item) => item.id)),
+          ]);
           const merged: CustomerRow[] = items.map((item) => ({
             ...item,
             totalVolume: stats[item.id]?.totalVolume ?? '0.0000',
             orderCount: stats[item.id]?.orderCount ?? 0,
+            sales: receivables[item.id]?.sales ?? '0.00',
+            receipts: receivables[item.id]?.receipts ?? '0.00',
+            outstanding: receivables[item.id]?.outstanding ?? '0.00',
           }));
           const direction = sort.order === 'asc' ? 1 : -1;
           merged.sort((a, b) => {
@@ -184,7 +217,10 @@ export default function CustomersPage(): React.ReactElement {
             return;
           }
           const items = result.data.items;
-          const stats = await fetchCustomerStats(items.map((item) => item.id));
+          const [stats, receivables] = await Promise.all([
+            fetchCustomerStats(items.map((item) => item.id)),
+            fetchReceivables(items.map((item) => item.id)),
+          ]);
           if (cancelled) {
             return;
           }
@@ -193,6 +229,9 @@ export default function CustomersPage(): React.ReactElement {
               ...item,
               totalVolume: stats[item.id]?.totalVolume ?? '0.0000',
               orderCount: stats[item.id]?.orderCount ?? 0,
+              sales: receivables[item.id]?.sales ?? '0.00',
+              receipts: receivables[item.id]?.receipts ?? '0.00',
+              outstanding: receivables[item.id]?.outstanding ?? '0.00',
             })),
           );
           setTotal(result.data.total);
@@ -518,6 +557,7 @@ export default function CustomersPage(): React.ReactElement {
                 disabled={!volumeSortable}
                 disabledHint="客户数超过 500，暂不支持全量排序"
               />
+              <TableHead className="text-right">欠款</TableHead>
               <TableHead>备注</TableHead>
               <SortHead label="创建日期" field="createdAt" />
               <TableHead className="w-28 text-right">操作</TableHead>
@@ -526,13 +566,13 @@ export default function CustomersPage(): React.ReactElement {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-muted-foreground">
+                <TableCell colSpan={canManage ? 10 : 9} className="text-muted-foreground">
                   加载中…
                 </TableCell>
               </TableRow>
             ) : rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-muted-foreground">
+                <TableCell colSpan={canManage ? 10 : 9} className="text-muted-foreground">
                   暂无客户
                 </TableCell>
               </TableRow>
@@ -563,6 +603,11 @@ export default function CustomersPage(): React.ReactElement {
                     </span>
                   </TableCell>
                   <TableCell className="text-right tabular-nums">{customer.totalVolume}</TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {customer.outstanding.startsWith('-')
+                      ? `${absMoney(customer.outstanding)}（预收）`
+                      : customer.outstanding}
+                  </TableCell>
                   <TableCell className="max-w-40 truncate" title={customer.note}>
                     {customer.note}
                   </TableCell>

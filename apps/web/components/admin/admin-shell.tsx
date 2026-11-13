@@ -350,7 +350,7 @@ function AdminShellInner({
             <TabBar />
             <div className="shrink-0">
               <DropdownMenu>
-                <DropdownMenuTrigger>
+                <DropdownMenuTrigger aria-label="账号菜单">
                   <Avatar className="size-8">
                     <AvatarFallback>销</AvatarFallback>
                   </Avatar>
@@ -366,6 +366,11 @@ function AdminShellInner({
                   {hasScope(role, 'account:manage') ? (
                     <DropdownMenuItem onClick={() => router.push('/admin/users')}>
                       账号管理
+                    </DropdownMenuItem>
+                  ) : null}
+                  {hasScope(role, 'audit:view') ? (
+                    <DropdownMenuItem onClick={() => router.push('/admin/audit-logs')}>
+                      审计日志
                     </DropdownMenuItem>
                   ) : null}
                   <DropdownMenuItem onClick={() => void handleLogout()}>退出登录</DropdownMenuItem>

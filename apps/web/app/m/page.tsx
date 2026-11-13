@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { ChevronRightIcon, LogOutIcon, ReceiptTextIcon, UsersIcon } from 'lucide-react';
+import { ChevronRightIcon, LogOutIcon, ReceiptTextIcon, UsersIcon, WalletIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCan } from '@/components/auth/permission-context';
 import { MobileHeader } from '@/components/mobile/mobile-shell';
@@ -29,8 +29,8 @@ function EntryCard({
     >
       <Icon className="size-8 shrink-0" />
       <span className="min-w-0 flex-1">
-        <span className="block text-lg font-medium">{title}</span>
-        <span className="mt-1 block text-sm text-muted-foreground">{description}</span>
+        <span className="block text-mobile-title font-medium">{title}</span>
+        <span className="mt-1 block text-mobile-body text-muted-foreground">{description}</span>
       </span>
       <ChevronRightIcon className="size-5 shrink-0 text-muted-foreground" />
     </Link>
@@ -40,6 +40,7 @@ function EntryCard({
 export default function MobileHomePage(): React.ReactElement {
   const canOrder = useCan('order:view');
   const canCustomer = useCan('customer:view');
+  const canFinance = useCan('finance:view');
   const [loggingOut, setLoggingOut] = useState(false);
 
   async function handleLogout(): Promise<void> {
@@ -61,7 +62,7 @@ export default function MobileHomePage(): React.ReactElement {
           <Button
             type="button"
             variant="ghost"
-            className="h-11 gap-1 px-2 text-sm text-muted-foreground"
+            className="h-11 gap-1 px-2 text-mobile-label text-muted-foreground"
             aria-label="退出登录"
             title="退出登录"
             disabled={loggingOut}
@@ -73,7 +74,7 @@ export default function MobileHomePage(): React.ReactElement {
         }
       />
       <div className="space-y-4 p-4">
-        <p className="text-sm text-muted-foreground">选择要办理的业务</p>
+        <p className="text-mobile-body text-muted-foreground">选择要办理的业务</p>
         {canOrder ? (
           <EntryCard
             href="/m/sale-orders"
@@ -88,6 +89,14 @@ export default function MobileHomePage(): React.ReactElement {
             icon={UsersIcon}
             title="客户档案"
             description="查客户 / 维护资料"
+          />
+        ) : null}
+        {canFinance ? (
+          <EntryCard
+            href="/m/finance"
+            icon={WalletIcon}
+            title="资金"
+            description="查流水 / 收支汇总"
           />
         ) : null}
       </div>

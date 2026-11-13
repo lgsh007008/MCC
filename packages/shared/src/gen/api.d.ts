@@ -4,6 +4,23 @@
  */
 
 export interface paths {
+    "/api/v1/audit-logs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 审计日志列表：时间范围、操作人、领域、动作、结果 + 分页 */
+        get: operations["AuditController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/login": {
         parameters: {
             query?: never;
@@ -246,24 +263,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/finance/events": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 财务事件列表：筛选（发生日期区间、分类、来源）+ 排序 + 分页 */
-        get: operations["FinanceController_list"];
-        put?: never;
-        /** 手工记账（仅其他收入 / 其他支出；金额按正数提交） */
-        post: operations["FinanceController_create"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/finance/summary": {
         parameters: {
             query?: never;
@@ -271,7 +270,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** 收支汇总（日期区间实时聚合：总收入 / 总成本 / 净利润 / 分类小计） */
+        /** 经营收支汇总（日期区间实时聚合：销售单 + 流水分类；总收入 / 总支出 / 净额） */
         get: operations["FinanceController_summary"];
         put?: never;
         post?: never;
@@ -281,26 +280,25 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/finance/events/{id}": {
+    "/api/v1/finance/accounts": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** 财务事件详情 */
-        get: operations["FinanceController_detail"];
-        /** 更新手工事件（自动生成的事件不可编辑） */
-        put: operations["FinanceController_update"];
-        post?: never;
-        /** 删除手工事件（软删除；自动事件拒绝） */
-        delete: operations["FinanceController_remove"];
+        /** 资金账户列表（不分页；余额 = 期初 + 收 − 付 + 转入 − 转出） */
+        get: operations["FinanceController_listAccounts"];
+        put?: never;
+        /** 新建资金账户（对公 / 对私级联渠道） */
+        post: operations["FinanceController_createAccount"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/v1/finance/events/batch-delete": {
+    "/api/v1/finance/accounts/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -308,10 +306,82 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
+        /** 更新资金账户（改名称 / 期初 / 启用状态） */
+        put: operations["FinanceController_updateAccount"];
+        post?: never;
+        /** 删除资金账户（软删除；历史流水保留账户名，编号不复用） */
+        delete: operations["FinanceController_removeAccount"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/finance/cash-entries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 资金流水列表：方向 / 收支分类 / 账户 / 客户 / 日期区间筛选 + 分页 + 筛选全量合计 */
+        get: operations["FinanceController_listCashEntries"];
         put?: never;
-        /** 批量删除手工事件（软删除；自动事件与不存在行静默跳过） */
-        post: operations["FinanceController_batchDelete"];
+        /** 登记资金流水（收支分类按方向必选；销售回款挂客户） */
+        post: operations["FinanceController_createCashEntry"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/finance/cash-summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 资金汇总（期间收款 / 付款 / 净流入 + 各账户当前余额） */
+        get: operations["FinanceController_cashSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/finance/receivables": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 客户应收（批量）：累计销售 / 累计收款 / 欠款（负数为预收） */
+        get: operations["FinanceController_receivables"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/finance/cash-entries/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 资金流水详情（单条，含来源与可编辑标记） */
+        get: operations["FinanceController_cashEntryDetail"];
+        /** 更新资金流水 */
+        put: operations["FinanceController_updateCashEntry"];
+        post?: never;
+        /** 删除资金流水（软删除；余额随之回退） */
+        delete: operations["FinanceController_removeCashEntry"];
         options?: never;
         head?: never;
         patch?: never;
@@ -388,10 +458,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sale-orders/{id}/print-events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 记录销售单打印审计（无业务副作用） */
+        post: operations["OrderController_recordPrint"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AuditLogItemDto: {
+            id: string;
+            /** @description ISO 时间 */
+            createdAt: string;
+            actorId?: string | null;
+            actorUsername?: string | null;
+            actorRole?: string | null;
+            /** @description 领域 */
+            domain: string;
+            /** @description 动作标识 */
+            action: string;
+            /** @description 中文动作名 */
+            actionLabel?: string | null;
+            objectType?: string | null;
+            objectId?: string | null;
+            /** @description 业务编号快照 */
+            objectCode?: string | null;
+            /** @description ok / failed（旧记录可能为状态码） */
+            result: string;
+            statusCode?: number | null;
+            errorCode?: string | null;
+            ip?: string | null;
+            userAgent?: string | null;
+            requestId?: string | null;
+        };
+        AuditLogListDto: {
+            /** @description 筛选后总数 */
+            total: number;
+            items: components["schemas"]["AuditLogItemDto"][];
+        };
         LoginBodyDto: {
             /**
              * @description 账号，一人一号
@@ -564,142 +681,176 @@ export interface components {
             /** @description 实际删除（软删除）条数 */
             deleted: number;
         };
-        FinanceEventSummaryDto: {
-            /** @description 金额合计（有符号，筛选全量） */
-            amount: string;
-        };
-        FinanceEventListItemDto: {
-            id: string;
-            /** @description 事件编号（年月+当月流水） */
-            code: string;
-            /** @description 发生日期 */
-            occurredDate: string;
-            /**
-             * @description 分类
-             * @enum {string}
-             */
-            category: "sales_revenue" | "other_revenue" | "purchase_cost" | "labor_cost" | "other_expense";
-            /** @description 金额（有符号：收入正、支出负） */
-            amount: string;
-            note: string;
-            /**
-             * @description 来源：自动 / 手工
-             * @enum {string}
-             */
-            source: "auto" | "manual";
-            /** @description 源单类型（如 sale_order） */
-            sourceType?: string | null;
-            /** @description 源单 id */
-            sourceId?: string | null;
-            /** @description 源单编号 */
-            sourceCode?: string | null;
-        };
-        FinanceEventListDto: {
-            /** @description 总数 */
-            total: number;
-            /** @description 筛选全量汇总（合计行） */
-            summary: components["schemas"]["FinanceEventSummaryDto"];
-            items: components["schemas"]["FinanceEventListItemDto"][];
-        };
         FinanceCategorySubtotalDto: {
-            /** @enum {string} */
-            category: "sales_revenue" | "other_revenue" | "purchase_cost" | "labor_cost" | "other_expense";
-            /** @description 收入小计 */
-            income: string;
-            /** @description 成本小计（绝对值） */
-            cost: string;
-            /** @description 净额（收入 − 成本） */
-            net: string;
+            /**
+             * @description 经营收支项（固定五项输出）
+             * @enum {string}
+             */
+            category: "sales_revenue" | "other_revenue" | "purchase_payment" | "labor_cost" | "operating_expense";
+            /** @description 金额（正数，无数据为 0.00） */
+            amount: string;
         };
         FinanceSummaryDto: {
-            /** @description 总收入 */
+            /** @description 总收入 = 销售收入 + 其他收入 */
             totalIncome: string;
-            /** @description 总成本（绝对值） */
-            totalCost: string;
-            /** @description 净利润 = 总收入 − 总成本 */
-            netProfit: string;
-            /** @description 事件条数 */
-            eventCount: number;
-            /** @description 分类小计（五类固定输出） */
+            /** @description 总支出 = 采购付款 + 工资 + 费用 */
+            totalExpense: string;
+            /** @description 净额 = 总收入 − 总支出 */
+            netAmount: string;
+            /** @description 期间销售单数 */
+            orderCount: number;
+            /** @description 计入经营收支的流水条数 */
+            cashEntryCount: number;
+            /** @description 分类小计（五项固定输出） */
             categories: components["schemas"]["FinanceCategorySubtotalDto"][];
         };
-        FinanceEventDto: {
+        FinanceAccountDto: {
             id: string;
-            /** @description 事件编号（年月+当月流水） */
+            /** @description 账户编号（AC + 5 位流水） */
             code: string;
-            /** @description 发生日期 */
+            name: string;
+            /** @enum {string} */
+            kind: "corporate" | "personal";
+            /** @enum {string} */
+            channel: "bank" | "wechat" | "alipay" | "cash" | "bill";
+            /** @description 期初余额 */
+            openingBalance: string;
+            /** @description 当前余额（期初 + 收 − 付 + 转入 − 转出） */
+            balance: string;
+            active: boolean;
+            /** @description 该账户的流水条数（列表返回，用于删除确认） */
+            entryCount?: number;
+        };
+        FinanceAccountListDto: {
+            items: components["schemas"]["FinanceAccountDto"][];
+        };
+        FinanceAccountBodyDto: {
+            /**
+             * @description 账户名称
+             * @example 对公账户
+             */
+            name: string;
+            /**
+             * @description 类型：对公 / 对私
+             * @enum {string}
+             */
+            kind: "corporate" | "personal";
+            /**
+             * @description 渠道：银行 / 微信 / 支付宝 / 现金 / 承兑
+             * @enum {string}
+             */
+            channel: "bank" | "wechat" | "alipay" | "cash" | "bill";
+            /**
+             * @description 期初余额（非负数）
+             * @example 0.00
+             */
+            openingBalance: string;
+            /**
+             * @description 是否启用
+             * @default true
+             */
+            active: boolean;
+        };
+        FinanceCashEntryListSummaryDto: {
+            /** @description 筛选全量收款合计 */
+            receipts: string;
+            /** @description 筛选全量付款合计 */
+            payments: string;
+            /** @description 净额 = 收款 − 付款 */
+            net: string;
+        };
+        FinanceCashEntryDto: {
+            id: string;
+            /** @description 流水编号（CF + 5 位流水） */
+            code: string;
+            /** @enum {string} */
+            direction: "in" | "out" | "transfer";
             occurredDate: string;
-            /**
-             * @description 分类
-             * @enum {string}
-             */
-            category: "sales_revenue" | "other_revenue" | "purchase_cost" | "labor_cost" | "other_expense";
-            /** @description 金额（有符号：收入正、支出负） */
             amount: string;
+            accountId: string;
+            accountName: string;
+            toAccountId?: string | null;
+            toAccountName?: string | null;
+            customerId?: string | null;
+            customerName: string;
+            /** @enum {string} */
+            method: "bank" | "wechat" | "alipay" | "cash" | "acceptance";
+            /** @enum {string|null} */
+            category?: "sales_receipt" | "other_revenue" | "loan_in" | "purchase_payment" | "labor_cost" | "operating_expense" | "asset_purchase" | "loan_repay" | null;
             note: string;
-            /**
-             * @description 来源：自动 / 手工
-             * @enum {string}
-             */
-            source: "auto" | "manual";
-            /** @description 源单类型（如 sale_order） */
+            /** @description 源单类型（sale_order） */
             sourceType?: string | null;
             /** @description 源单 id */
             sourceId?: string | null;
             /** @description 源单编号 */
             sourceCode?: string | null;
+            /** @description 来源显示名 */
+            sourceLabel?: string | null;
+            /** @description 是否可手工编辑 / 删除（源单流水为 false） */
+            editable: boolean;
         };
-        FinanceEventBodyDto: {
+        FinanceCashEntryListDto: {
+            total: number;
+            /** @description 筛选全量汇总（合计行） */
+            summary: components["schemas"]["FinanceCashEntryListSummaryDto"];
+            items: components["schemas"]["FinanceCashEntryDto"][];
+        };
+        FinanceCashSummaryDto: {
+            /** @description 期间收款合计 */
+            receipts: string;
+            /** @description 期间付款合计 */
+            payments: string;
+            /** @description 净流入 = 收款 − 付款 */
+            netFlow: string;
+            /** @description 全部账户当前资金总额（含票据） */
+            totalFunds: string;
+            /** @description 各账户当前余额 */
+            accounts: components["schemas"]["FinanceAccountDto"][];
+        };
+        FinanceReceivableDto: {
+            customerId: string;
+            /** @description 累计销售（现结取实收、赊销取合计） */
+            sales: string;
+            /** @description 累计收款（销售回款流水合计） */
+            receipts: string;
+            /** @description 欠款 = 销售 − 收款；负数为预收 */
+            outstanding: string;
+        };
+        FinanceReceivableListDto: {
+            items: components["schemas"]["FinanceReceivableDto"][];
+        };
+        FinanceCashEntryBodyDto: {
             /**
-             * @description 分类：手工记账仅允许 other_revenue（其他收入）/ other_expense（其他支出）
+             * @description 方向：收款 / 付款 / 内部转账
              * @enum {string}
              */
-            category: "other_revenue" | "other_expense";
+            direction: "in" | "out" | "transfer";
             /**
              * @description 发生日期
-             * @example 2026-11-10
+             * @example 2026-11-12
              */
             occurredDate: string;
             /**
-             * @description 金额（按正数提交、最多 2 位小数；符号由分类决定）
-             * @example 350.25
+             * @description 金额（正数，最多 2 位小数）
+             * @example 1200.00
              */
             amount: string;
+            /** @description 资金账户 id */
+            accountId: string;
+            /** @description 内部转账的转入账户 id */
+            toAccountId?: string | null;
             /**
-             * @description 备注（具体事由）
+             * @description 收支分类：收款 3 项 / 付款 5 项；内部转账为空
+             * @enum {string|null}
+             */
+            category?: "sales_receipt" | "other_revenue" | "loan_in" | "purchase_payment" | "labor_cost" | "operating_expense" | "asset_purchase" | "loan_repay" | null;
+            /** @description 客户 id（仅销售回款必填） */
+            customerId?: string | null;
+            /**
+             * @description 备注（付款写对象与事由；承兑写票号 / 到期日）
              * @default
              */
             note: string;
-        };
-        FinanceEventUpdateBodyDto: {
-            /**
-             * @description 分类：手工记账仅允许 other_revenue（其他收入）/ other_expense（其他支出）
-             * @enum {string}
-             */
-            category: "other_revenue" | "other_expense";
-            /**
-             * @description 发生日期
-             * @example 2026-11-10
-             */
-            occurredDate: string;
-            /**
-             * @description 金额（按正数提交、最多 2 位小数；符号由分类决定）
-             * @example 350.25
-             */
-            amount: string;
-            /**
-             * @description 备注（具体事由）
-             * @default
-             */
-            note: string;
-        };
-        FinanceEventBatchDeleteBodyDto: {
-            /** @description 要删除的事件 id 列表（1~200，仅手工事件） */
-            ids: string[];
-        };
-        FinanceEventBatchDeleteResponseDto: {
-            /** @description 实际删除（软删除）条数 */
-            deleted: number;
         };
         SaleOrderSummaryDto: {
             /** @description 合计方量（筛选全量） */
@@ -725,6 +876,15 @@ export interface components {
             otherAmount: string;
             totalAmount: string;
             note: string;
+            /**
+             * @description 结算方式
+             * @enum {string}
+             */
+            settlementMode: "credit" | "settled";
+            /** @description 实收金额（赊销为 0） */
+            receivedAmount: string;
+            /** @description 现结收款账户 id */
+            settleAccountId?: string | null;
         };
         SaleOrderListDto: {
             /** @description 总数 */
@@ -795,6 +955,15 @@ export interface components {
             otherAmount: string;
             totalAmount: string;
             note: string;
+            /**
+             * @description 结算方式
+             * @enum {string}
+             */
+            settlementMode: "credit" | "settled";
+            /** @description 实收金额（赊销为 0） */
+            receivedAmount: string;
+            /** @description 现结收款账户 id */
+            settleAccountId?: string | null;
             /** @description 客户编号（取自客户档案当前记录） */
             customerCode?: string | null;
             /** @description 客户档案是否已删除（历史单据仍可读） */
@@ -863,6 +1032,16 @@ export interface components {
              * @default
              */
             note: string;
+            /**
+             * @description 结算方式：赊销（默认）/ 现结
+             * @default credit
+             * @enum {string}
+             */
+            settlementMode: "credit" | "settled";
+            /** @description 现结收款账户 id（现结必填） */
+            settleAccountId?: string | null;
+            /** @description 实收金额（现结默认等于合计，可抹零 / 约整） */
+            receivedAmount?: string | null;
             /** @description 明细行（至少一行） */
             items: components["schemas"]["SaleOrderItemBodyDto"][];
         };
@@ -929,6 +1108,16 @@ export interface components {
              * @default
              */
             note: string;
+            /**
+             * @description 结算方式：赊销（默认）/ 现结
+             * @default credit
+             * @enum {string}
+             */
+            settlementMode: "credit" | "settled";
+            /** @description 现结收款账户 id（现结必填） */
+            settleAccountId?: string | null;
+            /** @description 实收金额（现结默认等于合计） */
+            receivedAmount?: string | null;
             /** @description 明细行（至少一行；已有行带 id） */
             items: components["schemas"]["SaleOrderItemUpdateBodyDto"][];
         };
@@ -940,6 +1129,12 @@ export interface components {
             /** @description 实际删除（软删除）条数 */
             deleted: number;
         };
+        SaleOrderPrintEventDto: {
+            /** @description 销售单 id */
+            id: string;
+            /** @description 销售单编号快照 */
+            code: string;
+        };
     };
     responses: never;
     parameters: never;
@@ -949,6 +1144,42 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    AuditController_list: {
+        parameters: {
+            query?: {
+                /** @description 每页条数，默认 20（最大 100） */
+                pageSize?: number;
+                /** @description 页码，默认 1 */
+                page?: number;
+                /** @description 结果 */
+                result?: "ok" | "failed";
+                /** @description 动作标识 */
+                action?: string;
+                /** @description 领域 */
+                domain?: string;
+                /** @description 操作人账号模糊 */
+                actor?: string;
+                /** @description 结束日期 YYYY-MM-DD */
+                dateTo?: string;
+                /** @description 开始日期 YYYY-MM-DD */
+                dateFrom?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditLogListDto"];
+                };
+            };
+        };
+    };
     AuthController_login: {
         parameters: {
             query?: never;
@@ -1368,61 +1599,6 @@ export interface operations {
             };
         };
     };
-    FinanceController_list: {
-        parameters: {
-            query?: {
-                sortOrder?: "asc" | "desc";
-                sortBy?: "occurredDate" | "amount";
-                /** @description 每页条数，默认 20（最大 100） */
-                pageSize?: number;
-                /** @description 页码，默认 1 */
-                page?: number;
-                source?: "auto" | "manual";
-                category?: "sales_revenue" | "other_revenue" | "purchase_cost" | "labor_cost" | "other_expense";
-                /** @description 发生日期止（YYYY-MM-DD） */
-                dateTo?: string;
-                /** @description 发生日期起（YYYY-MM-DD） */
-                dateFrom?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["FinanceEventListDto"];
-                };
-            };
-        };
-    };
-    FinanceController_create: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["FinanceEventBodyDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["FinanceEventDto"];
-                };
-            };
-        };
-    };
     FinanceController_summary: {
         parameters: {
             query?: {
@@ -1447,13 +1623,11 @@ export interface operations {
             };
         };
     };
-    FinanceController_detail: {
+    FinanceController_listAccounts: {
         parameters: {
             query?: never;
             header?: never;
-            path: {
-                id: string;
-            };
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;
@@ -1463,12 +1637,35 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["FinanceEventDto"];
+                    "application/json": components["schemas"]["FinanceAccountListDto"];
                 };
             };
         };
     };
-    FinanceController_update: {
+    FinanceController_createAccount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FinanceAccountBodyDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FinanceAccountDto"];
+                };
+            };
+        };
+    };
+    FinanceController_updateAccount: {
         parameters: {
             query?: never;
             header?: never;
@@ -1479,7 +1676,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["FinanceEventUpdateBodyDto"];
+                "application/json": components["schemas"]["FinanceAccountBodyDto"];
             };
         };
         responses: {
@@ -1488,12 +1685,12 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["FinanceEventDto"];
+                    "application/json": components["schemas"]["FinanceAccountDto"];
                 };
             };
         };
     };
-    FinanceController_remove: {
+    FinanceController_removeAccount: {
         parameters: {
             query?: never;
             header?: never;
@@ -1512,7 +1709,40 @@ export interface operations {
             };
         };
     };
-    FinanceController_batchDelete: {
+    FinanceController_listCashEntries: {
+        parameters: {
+            query?: {
+                /** @description 每页条数，默认 20（最大 100） */
+                pageSize?: number;
+                /** @description 页码，默认 1 */
+                page?: number;
+                /** @description 发生日期止（YYYY-MM-DD） */
+                dateTo?: string;
+                /** @description 发生日期起（YYYY-MM-DD） */
+                dateFrom?: string;
+                /** @description 客户 id（收款流水） */
+                customerId?: string;
+                accountId?: string;
+                category?: "sales_receipt" | "other_revenue" | "loan_in" | "purchase_payment" | "labor_cost" | "operating_expense" | "asset_purchase" | "loan_repay";
+                direction?: "in" | "out" | "transfer";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FinanceCashEntryListDto"];
+                };
+            };
+        };
+    };
+    FinanceController_createCashEntry: {
         parameters: {
             query?: never;
             header?: never;
@@ -1521,7 +1751,97 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["FinanceEventBatchDeleteBodyDto"];
+                "application/json": components["schemas"]["FinanceCashEntryBodyDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FinanceCashEntryDto"];
+                };
+            };
+        };
+    };
+    FinanceController_cashSummary: {
+        parameters: {
+            query?: {
+                dateTo?: string;
+                dateFrom?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FinanceCashSummaryDto"];
+                };
+            };
+        };
+    };
+    FinanceController_receivables: {
+        parameters: {
+            query: {
+                /** @description 逗号分隔的客户 id */
+                customerIds: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FinanceReceivableListDto"];
+                };
+            };
+        };
+    };
+    FinanceController_cashEntryDetail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FinanceCashEntryDto"];
+                };
+            };
+        };
+    };
+    FinanceController_updateCashEntry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FinanceCashEntryBodyDto"];
             };
         };
         responses: {
@@ -1530,8 +1850,27 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["FinanceEventBatchDeleteResponseDto"];
+                    "application/json": components["schemas"]["FinanceCashEntryDto"];
                 };
+            };
+        };
+    };
+    FinanceController_removeCashEntry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -1700,6 +2039,27 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SaleOrderBatchDeleteResponseDto"];
+                };
+            };
+        };
+    };
+    OrderController_recordPrint: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SaleOrderPrintEventDto"];
                 };
             };
         };

@@ -27,7 +27,7 @@ modules/order/
 
 | 表 | 字段要点 | 备注 |
 | --- | --- | --- |
-| `sale_order` | 编号（唯一）、销售日期、客户外键、客户名称快照、合计方量、小计金额、其他金额、合计金额、备注 | 通用字段（主键、`tenant_id`、`created_at/updated_at`、`deleted_at`）按技术方案 §5.1；编号唯一约束按租户复合 `(tenant_id, 编号)`；客户外键建索引 |
+| `sale_order` | 编号（唯一）、销售日期、客户外键、客户名称快照、合计方量、小计金额、其他金额、合计金额、备注、结算方式、实收金额、收款账户 id 快照 | 通用字段（主键、`tenant_id`、`created_at/updated_at`、`deleted_at`）按技术方案 §5.1；编号唯一约束按租户复合 `(tenant_id, 编号)`；客户外键建索引；合计金额仍为原价 |
 | `sale_order_item` | 行序、产品类型（固定方木）、长度/宽度/高度（整数 mm）、根数、计价方式、方量、单价、小计金额、其他金额、备注、所属销售单 | 通用字段同上按 §5.1；尺寸为整数 `Int`，方量非空 |
 
 - 金额与尺寸一律 Decimal / Int，禁止浮点（§5.1）；精度按需求口径：方量 4 位、金额 2 位、尺寸整数毫米
@@ -56,6 +56,8 @@ modules/order/
 - 按根数行小计金额 = round2(根数 × 单价)
 - 单行金额 = 小计金额 + 其他金额
 - 逐行舍入后落账；主表合计方量 = Σ明细方量，主表小计金额 = round2(Σ单行金额)
+- 结算方式枚举 `sale_order_settlement`：`CREDIT`（默认）/ `SETTLED`；现结时实收金额默认 = 合计金额、可改；差额 = 合计 − 实收，作折让 / 抹零
+- 现结时生成收款流水，金额 = 实收、分类 = 销售回款；赊销不生成流水；差额只作单据信息，不进收支汇总
 - 纯函数单测为最高优先级（技术方案 §10 测试策略：计算类逻辑纯函数化）
 
 ## 4. 编号生成
@@ -72,15 +74,16 @@ modules/order/
 | --- | --- | --- |
 | list | `GET /api/v1/sale-orders` | 列表（筛选：销售日期区间、客户 id、客户名称快照模糊 `customerName`；排序：saleDate / totalVolume / totalAmount，asc / desc，默认日期倒序；分页；响应含 `summary` 汇总——对筛选全量、排除分页） |
 | detail | `GET /api/v1/sale-orders/:id` | 详情（含明细）；客户编号经 customer 公开接口读取（含已删档案），并返回 `customerDeleted` 供界面标注「已删除」 |
-| create | `POST /api/v1/sale-orders` | 新建（幂等见 §6.3 Idempotency-Key；保存前经 customer 公开接口校验客户存在且启用，并按客户当前名称写入 `customer_name` 快照） |
-| update | `PUT /api/v1/sale-orders/:id` | 更新（整单提交：明细重算落账；客户未变更时不校验启用态，允许历史单保存；变更客户时重取名称快照） |
+| create | `POST /api/v1/sale-orders` | 新建（幂等见 §6.3 Idempotency-Key；保存前经 customer 公开接口校验客户存在且启用，并按客户当前名称写入 `customer_name` 快照；可带 `settlementMode` / `settleAccountId` / `receivedAmount`，现结时同事务生成收款流水） |
+| update | `PUT /api/v1/sale-orders/:id` | 更新（整单提交：明细重算落账；客户未变更时不校验启用态，允许历史单保存；变更客户时重取名称快照；结算字段同步收款流水） |
 | remove | `DELETE /api/v1/sale-orders/:id` | 删除（软删除，编号不回收） |
 | batch-delete | `POST /api/v1/sale-orders/batch-delete` | 批量删除（body `{ ids }`，软删除，返回删除条数；不存在/已删行静默跳过） |
 | customer-volume-summary | `GET /api/v1/sale-orders/customer-volume-summary?customerIds=` | 客户维度累计方量汇总：对未软删销售单按 `customer_id` 聚合 `total_volume` 与 `orderCount`（订单数），供客户列表页与详情页批量取数与删除确认（`product/customer.md` 只引用不重述） |
 
 ## 6. 后置边界（本轮不建）
 
-- 收款记录、欠款余额：本模块不建，finance 域建成后另立需求（见 `product/order.md` 待补注记）
+- 收款记录、欠款余额：归 finance 域（`design/finance.md`）；本模块只保存结算方式、实收金额与收款账户快照，并经 `FinanceService` 公开接口在同一事务内生成收款流水（分类 = 销售回款），不写 finance 表
+- 部分现结、分期收款：本轮不做；部分收款走资金流水的手工收款（挂客户、不挂单）
 - 客户档案：归 `customer` 模块（`design/customer.md`），本模块只经其公开接口校验并保存外键，不读 customer 表（技术方案 §4.2 禁止穿透）
 
 ## 7. 前端实现节（web）
@@ -88,10 +91,10 @@ modules/order/
 - **多端变更清单**：修改销售单的字段、校验、计算或交互时，按序核对——`packages/shared`（schema / 计算纯函数）→ `apps/server`（DTO / service）→ 重建契约（`gen:openapi` / `gen:client`）→ PC 表单 / 列表 / 详情（`components/order/sale-order-form.tsx`、`app/admin/sale-orders/**`）→ 移动端表单 / 列表 / 详情（`components/mobile/sale-order-form.tsx`、`app/m/sale-orders/**`）→ PC 与移动 E2E；移动端不展示编号等差异按 `product/order.md` 移动页口径处理，不可直接照搬 PC。
 - **PC 页面骨架**：新建 / 编辑 / 详情统一用 `components/admin/page-frame.tsx`——标题区与底部操作区固定、中间内容区滚动；表单的 `<form>` 包裹 `PageFrame`，保存按钮 `type="submit"` 放操作区；详情标题含单号 + 客户括注，编辑 / 打印 / 返回列表放操作区；详情明细表 `containerClassName="max-h-[420px] overflow-y-auto"` + 表头 sticky。
 - 列表页（`/admin/sale-orders`）：筛选 / 多选 / 排序 / 分页按列表页模式（组件拼装见 `design/平台布局.md` §1.5）；客户筛选项为下拉（数据源 customer 列表接口，含停用客户，按 `customerId` 下发），列显示 `customerName` 快照；排序参数随请求下发（sortBy / sortOrder），批量删除调 batch-delete；路由与菜单随菜单表（`design/平台布局.md` §1.3 静态配置）登记更新
-- 表单页：客户为下拉选择（数据源 customer 列表接口，只列启用客户；编辑历史单且其客户已停用或已删除时，用单据自带的 `customerId + customerName` 快照补一个选项并保持选中，不再请求客户档案，否则单据无法保存）；明细行动态增删（行操作 = 复制 / 删除，图标按钮）；复制为深拷贝当前行（去行 id，追加末尾，达 200 行禁用，新增行滚动到可见）；尺寸列顺序为长度、宽度、高度，均用文本输入 + `inputMode="numeric"`（整数毫米、不显示步进器），根数同样文本输入，计价方式下拉（按方量 / 按根数，最小宽度 `w-24`），单价标签随计价方式切换为「元/m³」或「元/根」；小计金额两种方式下均只读；输入时实时调用 `packages/shared` 计算纯函数显示方量 / 小计 / 合计（与服务端落账同源）；面包屑标识经 `usePageCrumb` 注入壳（新建 =「新建」；编辑 =「单号 / 编辑」，单号链接回详情）
+- 表单页：客户为下拉选择（数据源 customer 列表接口，只列启用客户；编辑历史单且其客户已停用或已删除时，用单据自带的 `customerId + customerName` 快照补一个选项并保持选中，不再请求客户档案，否则单据无法保存）；新增结算区 = 结算方式（赊销 / 现结，默认赊销）+ 现结时的收款账户（只列启用账户）与实收金额（默认合计、可改，显示差额）；明细行动态增删（行操作 = 复制 / 删除，图标按钮）；复制为深拷贝当前行（去行 id，追加末尾，达 200 行禁用，新增行滚动到可见）；尺寸列顺序为长度、宽度、高度，均用文本输入 + `inputMode="numeric"`（整数毫米、不显示步进器），根数同样文本输入，计价方式下拉（按方量 / 按根数，最小宽度 `w-24`），单价标签随计价方式切换为「元/m³」或「元/根」；小计金额两种方式下均只读；输入时实时调用 `packages/shared` 计算纯函数显示方量 / 小计 / 合计（与服务端落账同源）；面包屑标识经 `usePageCrumb` 注入壳（新建 =「新建」；编辑 =「单号 / 编辑」，单号链接回详情）
 - 保存：整单提交（主表 + 明细，明细不含 `productType`），服务端固定写入方木、重算校验后落账并回传；服务端经 customer 公开接口校验客户启用态，客户未变更的更新不校验
-- 详情页：只读展示 + 编辑入口；信息条展示客户编号与名称快照、产品类型（方木）；客户档案已删除时编号后缀标注「已删除」；明细单价按行标注「元/m³」或「元/根」，不单列计价方式；面包屑标识经 `usePageCrumb` 注入壳（单号）
-- 移动页（移动 Web `/m`，ADR-011）：路由 `/m`（入口卡片）、`/m/sale-orders`（搜索 + 卡片列表 + 加载更多；搜索按 `customerName` 模糊，回车即查、查询后回第 1 页并清空已加载数据；卡片层级 = 销售日期大号 + 客户名称在上、合计方量 + 合计金额在下；统一使用 `components/mobile/list.tsx` 的搜索框 / 卡片 / 加载更多 / 空态）、`/m/sale-orders/new`、`/m/sale-orders/[id]`（详情）、`/m/sale-orders/[id]/edit`；**移动端不展示销售单编号、客户编号与明细编码**（PC 与打印单据保留，接口字段不删）；详情页在明细下方提供「删除销售单」（`order:manage` 才渲染，`useConfirm` 二次确认，`DELETE /api/v1/sale-orders/{id}` 成功后 `router.replace('/m/sale-orders')`）；壳用 `components/mobile/mobile-shell.tsx`（`data-mode="mobile"`，无侧边栏 / 标签页 / 面包屑），页面自带底部固定操作条；表单组件 `components/mobile/sale-order-form.tsx` 为新建 / 编辑共用，状态与校验沿用 PC 表单口径（`saleOrderUpdateSchema`、`calcVolumeM3` / `calcLineAmount` / `calcOrderTotals` 同源），明细逐行卡片、行内两列栅格、数字字段 `inputMode="numeric"`；保存成功跳 `/m/sale-orders/{id}`；不新增后端接口
+- 详情页：只读展示 + 编辑入口；信息条展示客户编号与名称快照、结算方式（现结附实收金额与收款账户）、产品类型（方木）；客户档案已删除时编号后缀标注「已删除」；明细单价按行标注「元/m³」或「元/根」，不单列计价方式；面包屑标识经 `usePageCrumb` 注入壳（单号）
+- 移动页（移动 Web `/m`，ADR-011）：路由 `/m`（入口卡片）、`/m/sale-orders`（搜索 + 卡片列表 + 加载更多；搜索按 `customerName` 模糊，回车即查、查询后回第 1 页并清空已加载数据；卡片层级 = 销售日期大号 + 客户名称在上、合计方量 + 合计金额在下；统一使用 `components/mobile/list.tsx` 的搜索框 / 卡片 / 加载更多 / 空态）、`/m/sale-orders/new`、`/m/sale-orders/[id]`（详情）、`/m/sale-orders/[id]/edit`；**移动端支持现结**：结算方式用整行分段按钮（赊销 / 现结，`h-12`、选中实心），现结展开收款账户下拉（取 `/finance/accounts` 启用项，控件 `h-12`；仅一个启用账户时自动选中）与实收金额输入（`inputMode="decimal"`，默认合计，`receivedTouched` 后才采用手填值，与 PC 同逻辑），差额经 `calcSettlementDifference` 计算后转白话文案（正数为「抹零 N 元」、负数为「预收 N 元」）；切回赊销清空账户与实收；提交时按结算方式裁剪 body（非现结时 `settleAccountId` / `receivedAmount` 传 null）；移动详情展示结算方式，现结时附收款账户、实收金额与差额；**移动端不展示销售单编号、客户编号与明细编码**（PC 与打印单据保留，接口字段不删）；详情页在明细下方提供「删除销售单」（`order:manage` 才渲染，`useConfirm` 二次确认，`DELETE /api/v1/sale-orders/{id}` 成功后 `router.replace('/m/sale-orders')`）；壳用 `components/mobile/mobile-shell.tsx`（`data-mode="mobile"`，无侧边栏 / 标签页 / 面包屑），页面自带底部固定操作条；表单组件 `components/mobile/sale-order-form.tsx` 为新建 / 编辑共用，状态与校验沿用 PC 表单口径（`saleOrderUpdateSchema`、`calcVolumeM3` / `calcLineAmount` / `calcOrderTotals` 同源），明细逐行卡片、行内两列栅格、数字字段 `inputMode="numeric"`；保存成功跳 `/m/sale-orders/{id}`；不新增后端接口
 
 ## 8. 打印实现（web）
 
@@ -103,6 +106,7 @@ modules/order/
 - **打印隔离**：点击打印创建隐藏 iframe，复制主文档 `<style>` 与 `link[rel=stylesheet]`，注入 `@page { size: A4; margin: 12mm 10mm }`、`thead { display: table-header-group }`、`tr { break-inside: avoid }` 等规则，用 `createRoot` 渲染同一模板后调用 `iframe.contentWindow.print()`；`afterprint` 后卸载并移除 iframe，打印样式不写入主文档
 - **打印提示**：弹窗操作栏提示「如出现浏览器页眉页脚（时间、网址等），请在打印对话框中取消勾选页眉和页脚」；页面不尝试用 CSS 关闭浏览器页眉页脚（避免多页贴边）
 - **数据**：复用详情查询 `['sale-order', id]` 的已加载数据，打印端只展示、不重算；客户档案已删除时名称后标注「已删除」
+- **打印审计**：新增 `POST /api/v1/sale-orders/{id}/print-events`（`order:view`），仅写审计、无业务副作用；接口加 `@AuditAction({ domain: 'order', action: 'print', label: '打印销售单', objectType: 'sale_order' })`，由全局审计拦截器落库；`PrintPreviewDialog` 在点击「打印」时调用，失败不阻塞打印，打开预览不记录
 - **验证**：E2E 在详情页打开打印弹窗，断言单号、客户、明细与合计可见、A4 模板容器存在，ESC 可关闭；实际打印效果以浏览器打印预览与「另存为 PDF」人工验收（A4 分页、表头重复、单行不截断）
 
 ---
@@ -153,6 +157,20 @@ modules/order/
 | 位置 | 类型 | 原本 | 现在 | 原因 |
 | --- | --- | --- | --- | --- |
 | 7 前端实现节 · PC 页面骨架 | 新增 | 新建/编辑/详情各自 `space-y-4`，标题、内容与操作区同处一个滚动文档流 | 新增 `components/admin/page-frame.tsx`：标题区与底部操作区固定、内容区独立滚动；销售单新建/编辑/详情接入；详情明细表限高 420px + 内滚 + sticky 表头 | 落地产品文档「表单页与详情页共用骨架」；长明细不再把标题与操作区顶出视口 |
+
+### v20261112
+
+| 位置 | 类型 | 原本 | 现在 | 原因 |
+| --- | --- | --- | --- | --- |
+| 8 打印实现 | 新增 | 打印无审计记录 | 新增 `POST /api/v1/sale-orders/{id}/print-events`（`order:view`），仅写审计、无业务副作用；点击打印时调用，失败不阻塞打印，打开预览不记录 | 落地 `product/审计日志.md` R-审计-001：打印纳入操作审计 |
+| 2 数据模型 / 3 计算规则 / 5 接口 / 6 边界 / 7 前端 | 修改 | 销售单只有赊销，收款由 finance 单独登记 | 增加结算方式、实收金额、收款账户快照；现结收入 = 实收、赊销 = 合计；create/update 同事务调用 finance 生成收入事件 + 收款流水；PC 表单 / 详情增加结算信息；移动端本轮固定赊销 | 一次录入、另一侧自动派生，消除销售单与流水重复录入；抹零按实收确认 |
+
+### v20261113
+
+| 位置 | 类型 | 原本 | 现在 | 原因 |
+| --- | --- | --- | --- | --- |
+| 3 计算规则 / 5 接口清单 / 6 后置边界 | 修改 | 现结同事务生成收入事件 + 收款流水；结算字段同步收入事件与收款流水 | 现结只生成收款流水（分类 = 销售回款）；赊销不生成流水；结算字段只同步收款流水 | 财务改为资金流水单轨制，业务发生台账下线 |
+| 7 前端实现节 · 移动页 | 修改 | 移动端固定按赊销保存，结算在 PC 处理 | 移动表单增加结算方式分段按钮与现结三字段（账户下拉、实收、白话差额）；详情展示结算三值；提交按结算方式裁剪 body | 移动端需要现场收现金；契约已支持，无需后端改动 |
 
 ---
 

@@ -35,6 +35,7 @@ describe('订单接口（契约/集成）', () => {
     customerId,
     otherAmount: '0',
     note: '集成测试单',
+    settlementMode: 'credit',
     items: [
       {
         lengthMm: 300,
@@ -83,12 +84,12 @@ describe('订单接口（契约/集成）', () => {
   });
 
   afterAll(async () => {
-    // 订单创建会联动生成财务事件（design/finance.md §6），先按源单清理再删订单
+    // 现结订单会联动生成收款流水（design/finance.md §6），先按源单清理再删订单
     const orders = await prisma.client.saleOrder.findMany({
       where: { customerId },
       select: { id: true },
     });
-    await prisma.client.financeEvent.deleteMany({
+    await prisma.client.financeCashEntry.deleteMany({
       where: { sourceType: 'sale_order', sourceId: { in: orders.map((row) => row.id) } },
     });
     await prisma.client.saleOrder.deleteMany({ where: { customerId } });

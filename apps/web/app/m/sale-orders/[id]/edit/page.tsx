@@ -39,10 +39,10 @@ export default function MobileSaleOrderEditPage(): React.ReactElement {
   }, [params.id]);
 
   if (error) {
-    return <p className="p-4 text-base text-destructive">{error}</p>;
+    return <p className="p-4 text-mobile-body text-destructive">{error}</p>;
   }
   if (!initial) {
-    return <p className="p-4 text-base text-muted-foreground">加载中…</p>;
+    return <p className="p-4 text-mobile-body text-muted-foreground">加载中…</p>;
   }
   return <MobileSaleOrderForm orderId={params.id} initial={initial} />;
 }

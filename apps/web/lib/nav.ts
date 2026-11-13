@@ -1,9 +1,10 @@
 import {
+  ArrowLeftRightIcon,
   BarChart3Icon,
   ContactIcon,
   FileTextIcon,
   HomeIcon,
-  ReceiptTextIcon,
+  ScrollTextIcon,
   ShoppingCartIcon,
   UserCogIcon,
   UsersIcon,
@@ -65,7 +66,7 @@ export const navGroups: NavGroup[] = [
     domain: 'finance',
     icon: WalletIcon,
     items: [
-      { title: '财务台账', icon: ReceiptTextIcon, href: '/admin/finance/events', scope: 'finance:view' },
+      { title: '资金流水', icon: ArrowLeftRightIcon, href: '/admin/finance/cash', scope: 'finance:view' },
       { title: '收支汇总', icon: BarChart3Icon, href: '/admin/finance/summary', scope: 'finance:view' },
     ],
   },
@@ -74,6 +75,7 @@ export const navGroups: NavGroup[] = [
 // 平台机制页面：不占侧边业务分组，入口在顶栏头像下拉（product/平台布局.md 权限可见性）
 export const platformNavItems: NavItem[] = [
   { title: '账号管理', icon: UserCogIcon, href: '/admin/users', scope: 'account:manage' },
+  { title: '审计日志', icon: ScrollTextIcon, href: '/admin/audit-logs', scope: 'audit:view' },
 ];
 
 // 按角色过滤侧边菜单：无可见项的分组不渲染
@@ -116,6 +118,9 @@ export function findNavByPath(pathname: string): NavMatch | null {
 export function scopeForPath(pathname: string): Scope | null {
   if (pathname === '/admin/users') {
     return 'account:manage';
+  }
+  if (pathname.startsWith('/admin/audit-logs')) {
+    return 'audit:view';
   }
   if (pathname.startsWith('/admin/sale-orders')) {
     return /^\/admin\/sale-orders\/(new|[^/]+\/edit)$/.test(pathname)

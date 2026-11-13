@@ -82,8 +82,8 @@ model RefreshToken {
 }
 
 // ── 审计（server 全局基础设施，技术方案 §8.5 / §5.2 事件日志模式）────
-// 全量写操作的审计日志：主体、时间、对象、动作、结果；审计日志只增、不可篡改。
-// 归属：横切中间件（common/audit），不属任何业务模块（技术方案 §1.1）。
+// 操作审计日志：主体、时间、对象、动作、结果、终端；审计日志只增、不可篡改。
+// 归属：audit 模块（modules/audit）；采集由 common 审计拦截器与 auth 显式调用写入。
 
 model EventLog {
   id        String   @id @default(uuid()) @db.Uuid
@@ -95,19 +95,33 @@ model EventLog {
   // 操作主体（登录后写入 user id；匿名操作如登录失败为 null）
   actorId       String? @map("actor_id")
   actorUsername String? @map("actor_username")
-  // 领域 + 动作：由请求路径解析（如 /api/v1/auth/login → auth / login）
-  domain  String  @map("domain")
-  action  String  @map("action")
-  // 操作对象（如改密对象为账号 id）
+  // 操作发生时的角色快照
+  actorRole String? @map("actor_role")
+  // 领域 + 动作（动作标识机器可读，动作名为中文展示）
+  domain      String  @map("domain")
+  action      String  @map("action")
+  actionLabel String? @map("action_label")
+  // 操作对象（如改密对象为账号 id；对象编号为业务编号快照）
   objectType String? @map("object_type")
   objectId   String? @map("object_id")
-  // 结果：ok / error / forbidden 等
-  result String @map("result")
-  // 附加上下文（不含敏感信息）
-  payload Json? @map("payload")
+  objectCode String? @map("object_code")
+  // 结果：ok / failed（旧记录可能为状态码或 error）
+  result     String  @map("result")
+  statusCode Int?    @map("status_code")
+  errorCode  String? @map("error_code")
+  // 请求与终端上下文（不含敏感信息）
+  method    String? @map("method")
+  path      String? @map("path")
+  ip        String? @map("ip")
+  userAgent String? @map("user_agent")
+  requestId String? @map("request_id")
+  payload   Json?   @map("payload")
 
   @@index([createdAt])
   @@index([actorId])
+  @@index([tenantId, createdAt])
+  @@index([actorId, createdAt])
+  @@index([domain, action])
   @@map("event_logs")
 }
 
@@ -165,6 +179,14 @@ enum SaleOrderPricingMode {
   @@map("sale_order_pricing_mode")
 }
 
+enum SaleOrderSettlementMode {
+  // 结算方式：赊销（默认）/ 现结；现结时同事务生成收入事件 + 收款流水
+  CREDIT
+  SETTLED
+
+  @@map("sale_order_settlement_mode")
+}
+
 model SaleOrder {
   id        String   @id @default(uuid()) @db.Uuid
   tenantId  String   @default("default") @map("tenant_id")
@@ -185,6 +207,11 @@ model SaleOrder {
   otherAmount    Decimal @default(0) @map("other_amount") @db.Decimal(18, 2)
   totalAmount    Decimal @map("total_amount") @db.Decimal(18, 2)
   note           String  @default("") @map("note")
+
+  // 结算：合计金额仍为原价；现结实收默认等于合计、可抹零 / 约整
+  settlementMode SaleOrderSettlementMode @default(CREDIT) @map("settlement_mode")
+  receivedAmount Decimal                 @default(0) @map("received_amount") @db.Decimal(18, 2)
+  settleAccountId String?                @db.Uuid @map("settle_account_id")
 
   items SaleOrderItem[]
 
@@ -228,53 +255,125 @@ model SaleOrderItem {
 }
 
 // ── 财务领域（finance，design/finance.md §2）────────────────
-// 业务发生台账：单式流水，一笔业务一条事件，金额有符号（收入正、支出负）。
-// 管理会计口径，不做复式记账（product/finance.md R-财务-001 口径声明）。
-// 自动事件（销售收入）由订单域在同一事务内经 FinanceService 写入，源单唯一约束防重复。
+// 资金流水单轨制：一笔钱一条流水，方向与收支分类表明性质。
+// 管理会计口径，不做复式记账（product/finance.md 口径声明）。
+// 销售单现结由订单域在同一事务内经 FinanceService 派生收款流水，源单唯一约束防重复。
 
-enum FinanceEventCategory {
-  // 收入类为正；成本 / 费用类为负（符号由服务端按分类规范化）
-  SALES_REVENUE
+enum FinanceCashCategory {
+  // 收款（IN）
+  SALES_RECEIPT
   OTHER_REVENUE
-  PURCHASE_COST
+  LOAN_IN
+  // 付款（OUT）
+  PURCHASE_PAYMENT
   LABOR_COST
-  OTHER_EXPENSE
+  OPERATING_EXPENSE
+  ASSET_PURCHASE
+  LOAN_REPAY
 
-  @@map("finance_event_category")
+  @@map("finance_cash_category")
 }
 
-enum FinanceEventSource {
-  // AUTO：由业务单据自动生成（当前仅销售单 → 销售收入）；MANUAL：手工记账
-  AUTO
-  MANUAL
+// ── 资金收付与固定资产（product/finance.md R-财务-002 / R-财务-003）──
+// 收款不是收入，付款不是成本；收支分类决定是否计入经营收支。
+// 账户余额 = 期初 + 收款 − 付款 + 转入 − 转出；内部转账不计入收支统计。
 
-  @@map("finance_event_source")
+enum FinanceAccountKind {
+  // 对公 / 对私（原「票据」类型取消，承兑汇票改为对公下的渠道）
+  CORPORATE
+  PERSONAL
+
+  @@map("finance_account_kind")
 }
 
-model FinanceEvent {
-  id        String   @id @default(uuid()) @db.Uuid
-  tenantId  String   @default("default") @map("tenant_id")
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+enum FinanceAccountChannel {
+  BANK
+  WECHAT
+  ALIPAY
+  CASH
+  BILL
+
+  @@map("finance_account_channel")
+}
+
+enum FinanceCashDirection {
+  IN
+  OUT
+  TRANSFER
+
+  @@map("finance_cash_direction")
+}
+
+enum FinanceCashMethod {
+  BANK
+  WECHAT
+  ALIPAY
+  CASH
+  ACCEPTANCE
+
+  @@map("finance_cash_method")
+}
+
+model FinanceAccount {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @default("default") @map("tenant_id")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
   deletedAt DateTime? @map("deleted_at")
 
-  // 事件编号：FN + 连字符 + 5 位全局流水（如 FN-00001），只读、永不复用（1-产品文档.md 五）
+  // 账户编号：AC + 连字符 + 5 位全局流水（1-产品文档.md 五）
+  code           String               @map("code")
+  name           String               @map("name")
+  kind           FinanceAccountKind   @default(CORPORATE) @map("kind")
+  channel        FinanceAccountChannel @default(BANK) @map("channel")
+  openingBalance Decimal              @default(0) @map("opening_balance") @db.Decimal(18, 2)
+  active         Boolean              @default(true) @map("active")
+
+  entries   FinanceCashEntry[] @relation("CashEntryAccount")
+  transfers FinanceCashEntry[] @relation("CashEntryToAccount")
+
+  @@unique([tenantId, code])
+  @@index([name])
+  @@map("finance_accounts")
+}
+
+model FinanceCashEntry {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @default("default") @map("tenant_id")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at")
+
+  // 流水编号：CF + 连字符 + 5 位全局流水（1-产品文档.md 五）
   code         String               @map("code")
+  direction    FinanceCashDirection @map("direction")
   occurredDate DateTime             @map("occurred_date") @db.Date
-  category     FinanceEventCategory @map("category")
-  // 有符号金额（收入正、支出负），2 位小数
+  // 金额：正数，方向由 direction 决定
   amount       Decimal              @map("amount") @db.Decimal(18, 2)
+  accountId    String               @map("account_id") @db.Uuid
+  account      FinanceAccount       @relation("CashEntryAccount", fields: [accountId], references: [id])
+  // 内部转账的转入账户
+  toAccountId  String?              @map("to_account_id") @db.Uuid
+  toAccount    FinanceAccount?      @relation("CashEntryToAccount", fields: [toAccountId], references: [id])
+  // 收款挂客户（不挂销售单）；付款对象写入备注
+  customerId   String?              @map("customer_id") @db.Uuid
+  customerName String               @default("") @map("customer_name")
+  // 方式由账户渠道推导，不单独录入
+  method       FinanceCashMethod    @default(BANK) @map("method")
+  // 收支分类：收款 / 付款必填，内部转账为 NULL；决定是否计入经营收支
+  category     FinanceCashCategory? @map("category")
   note         String               @default("") @map("note")
-  source       FinanceEventSource   @default(MANUAL) @map("source")
-  // 源单：自动事件记录销售单类型 / id / 编号；手工事件为空
+  // 源单：当前仅销售单现结派生；手工流水三列为 NULL
   sourceType   String?              @map("source_type")
   sourceId     String?              @db.Uuid @map("source_id")
   sourceCode   String?              @map("source_code")
 
   @@unique([tenantId, code])
-  // 源单唯一：同一单据只生成一条事件（手工事件三列为 NULL，唯一索引允许多个 NULL）
+  // 同一源单最多派生一条流水（手工流水三列 NULL，唯一索引允许多个 NULL）
   @@unique([tenantId, sourceType, sourceId])
   @@index([occurredDate])
+  @@index([accountId])
+  @@index([customerId])
   @@index([category])
-  @@map("finance_events")
+  @@map("finance_cash_entries")
 }

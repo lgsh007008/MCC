@@ -32,7 +32,7 @@ function MobileField({
 }): React.ReactElement {
   return (
     <div className="space-y-1.5">
-      <Label htmlFor={htmlFor} className="text-sm text-muted-foreground">
+      <Label htmlFor={htmlFor} className="text-mobile-label text-muted-foreground">
         {label}
       </Label>
       {children}
@@ -115,10 +115,10 @@ export function MobileCustomerForm({
                 value={name}
                 onChange={(event) => setName(event.target.value)}
                 onBlur={() => void checkDuplicate(name)}
-                className="h-12 text-base"
+                className="h-12 text-mobile-body"
               />
               {duplicateName ? (
-                <p className="text-sm text-muted-foreground">已存在同名客户，可继续保存</p>
+                <p className="text-mobile-caption text-muted-foreground">已存在同名客户，可继续保存</p>
               ) : null}
             </MobileField>
 
@@ -128,7 +128,7 @@ export function MobileCustomerForm({
                 value={contact}
                 onChange={(event) => setContact(event.target.value)}
                 placeholder="电话等，可分行填写"
-                className="h-12 text-base"
+                className="h-12 text-mobile-body"
               />
             </MobileField>
 
@@ -137,7 +137,7 @@ export function MobileCustomerForm({
                 id="mobileCustomerNote"
                 value={note}
                 onChange={(event) => setNote(event.target.value)}
-                className="min-h-12 text-base"
+                className="min-h-12 text-mobile-body"
               />
             </MobileField>
           </section>
@@ -148,7 +148,7 @@ export function MobileCustomerForm({
         <div className="fixed inset-x-0 bottom-[76px] z-30 mx-auto w-full max-w-[560px] px-4">
           <p
             role="alert"
-            className="rounded-lg border border-destructive/40 bg-background p-3 text-base text-destructive"
+            className="rounded-lg border border-destructive/40 bg-background p-3 text-mobile-body text-destructive"
           >
             {error}
           </p>
@@ -159,7 +159,7 @@ export function MobileCustomerForm({
         <Button
           type="submit"
           form="mobile-customer-form"
-          className="h-12 w-full text-base"
+          className="h-12 w-full text-mobile-body"
           disabled={submitting}
         >
           {submitting ? '保存中…' : '保存'}

@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ChevronRightIcon } from 'lucide-react';
 import { buttonVariants } from '@/components/ui/button';
 import { useCan } from '@/components/auth/permission-context';
 import {
@@ -100,7 +99,7 @@ export default function MobileCustomersPage(): React.ReactElement {
         canManage ? (
           <Link
             href="/m/customers/new"
-            className={cn(buttonVariants(), 'h-12 flex-1 text-base')}
+            className={cn(buttonVariants(), 'h-12 flex-1 text-mobile-body')}
           >
             新建客户
           </Link>
@@ -118,22 +117,13 @@ export default function MobileCustomersPage(): React.ReactElement {
       ) : null}
 
       {items.map((customer) => (
-        <MobileListCard key={customer.id} href={`/m/customers/${customer.id}`}>
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="truncate text-lg font-medium">{customer.name}</p>
-              <p className="mt-1 truncate text-base text-muted-foreground">
-                {customer.contact || '未填写联系信息'}
-              </p>
-            </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <span className="rounded border border-border px-2 py-0.5 text-xs text-muted-foreground">
-                {customer.status === 'active' ? '启用' : '停用'}
-              </span>
-              <ChevronRightIcon className="size-5 text-muted-foreground" />
-            </div>
-          </div>
-        </MobileListCard>
+        <MobileListCard
+          key={customer.id}
+          href={`/m/customers/${customer.id}`}
+          topRight={customer.status === 'active' ? '启用' : '停用'}
+          title={customer.name}
+          subtitle={customer.contact || '未填写联系信息'}
+        />
       ))}
 
       {hasMore ? (

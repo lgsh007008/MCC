@@ -83,6 +83,9 @@ interface ListRow {
   otherAmount: Prisma.Decimal;
   totalAmount: Prisma.Decimal;
   note: string;
+  settlementMode: 'CREDIT' | 'SETTLED';
+  receivedAmount: Prisma.Decimal;
+  settleAccountId: string | null;
 }
 
 interface DetailOrder extends ListRow {
@@ -139,6 +142,9 @@ export class OrderService {
       otherAmount: money(row.otherAmount.toString()),
       totalAmount: money(row.totalAmount.toString()),
       note: row.note,
+      settlementMode: row.settlementMode === 'SETTLED' ? 'settled' : 'credit',
+      receivedAmount: money(row.receivedAmount.toString()),
+      settleAccountId: row.settleAccountId,
     };
   }
 
@@ -206,6 +212,9 @@ export class OrderService {
           otherAmount: true,
           totalAmount: true,
           note: true,
+          settlementMode: true,
+          receivedAmount: true,
+          settleAccountId: true,
         },
       }),
       // 合计行：对筛选全量 aggregate（排除分页），由接口返回而非前端本地加（页面模式规范）
@@ -229,6 +238,18 @@ export class OrderService {
       },
       items: rows.map((row) => this.toListItem(row)),
     };
+  }
+
+  // 打印审计只需要编号快照；不存在 / 已删单返回 404，不暴露其他字段。
+  async codeOf(id: string): Promise<string> {
+    const order = await this.prisma.client.saleOrder.findFirst({
+      where: { id, deletedAt: null },
+      select: { code: true },
+    });
+    if (!order) {
+      throw problem(404, 'NOT_FOUND', '销售单不存在');
+    }
+    return order.code;
   }
 
   async detail(id: string): Promise<SaleOrderDto> {
@@ -268,6 +289,8 @@ export class OrderService {
       try {
         const order = await this.prisma.client.$transaction(async (tx) => {
           const code = await this.nextCode(tx);
+          const settled = input.settlementMode === 'settled';
+          const receivedAmount = settled ? input.receivedAmount ?? totals.totalAmount : '0.00';
           const created = await tx.saleOrder.create({
             data: {
               code,
@@ -279,6 +302,9 @@ export class OrderService {
               otherAmount: money(input.otherAmount),
               totalAmount: totals.totalAmount,
               note: input.note,
+              settlementMode: settled ? 'SETTLED' : 'CREDIT',
+              receivedAmount,
+              settleAccountId: settled ? input.settleAccountId ?? null : null,
             },
           });
           await tx.saleOrderItem.createMany({
@@ -298,14 +324,22 @@ export class OrderService {
               note: item.note,
             })),
           });
-          // 财务联动（design/finance.md §6）：同事务内生成销售收入事件，失败则整单回滚
-          await this.finance.syncSaleOrderEvent(tx, {
-            orderId: created.id,
-            code: created.code,
-            saleDate: input.saleDate,
-            totalAmount: totals.totalAmount,
-            customerName: customer.name,
-          });
+          // 财务联动（design/finance.md §6）：仅现结时同事务生成收款流水，失败则整单回滚
+          if (settled && input.settleAccountId) {
+            await this.finance.syncSourceCashEntry(tx, {
+              sourceType: 'sale_order',
+              sourceId: created.id,
+              sourceCode: created.code,
+              direction: 'in',
+              category: 'sales_receipt',
+              occurredDate: input.saleDate,
+              amount: receivedAmount,
+              accountId: input.settleAccountId,
+              customerId: customer.id,
+              customerName: customer.name,
+              note: `销售单 ${created.code}`,
+            });
+          }
           return created;
         });
         return this.detail(order.id);
@@ -371,6 +405,8 @@ export class OrderService {
     });
 
     await this.prisma.client.$transaction(async (tx) => {
+      const settled = input.settlementMode === 'settled';
+      const receivedAmount = settled ? input.receivedAmount ?? totals.totalAmount : '0.00';
       await tx.saleOrder.updateMany({
         where: { id },
         data: {
@@ -382,6 +418,9 @@ export class OrderService {
           otherAmount: money(input.otherAmount),
           totalAmount: totals.totalAmount,
           note: input.note,
+          settlementMode: settled ? 'SETTLED' : 'CREDIT',
+          receivedAmount,
+          settleAccountId: settled ? input.settleAccountId ?? null : null,
         },
       });
 
@@ -416,14 +455,24 @@ export class OrderService {
         });
       }
 
-      // 财务联动（design/finance.md §6）：销售单编辑同步收入事件的日期 / 金额 / 备注
-      await this.finance.syncSaleOrderEvent(tx, {
-        orderId: id,
-        code: existing.code,
-        saleDate: input.saleDate,
-        totalAmount: totals.totalAmount,
-        customerName: customer.name,
-      });
+      // 财务联动（design/finance.md §6）：现结同步收款流水，改为赊销则软删
+      if (settled && input.settleAccountId) {
+        await this.finance.syncSourceCashEntry(tx, {
+          sourceType: 'sale_order',
+          sourceId: id,
+          sourceCode: existing.code,
+          direction: 'in',
+          category: 'sales_receipt',
+          occurredDate: input.saleDate,
+          amount: receivedAmount,
+          accountId: input.settleAccountId,
+          customerId: customer.id,
+          customerName: customer.name,
+          note: `销售单 ${existing.code}`,
+        });
+      } else {
+        await this.finance.removeSourceCashEntries(tx, 'sale_order', [id]);
+      }
     });
 
     return this.detail(id);

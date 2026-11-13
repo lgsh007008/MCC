@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z, type RefinementCtx } from 'zod';
 import { paginationQuerySchema } from './pagination.schemas';
 
 // 订单领域的边界校验 schema（design/order.md）：前后端共用同一份，
@@ -47,16 +47,47 @@ const saleOrderBaseFields = {
   note: z.string().trim().max(500).default(''),
 };
 
-export const saleOrderInputSchema = z.object({
-  ...saleOrderBaseFields,
-  items: z.array(saleOrderItemSchema).min(1, '至少一行明细').max(200),
-});
+export const saleOrderSettlementModeSchema = z.enum(['credit', 'settled']);
+export type SaleOrderSettlementModeValue = z.infer<typeof saleOrderSettlementModeSchema>;
+
+const settlementReceivedSchema = z
+  .string()
+  .regex(decimal2Re, '实收金额须为非负数、最多 2 位小数')
+  .refine((value) => !/^0+(\.0{1,2})?$/.test(value), { message: '实收金额必须大于 0' });
+
+const settlementFields = {
+  // 结算方式：赊销（默认）/ 现结；现结时同事务生成收款流水
+  settlementMode: saleOrderSettlementModeSchema.default('credit'),
+  settleAccountId: z.string().uuid().nullable().optional(),
+  // 实收金额：现结时默认等于合计，可抹零 / 约整；赊销忽略
+  receivedAmount: settlementReceivedSchema.nullable().optional(),
+};
+
+function refineSettlement(
+  value: { settlementMode?: 'credit' | 'settled'; settleAccountId?: string | null },
+  ctx: RefinementCtx,
+): void {
+  if (value.settlementMode === 'settled' && !value.settleAccountId) {
+    ctx.addIssue({ code: 'custom', message: '现结须选择收款账户', path: ['settleAccountId'] });
+  }
+}
+
+export const saleOrderInputSchema = z
+  .object({
+    ...saleOrderBaseFields,
+    ...settlementFields,
+    items: z.array(saleOrderItemSchema).min(1, '至少一行明细').max(200),
+  })
+  .superRefine(refineSettlement);
 export type SaleOrderInput = z.infer<typeof saleOrderInputSchema>;
 
-export const saleOrderUpdateSchema = z.object({
-  ...saleOrderBaseFields,
-  items: z.array(saleOrderItemUpdateSchema).min(1, '至少一行明细').max(200),
-});
+export const saleOrderUpdateSchema = z
+  .object({
+    ...saleOrderBaseFields,
+    ...settlementFields,
+    items: z.array(saleOrderItemUpdateSchema).min(1, '至少一行明细').max(200),
+  })
+  .superRefine(refineSettlement);
 export type SaleOrderUpdateInput = z.infer<typeof saleOrderUpdateSchema>;
 
 // 列表可排序列（页面模式规范：表头正/倒序）

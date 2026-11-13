@@ -19,7 +19,7 @@ modules/customer/
 ```
 
 - `customer` 表归本模块（数据所有权，技术方案 §4.2）。
-- **累计下单方量不落在本模块**：由 order 域提供汇总接口，本领域只在页面消费（见 §6 接口引用），不读 order 的表、不建冗余列。
+- **累计下单方量、累计销售、累计收款、欠款都不落在本模块**：方量由 order 域提供汇总接口，应收三项由 finance 域提供批量接口，本领域只在页面消费（见 §6 接口引用），不读对方表、不建冗余列。
 
 ## 2. 数据模型概览
 
@@ -74,21 +74,22 @@ modules/customer/
 ## 6. 前端实现节（web）
 
 - 列表页（`/admin/customers`）：筛选 / 排序 / 分页按列表页模式（组件拼装见 `design/平台布局.md` §1.5）；首列多选与表头本页全选，翻页 / 改筛选 / 改排序清空选择；行操作 = 查看 / 编辑 / 停用（启用）/ 删除；选中后批量操作区出现批量启用 / 批量停用 / 批量删除，按钮可用性按「将有变更的行数」计算（为 0 时禁用），动作经 `useConfirm` 确认并在弹层内执行（design/平台布局.md §1.7）；单条停用与删除确认、单条启用直接执行；删除确认文案中的销售单数量取自 order 方量汇总接口的 `orderCount`，历史保留与编号不回收写入正文
+- **应收取数（引用 finance）**：与方量同一批 id 并行调用 `GET /api/v1/finance/receivables?customerIds=`（每批 ≤200）；列表只取 `outstanding` 一列（右对齐，负数显示「金额（预收）」），详情取 `sales` / `receipts` / `outstanding` 三项；不参与排序、不改变分页策略；接口失败时显示 `0.00`，不阻断列表加载
 - **累计方量排序的取数策略（受控例外，技术方案 §6.3）**：
   - 适用范围：仅客户列表页的「累计下单方量」列；其余列表页仍走服务端分页
   - 规模阈值：客户总数 ≤ 500 时，前端先探总数，再并行取全部页（每页 100），方量按每批 ≤200 个 id 调 order 汇总接口，合并后**客户端排序 + 客户端分页（20/页）**；排序对筛选后全量生效
   - 比较口径：方量以放大整数比较（禁浮点），并列时按创建日期倒序、编号升序兜底，保证翻页顺序稳定
   - 数量守卫：客户总数 > 500 时回退服务端分页，累计方量列禁用排序并提示；方量仍按当前页展示
   - 退出方案：达到阈值后改由 order 域（数据主人）提供「客户方量排行」查询接口——接收 customer 域给出的筛选后 id 集合，返回按方量排序的一页数据与总数；customer 页面只取当前页 20 条明细，客户端分页与本例外一并删除
-- 表单页：新建与编辑共用；名称失焦调 `name-check`，命中则显示「已存在同名客户」提示，不阻断保存；编号新建时不展示、编辑时只读展示；PC 页面用 `components/admin/page-frame.tsx`，标题由页面传入（新建客户 / 编辑客户 + 编号），保存 / 取消与错误提示放固定操作区，中间内容独立滚动
-- 详情页：只读展示 + 编辑入口；不嵌销售单列表（需求明确不做）；累计下单方量同列表页取数方式（单 id 调汇总接口）；PC 页面用 `PageFrame`，标题 = 名称 + 编号括注，编辑 / 返回列表放固定操作区，信息条与主体随内容区滚动
-- 移动页（移动 Web `/m`，ADR-011）：路由 `/m/customers`（列表）、`/m/customers/new`、`/m/customers/[id]`（详情）、`/m/customers/[id]/edit`；列表用 `components/mobile/list.tsx` 的 `MobileListPage` 骨架与共用件（搜索框按 `name` 模糊、卡片、加载更多、空态），`customer:manage` 时底部固定「新建客户」主按钮（与销售单同位置同形态）；详情复用 `GET /api/v1/customers/{id}`，启停用调 `PATCH /api/v1/customers/{id}/status`（停用 `useConfirm` 确认、启用直接执行），删除前调 `GET /api/v1/sale-orders/customer-volume-summary?customerIds=` 取 `orderCount` 写入确认文案，删除调 `DELETE /api/v1/customers/{id}` 后 `router.replace('/m/customers')`；表单组件 `components/mobile/customer-form.tsx` 新建 / 编辑共用，名称失焦调 `name-check` 提示重名但不阻断；**移动端不展示编号与累计方量、不解析拨号、不做批量**；权限：查看 `customer:view`、写操作 `customer:manage`
+- 表单页：新建与编辑共用；名称失焦调 `name-check`，命中则显示「已存在同名客户」提示，不阻断保存；编号字段始终渲染，新建时只读显示占位「系统生成」，编辑时只读显示真实编号；PC 页面用 `components/admin/page-frame.tsx`，标题由页面传入（新建客户 / 编辑客户 + 编号），保存 / 取消与错误提示放固定操作区，中间内容独立滚动
+- 详情页：只读展示 + 编辑入口；不嵌销售单列表（需求明确不做）；累计下单方量同列表页取数方式（单 id 调汇总接口），应收三项单 id 调 finance 批量应收接口（负数为预收）；PC 页面用 `PageFrame`，标题 = 名称 + 编号括注，编辑 / 返回列表放固定操作区，信息条与主体随内容区滚动
+- 移动页（移动 Web `/m`，ADR-011）：路由 `/m/customers`（列表）、`/m/customers/new`、`/m/customers/[id]`（详情）、`/m/customers/[id]/edit`；列表用 `components/mobile/list.tsx` 的 `MobileListPage` 骨架与共用件（搜索框按 `name` 模糊、卡片、加载更多、空态），`customer:manage` 时底部固定「新建客户」主按钮（与销售单同位置同形态）；详情复用 `GET /api/v1/customers/{id}`，启停用调 `PATCH /api/v1/customers/{id}/status`（停用 `useConfirm` 确认、启用直接执行），删除前调 `GET /api/v1/sale-orders/customer-volume-summary?customerIds=` 取 `orderCount` 写入确认文案，删除调 `DELETE /api/v1/customers/{id}` 后 `router.replace('/m/customers')`；表单组件 `components/mobile/customer-form.tsx` 新建 / 编辑共用，名称失焦调 `name-check` 提示重名但不阻断；**移动端不展示编号（累计四项展示：并发调 `sale-orders/customer-volume-summary` 取方量、`finance/receivables` 取销售 / 收款 / 欠款，与 PC 同源，失败降级为 0 且不阻塞页面）、不解析拨号、不做批量**；权限：查看 `customer:view`、写操作 `customer:manage`
 - 菜单与路由：`/admin/customers` 登记入 `product/平台布局.md` 菜单表，并在 `apps/web/lib/nav.ts` 增「客户」分组；路由与守卫结构见 `design/平台布局.md` §1.2
 
 ## 7. 与其他领域的边界
 
 - **order**：订单保存时经 customer 的公开接口 `assertSelectable` 校验客户存在且启用，不读 customer 表（技术方案 §4.2）；客户方量汇总接口由 order 提供（见 `design/order.md` 接口清单），customer 不重复实现
-- **finance**：收款与欠款归 finance，本轮不建；customer 不预留金额列，避免出现第二份真相
+- **finance**：应收（累计销售 / 累计收款 / 欠款）归 finance，经 `GET /api/v1/finance/receivables` 批量引用；customer 不预留金额列，避免出现第二份真相；收款挂客户的名称快照由 finance 经 `CustomerService.findById` 取得，不直读 customer 表
 
 ---
 
@@ -120,6 +121,20 @@ modules/customer/
 | 位置 | 类型 | 原本 | 现在 | 原因 |
 | --- | --- | --- | --- | --- |
 | 6 前端实现节 · 表单页 / 详情页 | 修改 | 表单、详情为整页滚动，标题与操作区随内容移动 | 新建 / 编辑 / 详情统一用 `PageFrame`：标题由页面传入，保存取消与编辑返回放固定操作区，内容区独立滚动 | 与 `design/平台布局.md` 页面骨架及销售单实现对齐 |
+
+### v20261112
+
+| 位置 | 类型 | 原本 | 现在 | 原因 |
+| --- | --- | --- | --- | --- |
+| 1 模块结构 / 6 前端实现节 / 7 边界 | 修改 | 应收三项不展示、不取数 | 列表与详情增「累计销售 / 累计收款 / 欠款」三列；列表与方量同批并行调 `GET /api/v1/finance/receivables`（每批 ≤200，失败显示 0.00，不参与排序）；详情单 id 调用；边界明确为引用 finance 接口、不建冗余列 | finance `R-财务-002` 落地，客户应收需在客户页可见 |
+| 6 前端实现节 · 表单页 | 修改 | 编号新建时不展示、编辑时只读展示 | 编号字段始终渲染：新建展示只读占位「系统生成」，编辑展示真实编号（只读）；移动端表单仍不展示编号 | 用户要求新建页恢复显示编号；新建尚无编号，用占位表达 |
+
+### v20261113
+
+| 位置 | 类型 | 原本 | 现在 | 原因 |
+| --- | --- | --- | --- | --- |
+| 6 前端实现节 · 应收取数 | 修改 | 列表与详情都取 `sales` / `receipts` / `outstanding` 三列 | 列表只取 `outstanding` 一列；详情仍取三项 | 客户列表列过多，日常只看欠款 |
+| 6 前端实现节 · 移动详情 | 修改 | 移动详情只取客户本体，不展示累计方量与应收 | 并发取 `customer-volume-summary` 与 `finance/receivables`，展示累计方量 / 销售 / 收款 / 欠款四项；失败降级为 0 | 现场需要看到欠款与累计交易额 |
 
 ---
 

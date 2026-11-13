@@ -23,6 +23,7 @@ import {
   type CustomerStatusInput,
   type CustomerUpdateInput,
 } from '@mcc/shared';
+import { AuditAction } from '../../common/decorators/audit-action.decorator.js';
 import { RequireScopes } from '../../common/decorators/require-scopes.decorator.js';
 import { ZodValidationPipe } from '../../common/zod-validation.pipe.js';
 import {
@@ -80,6 +81,7 @@ export class CustomerController {
 
   @Post()
   @RequireScopes('customer:manage')
+  @AuditAction({ domain: 'customer', action: 'create', label: '新建客户', objectType: 'customer' })
   @HttpCode(201)
   @ApiOperation({ summary: '新建客户（编号自动生成；重名只提示不阻断）' })
   @ApiBody({ type: CustomerBodyDto })
@@ -90,6 +92,7 @@ export class CustomerController {
 
   @Put(':id')
   @RequireScopes('customer:manage')
+  @AuditAction({ domain: 'customer', action: 'update', label: '编辑客户', objectType: 'customer' })
   @ApiOperation({ summary: '更新客户（名称、联系信息、备注）' })
   @ApiBody({ type: CustomerBodyDto })
   @ApiOkResponse({ type: CustomerDto })
@@ -102,6 +105,7 @@ export class CustomerController {
 
   @Patch(':id/status')
   @RequireScopes('customer:manage')
+  @AuditAction({ domain: 'customer', action: 'change-status', label: '切换客户状态', objectType: 'customer' })
   @ApiOperation({ summary: '启用 / 停用客户' })
   @ApiBody({ type: CustomerStatusBodyDto })
   @ApiOkResponse({ type: CustomerDto })
@@ -114,6 +118,7 @@ export class CustomerController {
 
   @Post('batch-status')
   @RequireScopes('customer:manage')
+  @AuditAction({ domain: 'customer', action: 'batch-status', label: '批量启停用客户', objectType: 'customer' })
   @HttpCode(200)
   @ApiOperation({ summary: '批量启用 / 停用客户（已是目标状态或已删的跳过，返回实际变更条数）' })
   @ApiBody({ type: CustomerBatchStatusBodyDto })
@@ -126,6 +131,7 @@ export class CustomerController {
 
   @Post('batch-delete')
   @RequireScopes('customer:manage')
+  @AuditAction({ domain: 'customer', action: 'batch-delete', label: '批量删除客户', objectType: 'customer' })
   @HttpCode(200)
   @ApiOperation({ summary: '批量删除客户（软删除；不存在 / 已删行静默跳过，返回删除条数）' })
   @ApiBody({ type: CustomerBatchDeleteBodyDto })
@@ -138,6 +144,7 @@ export class CustomerController {
 
   @Delete(':id')
   @RequireScopes('customer:manage')
+  @AuditAction({ domain: 'customer', action: 'delete', label: '删除客户', objectType: 'customer' })
   @HttpCode(204)
   @ApiOperation({ summary: '删除客户（软删除，编号不回收）' })
   async remove(@Param('id', ParseUUIDPipe) id: string): Promise<void> {

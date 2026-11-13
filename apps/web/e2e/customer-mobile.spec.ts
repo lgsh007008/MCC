@@ -41,6 +41,13 @@ test('手机端客户档案：新建 → 编辑 → 停用/启用 → 删除', a
   await expect(page).toHaveURL(/\/m\/customers\/[0-9a-f-]{36}$/);
   await expect(page.getByText(customerName)).toBeVisible();
 
+  // 四个累计（product/customer.md 移动详情）：新客户无单据 → 均为 0
+  await expect(page.getByText('累计下单方量', { exact: true })).toBeVisible();
+  await expect(page.getByText('0.0000 m³')).toBeVisible();
+  await expect(page.getByText('累计销售', { exact: true })).toBeVisible();
+  await expect(page.getByText('累计收款', { exact: true })).toBeVisible();
+  await expect(page.getByText('欠款', { exact: true })).toBeVisible();
+
   // 编辑
   await page.getByRole('link', { name: '编辑' }).click();
   await expect(page).toHaveURL(/\/edit$/);

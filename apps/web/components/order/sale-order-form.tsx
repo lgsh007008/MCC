@@ -6,6 +6,7 @@ import { CopyIcon, Trash2Icon } from 'lucide-react';
 import {
   calcLineAmount,
   calcOrderTotals,
+  calcSettlementDifference,
   calcVolumeM3,
   saleOrderUpdateSchema,
 } from '@mcc/shared';
@@ -56,6 +57,9 @@ export interface SaleOrderFormInitial {
   customerName: string;
   otherAmount: string;
   note: string;
+  settlementMode: 'credit' | 'settled';
+  settleAccountId?: string | null;
+  receivedAmount: string;
   items: Array<{
     id: string;
     lengthMm: number;
@@ -128,6 +132,13 @@ export function SaleOrderForm({
   const [saleDate, setSaleDate] = useState(initial?.saleDate ?? localToday());
   const [customerId, setCustomerId] = useState(initial?.customerId ?? '');
   const [customerOptions, setCustomerOptions] = useState<CustomerOption[]>([]);
+  const [settlementMode, setSettlementMode] = useState<'credit' | 'settled'>(
+    initial?.settlementMode ?? 'credit',
+  );
+  const [settleAccountId, setSettleAccountId] = useState(initial?.settleAccountId ?? '');
+  const [receivedAmount, setReceivedAmount] = useState(initial?.receivedAmount ?? '');
+  const [receivedTouched, setReceivedTouched] = useState(false);
+  const [accountOptions, setAccountOptions] = useState<Array<{ id: string; name: string }>>([]);
   const [otherAmount, setOtherAmount] = useState(initial?.otherAmount ?? '0');
   const [note, setNote] = useState(initial?.note ?? '');
   const [items, setItems] = useState<FormRow[]>(() =>
@@ -193,6 +204,30 @@ export function SaleOrderForm({
     };
   }, [initial?.customerId]);
 
+  // 现结收款账户：只列启用账户
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { data, response } = await api.GET('/api/v1/finance/accounts');
+        if (!cancelled && response.ok && data) {
+          setAccountOptions(
+            data.items
+              .filter((item) => item.active)
+              .map((item) => ({ id: item.id, name: item.name })),
+          );
+        }
+      } catch {
+        if (!cancelled) {
+          setAccountOptions([]);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const scrollDetailToEnd = (): void => {
     requestAnimationFrame(() => {
       const el = detailScrollRef.current;
@@ -256,6 +291,16 @@ export function SaleOrderForm({
     }),
     decimalOk(otherAmount, 2) ? otherAmount : '0.00',
   );
+  const settled = settlementMode === 'settled';
+  const effectiveReceived = settled
+    ? receivedTouched
+      ? receivedAmount
+      : totals.totalAmount
+    : '';
+  const settlementDiff =
+    settled && decimalOk(effectiveReceived, 2)
+      ? calcSettlementDifference(totals.totalAmount, effectiveReceived)
+      : '0.00';
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -265,6 +310,9 @@ export function SaleOrderForm({
       customerId,
       otherAmount: normalizeMoney(otherAmount),
       note,
+      settlementMode,
+      settleAccountId: settled ? settleAccountId || null : null,
+      receivedAmount: settled ? effectiveReceived : null,
       items: items.map((row) => ({
         id: row.id,
         lengthMm: row.lengthMm,
@@ -387,6 +435,53 @@ export function SaleOrderForm({
               className="min-h-8 w-full max-w-72"
             />
           </Field>
+          <Field label="结算方式" htmlFor="settlementMode">
+            <Select
+              id="settlementMode"
+              value={settlementMode}
+              onChange={(value) => setSettlementMode(value as 'credit' | 'settled')}
+              options={[
+                { value: 'credit', label: '赊销' },
+                { value: 'settled', label: '现结' },
+              ]}
+              className="w-40"
+            />
+          </Field>
+          {settled ? (
+            <>
+              <Field label="收款账户" htmlFor="settleAccountId">
+                <Select
+                  id="settleAccountId"
+                  value={settleAccountId}
+                  onChange={setSettleAccountId}
+                  options={accountOptions.map((account) => ({
+                    value: account.id,
+                    label: account.name,
+                  }))}
+                  placeholder="选择资金账户"
+                  className="w-full max-w-72"
+                />
+              </Field>
+              <Field label="实收金额" htmlFor="receivedAmount">
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="receivedAmount"
+                    value={effectiveReceived}
+                    onChange={(e) => {
+                      setReceivedTouched(true);
+                      setReceivedAmount(e.target.value);
+                    }}
+                    placeholder="0.00"
+                    inputMode="decimal"
+                    className="h-8 w-40"
+                  />
+                  <span className="text-xs text-muted-foreground">
+                    差额 {settlementDiff}
+                  </span>
+                </div>
+              </Field>
+            </>
+          ) : null}
         </div>
       </section>
 

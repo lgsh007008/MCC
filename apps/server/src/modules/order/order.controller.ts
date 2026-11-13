@@ -25,6 +25,7 @@ import {
   type SaleOrderListQuery,
   type SaleOrderUpdateInput,
 } from '@mcc/shared';
+import { AuditAction } from '../../common/decorators/audit-action.decorator.js';
 import { CurrentUser, type AuthUser } from '../../common/decorators/current-user.decorator.js';
 import { RequireScopes } from '../../common/decorators/require-scopes.decorator.js';
 import { problem } from '../../common/http-problem.js';
@@ -37,6 +38,7 @@ import {
   SaleOrderBodyDto,
   SaleOrderDto,
   SaleOrderListDto,
+  SaleOrderPrintEventDto,
   SaleOrderUpdateBodyDto,
 } from './dto/order.dto.js';
 import { OrderService } from './order.service.js';
@@ -93,6 +95,7 @@ export class OrderController {
 
   @Post()
   @RequireScopes('order:manage')
+  @AuditAction({ domain: 'order', action: 'create', label: '新建销售单', objectType: 'sale_order' })
   @HttpCode(201)
   @ApiOperation({ summary: '新建销售单；重复提交防抖：请求头 Idempotency-Key' })
   @ApiBody({ type: SaleOrderBodyDto })
@@ -129,6 +132,7 @@ export class OrderController {
 
   @Put(':id')
   @RequireScopes('order:manage')
+  @AuditAction({ domain: 'order', action: 'update', label: '编辑销售单', objectType: 'sale_order' })
   @ApiOperation({ summary: '更新销售单（整单提交：明细重算落账）' })
   @ApiBody({ type: SaleOrderUpdateBodyDto })
   @ApiOkResponse({ type: SaleOrderDto })
@@ -141,6 +145,7 @@ export class OrderController {
 
   @Post('batch-delete')
   @RequireScopes('order:manage')
+  @AuditAction({ domain: 'order', action: 'batch-delete', label: '批量删除销售单', objectType: 'sale_order' })
   @HttpCode(200)
   @ApiOperation({ summary: '批量删除销售单（软删除；不存在/已删行静默跳过）' })
   @ApiBody({ type: SaleOrderBatchDeleteBodyDto })
@@ -153,9 +158,21 @@ export class OrderController {
 
   @Delete(':id')
   @RequireScopes('order:manage')
+  @AuditAction({ domain: 'order', action: 'delete', label: '删除销售单', objectType: 'sale_order' })
   @HttpCode(204)
   @ApiOperation({ summary: '删除销售单（软删除，编号不回收）' })
   async remove(@Param('id', ParseUUIDPipe) id: string): Promise<void> {
     await this.orderService.remove(id);
+  }
+
+  @Post(':id/print-events')
+  @RequireScopes('order:view')
+  @AuditAction({ domain: 'order', action: 'print', label: '打印销售单', objectType: 'sale_order' })
+  @HttpCode(200)
+  @ApiOperation({ summary: '记录销售单打印审计（无业务副作用）' })
+  @ApiOkResponse({ type: SaleOrderPrintEventDto })
+  async recordPrint(@Param('id', ParseUUIDPipe) id: string): Promise<SaleOrderPrintEventDto> {
+    const code = await this.orderService.codeOf(id);
+    return { id, code };
   }
 }

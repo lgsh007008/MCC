@@ -32,6 +32,14 @@ describe('角色与权限矩阵', () => {
     expect(scopesOf('WORKER')).toEqual(['order:view']);
   });
 
+  it('审计日志仅管理员可查看', () => {
+    expect(hasScope('ADMIN', 'audit:view')).toBe(true);
+    expect(hasScope('SALES', 'audit:view')).toBe(false);
+    expect(hasScope('FINANCE', 'audit:view')).toBe(false);
+    expect(hasScope('WORKER', 'audit:view')).toBe(false);
+    expect(SCOPES).not.toContain('audit:manage');
+  });
+
   it('销售含财务维护；财务可看订单与客户但不能维护', () => {
     expect(hasScope('SALES', 'finance:manage')).toBe(true);
     expect(hasScope('FINANCE', 'finance:manage')).toBe(true);

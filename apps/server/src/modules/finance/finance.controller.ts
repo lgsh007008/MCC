@@ -12,28 +12,33 @@ import {
 } from '@nestjs/common';
 import { ApiBody, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import {
-  financeEventBatchDeleteSchema,
-  financeEventInputSchema,
-  financeEventListQuerySchema,
-  financeEventUpdateSchema,
+  financeAccountInputSchema,
+  financeCashEntryInputSchema,
+  financeCashEntryListQuerySchema,
+  financeCashSummaryQuerySchema,
+  financeReceivablesQuerySchema,
   financeSummaryQuerySchema,
-  type FinanceEventBatchDeleteInput,
-  type FinanceEventInput,
-  type FinanceEventListQuery,
-  type FinanceEventUpdateInput,
+  type FinanceAccountInput,
+  type FinanceCashEntryInput,
+  type FinanceCashEntryListQuery,
+  type FinanceCashSummaryQuery,
+  type FinanceReceivablesQuery,
   type FinanceSummaryQuery,
 } from '@mcc/shared';
+import { AuditAction } from '../../common/decorators/audit-action.decorator.js';
 import { RequireScopes } from '../../common/decorators/require-scopes.decorator.js';
 import { ZodValidationPipe } from '../../common/zod-validation.pipe.js';
 import {
-  FinanceEventBatchDeleteBodyDto,
-  FinanceEventBatchDeleteResponseDto,
-  FinanceEventBodyDto,
-  FinanceEventDto,
-  FinanceEventListDto,
-  FinanceEventUpdateBodyDto,
-  FinanceSummaryDto,
-} from './dto/finance.dto.js';
+  FinanceAccountBodyDto,
+  FinanceAccountDto,
+  FinanceAccountListDto,
+  FinanceCashEntryBodyDto,
+  FinanceCashEntryDto,
+  FinanceCashEntryListDto,
+  FinanceCashSummaryDto,
+  FinanceReceivableListDto,
+} from './dto/cash.dto.js';
+import { FinanceSummaryDto } from './dto/finance.dto.js';
 import { FinanceService } from './finance.service.js';
 
 // 接口清单与路径（design/finance.md §5）；契约由装饰器代码生成（ADR-006）。
@@ -42,32 +47,11 @@ import { FinanceService } from './finance.service.js';
 export class FinanceController {
   constructor(private readonly financeService: FinanceService) {}
 
-  @Get('events')
-  @RequireScopes('finance:view')
-  @ApiOperation({ summary: '财务事件列表：筛选（发生日期区间、分类、来源）+ 排序 + 分页' })
-  @ApiQuery({ name: 'dateFrom', required: false, type: String, description: '发生日期起（YYYY-MM-DD）' })
-  @ApiQuery({ name: 'dateTo', required: false, type: String, description: '发生日期止（YYYY-MM-DD）' })
-  @ApiQuery({
-    name: 'category',
-    required: false,
-    enum: ['sales_revenue', 'other_revenue', 'purchase_cost', 'labor_cost', 'other_expense'],
-    type: String,
-  })
-  @ApiQuery({ name: 'source', required: false, enum: ['auto', 'manual'], type: String })
-  @ApiQuery({ name: 'page', required: false, type: Number, description: '页码，默认 1' })
-  @ApiQuery({ name: 'pageSize', required: false, type: Number, description: '每页条数，默认 20（最大 100）' })
-  @ApiQuery({ name: 'sortBy', required: false, enum: ['occurredDate', 'amount'], type: String })
-  @ApiQuery({ name: 'sortOrder', required: false, enum: ['asc', 'desc'], type: String })
-  @ApiOkResponse({ type: FinanceEventListDto })
-  list(
-    @Query(new ZodValidationPipe(financeEventListQuerySchema)) query: FinanceEventListQuery,
-  ): Promise<FinanceEventListDto> {
-    return this.financeService.list(query);
-  }
-
   @Get('summary')
   @RequireScopes('finance:view')
-  @ApiOperation({ summary: '收支汇总（日期区间实时聚合：总收入 / 总成本 / 净利润 / 分类小计）' })
+  @ApiOperation({
+    summary: '经营收支汇总（日期区间实时聚合：销售单 + 流水分类；总收入 / 总支出 / 净额）',
+  })
   @ApiQuery({ name: 'dateFrom', required: false, type: String, description: '发生日期起（YYYY-MM-DD）' })
   @ApiQuery({ name: 'dateTo', required: false, type: String, description: '发生日期止（YYYY-MM-DD）' })
   @ApiOkResponse({ type: FinanceSummaryDto })
@@ -77,55 +61,150 @@ export class FinanceController {
     return this.financeService.summary(query);
   }
 
-  @Get('events/:id')
+  // ── 资金账户（R-财务-002）────────────────────────────────
+
+  @Get('accounts')
   @RequireScopes('finance:view')
-  @ApiOperation({ summary: '财务事件详情' })
-  @ApiOkResponse({ type: FinanceEventDto })
-  detail(@Param('id', ParseUUIDPipe) id: string): Promise<FinanceEventDto> {
-    return this.financeService.detail(id);
+  @ApiOperation({ summary: '资金账户列表（不分页；余额 = 期初 + 收 − 付 + 转入 − 转出）' })
+  @ApiOkResponse({ type: FinanceAccountListDto })
+  listAccounts(): Promise<FinanceAccountListDto> {
+    return this.financeService.listAccounts();
   }
 
-  @Post('events')
+  @Post('accounts')
   @RequireScopes('finance:manage')
+  @AuditAction({ domain: 'finance', action: 'create-account', label: '新建资金账户', objectType: 'finance_account' })
   @HttpCode(201)
-  @ApiOperation({ summary: '手工记账（仅其他收入 / 其他支出；金额按正数提交）' })
-  @ApiBody({ type: FinanceEventBodyDto })
-  @ApiCreatedResponse({ type: FinanceEventDto })
-  create(
-    @Body(new ZodValidationPipe(financeEventInputSchema)) body: FinanceEventInput,
-  ): Promise<FinanceEventDto> {
-    return this.financeService.create(body);
+  @ApiOperation({ summary: '新建资金账户（对公 / 对私级联渠道）' })
+  @ApiBody({ type: FinanceAccountBodyDto })
+  @ApiCreatedResponse({ type: FinanceAccountDto })
+  createAccount(
+    @Body(new ZodValidationPipe(financeAccountInputSchema)) body: FinanceAccountInput,
+  ): Promise<FinanceAccountDto> {
+    return this.financeService.createAccount(body);
   }
 
-  @Put('events/:id')
+  @Put('accounts/:id')
   @RequireScopes('finance:manage')
-  @ApiOperation({ summary: '更新手工事件（自动生成的事件不可编辑）' })
-  @ApiBody({ type: FinanceEventUpdateBodyDto })
-  @ApiOkResponse({ type: FinanceEventDto })
-  update(
+  @AuditAction({ domain: 'finance', action: 'update-account', label: '编辑资金账户', objectType: 'finance_account' })
+  @ApiOperation({ summary: '更新资金账户（改名称 / 期初 / 启用状态）' })
+  @ApiBody({ type: FinanceAccountBodyDto })
+  @ApiOkResponse({ type: FinanceAccountDto })
+  updateAccount(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body(new ZodValidationPipe(financeEventUpdateSchema)) body: FinanceEventUpdateInput,
-  ): Promise<FinanceEventDto> {
-    return this.financeService.update(id, body);
+    @Body(new ZodValidationPipe(financeAccountInputSchema)) body: FinanceAccountInput,
+  ): Promise<FinanceAccountDto> {
+    return this.financeService.updateAccount(id, body);
   }
 
-  @Post('events/batch-delete')
+  @Delete('accounts/:id')
   @RequireScopes('finance:manage')
-  @HttpCode(200)
-  @ApiOperation({ summary: '批量删除手工事件（软删除；自动事件与不存在行静默跳过）' })
-  @ApiBody({ type: FinanceEventBatchDeleteBodyDto })
-  @ApiOkResponse({ type: FinanceEventBatchDeleteResponseDto })
-  batchDelete(
-    @Body(new ZodValidationPipe(financeEventBatchDeleteSchema)) body: FinanceEventBatchDeleteInput,
-  ): Promise<{ deleted: number }> {
-    return this.financeService.removeMany(body.ids);
-  }
-
-  @Delete('events/:id')
-  @RequireScopes('finance:manage')
+  @AuditAction({ domain: 'finance', action: 'delete-account', label: '删除资金账户', objectType: 'finance_account' })
   @HttpCode(204)
-  @ApiOperation({ summary: '删除手工事件（软删除；自动事件拒绝）' })
-  async remove(@Param('id', ParseUUIDPipe) id: string): Promise<void> {
-    await this.financeService.remove(id);
+  @ApiOperation({ summary: '删除资金账户（软删除；历史流水保留账户名，编号不复用）' })
+  async removeAccount(@Param('id', ParseUUIDPipe) id: string): Promise<void> {
+    await this.financeService.removeAccount(id);
+  }
+
+  // ── 资金流水（R-财务-002）────────────────────────────────
+
+  @Get('cash-entries')
+  @RequireScopes('finance:view')
+  @ApiOperation({
+    summary: '资金流水列表：方向 / 收支分类 / 账户 / 客户 / 日期区间筛选 + 分页 + 筛选全量合计',
+  })
+  @ApiQuery({ name: 'direction', required: false, enum: ['in', 'out', 'transfer'], type: String })
+  @ApiQuery({
+    name: 'category',
+    required: false,
+    enum: [
+      'sales_receipt',
+      'other_revenue',
+      'loan_in',
+      'purchase_payment',
+      'labor_cost',
+      'operating_expense',
+      'asset_purchase',
+      'loan_repay',
+    ],
+    type: String,
+  })
+  @ApiQuery({ name: 'accountId', required: false, type: String })
+  @ApiQuery({ name: 'customerId', required: false, type: String, description: '客户 id（收款流水）' })
+  @ApiQuery({ name: 'dateFrom', required: false, type: String, description: '发生日期起（YYYY-MM-DD）' })
+  @ApiQuery({ name: 'dateTo', required: false, type: String, description: '发生日期止（YYYY-MM-DD）' })
+  @ApiQuery({ name: 'page', required: false, type: Number, description: '页码，默认 1' })
+  @ApiQuery({ name: 'pageSize', required: false, type: Number, description: '每页条数，默认 20（最大 100）' })
+  @ApiOkResponse({ type: FinanceCashEntryListDto })
+  listCashEntries(
+    @Query(new ZodValidationPipe(financeCashEntryListQuerySchema)) query: FinanceCashEntryListQuery,
+  ): Promise<FinanceCashEntryListDto> {
+    return this.financeService.listCashEntries(query);
+  }
+
+  @Get('cash-summary')
+  @RequireScopes('finance:view')
+  @ApiOperation({ summary: '资金汇总（期间收款 / 付款 / 净流入 + 各账户当前余额）' })
+  @ApiQuery({ name: 'dateFrom', required: false, type: String })
+  @ApiQuery({ name: 'dateTo', required: false, type: String })
+  @ApiOkResponse({ type: FinanceCashSummaryDto })
+  cashSummary(
+    @Query(new ZodValidationPipe(financeCashSummaryQuerySchema)) query: FinanceCashSummaryQuery,
+  ): Promise<FinanceCashSummaryDto> {
+    return this.financeService.cashSummary(query);
+  }
+
+  @Get('receivables')
+  @RequireScopes('finance:view')
+  @ApiOperation({ summary: '客户应收（批量）：累计销售 / 累计收款 / 欠款（负数为预收）' })
+  @ApiQuery({ name: 'customerIds', required: true, type: String, description: '逗号分隔的客户 id' })
+  @ApiOkResponse({ type: FinanceReceivableListDto })
+  receivables(
+    @Query(new ZodValidationPipe(financeReceivablesQuerySchema)) query: FinanceReceivablesQuery,
+  ): Promise<FinanceReceivableListDto> {
+    return this.financeService.receivables(query);
+  }
+
+  @Post('cash-entries')
+  @RequireScopes('finance:manage')
+  @AuditAction({ domain: 'finance', action: 'create-cash-entry', label: '登记资金流水', objectType: 'finance_cash_entry' })
+  @HttpCode(201)
+  @ApiOperation({ summary: '登记资金流水（收支分类按方向必选；销售回款挂客户）' })
+  @ApiBody({ type: FinanceCashEntryBodyDto })
+  @ApiCreatedResponse({ type: FinanceCashEntryDto })
+  createCashEntry(
+    @Body(new ZodValidationPipe(financeCashEntryInputSchema)) body: FinanceCashEntryInput,
+  ): Promise<FinanceCashEntryDto> {
+    return this.financeService.createCashEntry(body);
+  }
+
+  @Put('cash-entries/:id')
+  @RequireScopes('finance:manage')
+  @AuditAction({ domain: 'finance', action: 'update-cash-entry', label: '编辑资金流水', objectType: 'finance_cash_entry' })
+  @ApiOperation({ summary: '更新资金流水' })
+  @ApiBody({ type: FinanceCashEntryBodyDto })
+  @ApiOkResponse({ type: FinanceCashEntryDto })
+  updateCashEntry(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(financeCashEntryInputSchema)) body: FinanceCashEntryInput,
+  ): Promise<FinanceCashEntryDto> {
+    return this.financeService.updateCashEntry(id, body);
+  }
+
+  @Get('cash-entries/:id')
+  @RequireScopes('finance:view')
+  @ApiOperation({ summary: '资金流水详情（单条，含来源与可编辑标记）' })
+  @ApiOkResponse({ type: FinanceCashEntryDto })
+  async cashEntryDetail(@Param('id', ParseUUIDPipe) id: string): Promise<FinanceCashEntryDto> {
+    return this.financeService.cashEntryDetail(id);
+  }
+
+  @Delete('cash-entries/:id')
+  @RequireScopes('finance:manage')
+  @AuditAction({ domain: 'finance', action: 'delete-cash-entry', label: '删除资金流水', objectType: 'finance_cash_entry' })
+  @HttpCode(204)
+  @ApiOperation({ summary: '删除资金流水（软删除；余额随之回退）' })
+  async removeCashEntry(@Param('id', ParseUUIDPipe) id: string): Promise<void> {
+    await this.financeService.removeCashEntry(id);
   }
 }

@@ -4,9 +4,11 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { Trash2Icon } from 'lucide-react';
+import { absMoney } from '@mcc/shared';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { useCan } from '@/components/auth/permission-context';
+import { MobileInfoRow } from '@/components/mobile/info-row';
 import { MobileActionBar, MobileHeader } from '@/components/mobile/mobile-shell';
 import { MobileListState } from '@/components/mobile/list';
 import { api } from '@/lib/api';
@@ -23,15 +25,6 @@ interface CustomerDetail {
   createdAt: string;
 }
 
-function InfoRow({ label, value }: { label: string; value: string }): React.ReactElement {
-  return (
-    <div className="flex items-start justify-between gap-4">
-      <span className="shrink-0 text-sm text-muted-foreground">{label}</span>
-      <span className="min-w-0 break-words text-right text-base">{value}</span>
-    </div>
-  );
-}
-
 export default function MobileCustomerDetailPage(): React.ReactElement {
   const canManage = useCan('customer:manage');
   const params = useParams<{ id: string }>();
@@ -41,6 +34,45 @@ export default function MobileCustomerDetailPage(): React.ReactElement {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  // 四个累计（product/customer.md 移动详情）：方量取 order 聚合、应收三项取 finance
+  const [accrual, setAccrual] = useState({
+    volume: '0.0000',
+    sales: '0.00',
+    receipts: '0.00',
+    outstanding: '0.00',
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const [volumeRes, receivableRes] = await Promise.all([
+        api
+          .GET('/api/v1/sale-orders/customer-volume-summary', {
+            params: { query: { customerIds: params.id } },
+          })
+          .catch(() => null),
+        api
+          .GET('/api/v1/finance/receivables', {
+            params: { query: { customerIds: params.id } },
+          })
+          .catch(() => null),
+      ]);
+      if (cancelled) {
+        return;
+      }
+      const volume = volumeRes?.data?.items[0]?.totalVolume;
+      const receivable = receivableRes?.data?.items[0];
+      setAccrual({
+        volume: volume ?? '0.0000',
+        sales: receivable?.sales ?? '0.00',
+        receipts: receivable?.receipts ?? '0.00',
+        outstanding: receivable?.outstanding ?? '0.00',
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [params.id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -173,16 +205,34 @@ export default function MobileCustomerDetailPage(): React.ReactElement {
       <div className="space-y-4 p-4">
         <section className="rounded-xl border border-border bg-card p-4">
           <div className="flex items-start justify-between gap-3">
-            <p className="min-w-0 text-2xl font-semibold">{customer.name}</p>
-            <span className="mt-1 shrink-0 rounded border border-border px-2 py-0.5 text-xs text-muted-foreground">
+            <p className="min-w-0 text-mobile-title font-semibold">{customer.name}</p>
+            <span className="mt-1 shrink-0 rounded border border-border px-2 py-0.5 text-mobile-caption text-muted-foreground">
               {customer.status === 'active' ? '启用' : '停用'}
             </span>
           </div>
 
           <div className="mt-4 space-y-2 border-t border-border pt-4">
-            <InfoRow label="联系信息" value={customer.contact || '—'} />
-            <InfoRow label="备注" value={customer.note || '—'} />
-            <InfoRow label="创建日期" value={customer.createdAt.slice(0, 10)} />
+            <MobileInfoRow label="累计下单方量" value={`${accrual.volume} m³`} />
+            <MobileInfoRow label="累计销售" value={`${accrual.sales} 元`} />
+            <MobileInfoRow label="累计收款" value={`${accrual.receipts} 元`} />
+            <MobileInfoRow
+              label="欠款"
+              value={
+                accrual.outstanding.startsWith('-') ? (
+                  `${absMoney(accrual.outstanding)} 元（预收）`
+                ) : accrual.outstanding === '0.00' ? (
+                  '0.00 元'
+                ) : (
+                  <span className="font-semibold text-destructive">
+                    {`${accrual.outstanding} 元`}
+                  </span>
+                )
+              }
+            />
+            <div className="border-t border-border pt-2" />
+            <MobileInfoRow label="联系信息" value={customer.contact || '—'} />
+            <MobileInfoRow label="备注" value={customer.note || '—'} />
+            <MobileInfoRow label="创建日期" value={customer.createdAt.slice(0, 10)} />
           </div>
         </section>
 
@@ -191,7 +241,7 @@ export default function MobileCustomerDetailPage(): React.ReactElement {
             <Button
               type="button"
               variant="outline"
-              className="h-12 w-full text-base"
+              className="h-12 w-full text-mobile-body"
               disabled={busy}
               onClick={() => void handleToggleStatus()}
             >
@@ -208,7 +258,7 @@ export default function MobileCustomerDetailPage(): React.ReactElement {
               删除客户
             </Button>
             {actionError ? (
-              <p role="alert" className="text-base text-destructive">
+              <p role="alert" className="text-mobile-body text-destructive">
                 {actionError}
               </p>
             ) : null}
@@ -220,14 +270,14 @@ export default function MobileCustomerDetailPage(): React.ReactElement {
         {canManage ? (
           <Link
             href={`/m/customers/${customer.id}/edit`}
-            className={cn(buttonVariants(), 'h-12 flex-1 text-base')}
+            className={cn(buttonVariants(), 'h-12 flex-1 text-mobile-body')}
           >
             编辑
           </Link>
         ) : null}
         <Link
           href="/m/customers"
-          className={cn(buttonVariants({ variant: 'outline' }), 'h-12 flex-1 text-base')}
+          className={cn(buttonVariants({ variant: 'outline' }), 'h-12 flex-1 text-mobile-body')}
         >
           返回列表
         </Link>

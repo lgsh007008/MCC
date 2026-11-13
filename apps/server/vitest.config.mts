@@ -11,6 +11,10 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['test/**/*.spec.ts'],
+    setupFiles: ['./test/setup.ts'],
+    // 集成测试共用同一测试库；并行执行多个 spec 会在编号生成等场景产生竞争，
+    // 串行跑文件（文件内用例仍按顺序）以保证结果可复现。
+    fileParallelism: false,
   },
   plugins: [swc.vite()],
 });

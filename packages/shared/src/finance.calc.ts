@@ -1,32 +1,8 @@
 // 财务领域计算纯函数（design/finance.md §3）：
-// 单式台账的符号规范化与收支汇总，服务端与 web 共用；单测为最高优先级（技术方案 §10）。
+// 经营收支汇总、账户余额与应收，服务端与 web 共用；单测为最高优先级（技术方案 §10）。
 // 金额一律为字符串 + BigInt 运算（含负数），禁止浮点。
 
-export type FinanceCategory =
-  | 'sales_revenue'
-  | 'other_revenue'
-  | 'purchase_cost'
-  | 'labor_cost'
-  | 'other_expense';
-
-export const FINANCE_CATEGORIES: FinanceCategory[] = [
-  'sales_revenue',
-  'other_revenue',
-  'purchase_cost',
-  'labor_cost',
-  'other_expense',
-];
-
-export const FINANCE_CATEGORY_LABELS: Record<FinanceCategory, string> = {
-  sales_revenue: '销售收入',
-  other_revenue: '其他收入',
-  purchase_cost: '采购成本',
-  labor_cost: '人工成本',
-  other_expense: '其他支出',
-};
-
-// 手工可录入的分类（系统类分类由业务单据自动生成，不允许手工记账）
-export const MANUAL_FINANCE_CATEGORIES: FinanceCategory[] = ['other_revenue', 'other_expense'];
+import type { FinanceCashCategoryValue } from './finance.schemas';
 
 const MONEY_SCALE = 2;
 
@@ -50,16 +26,6 @@ function fromScaled(value: bigint): string {
   return `${negative ? '-' : ''}${intPart}.${fracPart}`;
 }
 
-export function isIncomeCategory(category: FinanceCategory): boolean {
-  return category === 'sales_revenue' || category === 'other_revenue';
-}
-
-// 手工录入金额按正数提交，落库前按分类转有符号（收入正、支出负）
-export function signedAmount(category: FinanceCategory, positiveAmount: string): string {
-  const scaled = toScaled(positiveAmount);
-  return fromScaled(isIncomeCategory(category) ? scaled : -scaled);
-}
-
 // 金额绝对值
 export function absMoney(value: string): string {
   return fromScaled(toScaled(value) < 0n ? -toScaled(value) : toScaled(value));
@@ -70,59 +36,160 @@ export function sumMoney(values: string[]): string {
   return fromScaled(values.reduce((acc, value) => acc + toScaled(value), 0n));
 }
 
-export interface FinanceSummaryLine {
-  category: FinanceCategory;
-  amount: string;
+// ── 经营收支汇总（R-财务-001）────────────────────────────
+// 销售按应计（销售单合计，现结取实收、赊销取合计），其余按流水分类的实际收付。
+
+export type BusinessSummaryCategory =
+  | 'sales_revenue'
+  | 'other_revenue'
+  | 'purchase_payment'
+  | 'labor_cost'
+  | 'operating_expense';
+
+export const BUSINESS_SUMMARY_CATEGORIES: BusinessSummaryCategory[] = [
+  'sales_revenue',
+  'other_revenue',
+  'purchase_payment',
+  'labor_cost',
+  'operating_expense',
+];
+
+export const BUSINESS_SUMMARY_CATEGORY_LABELS: Record<BusinessSummaryCategory, string> = {
+  sales_revenue: '销售收入',
+  other_revenue: '其他收入',
+  purchase_payment: '采购付款',
+  labor_cost: '工资',
+  operating_expense: '费用',
+};
+
+export interface BusinessCashLine {
+  category: FinanceCashCategoryValue;
+  amount: string; // 正数
 }
 
-export interface FinanceCategorySubtotal {
-  category: FinanceCategory;
-  income: string;
-  cost: string;
-  net: string;
-}
-
-export interface FinanceSummary {
+export interface BusinessSummary {
   totalIncome: string;
-  totalCost: string;
-  netProfit: string;
-  byCategory: FinanceCategorySubtotal[];
+  totalExpense: string;
+  netAmount: string;
+  byCategory: Array<{ category: BusinessSummaryCategory; amount: string }>;
 }
 
-// 收支汇总：总收入 = Σ正数；总成本 = Σ负数绝对值；净利润 = 总收入 − 总成本。
-// 分类小计按五类固定输出（无数据为 0），保证报表行稳定。
-export function calcFinanceSummary(items: FinanceSummaryLine[]): FinanceSummary {
-  let income = 0n;
-  let cost = 0n;
-  const buckets = new Map<FinanceCategory, { income: bigint; cost: bigint }>(
-    FINANCE_CATEGORIES.map((category) => [category, { income: 0n, cost: 0n }]),
+// 流水分类 → 经营收支项；销售回款 / 借款 / 还款 / 资产购置 / 内部转账不计入
+const CASH_CATEGORY_TO_BUSINESS: Partial<
+  Record<FinanceCashCategoryValue, BusinessSummaryCategory>
+> = {
+  other_revenue: 'other_revenue',
+  purchase_payment: 'purchase_payment',
+  labor_cost: 'labor_cost',
+  operating_expense: 'operating_expense',
+};
+
+export function calcBusinessSummary(
+  salesAmounts: string[],
+  cashLines: BusinessCashLine[],
+): BusinessSummary {
+  const buckets = new Map<BusinessSummaryCategory, bigint>(
+    BUSINESS_SUMMARY_CATEGORIES.map((category) => [category, 0n]),
   );
-
-  for (const item of items) {
-    const scaled = toScaled(item.amount);
-    const bucket = buckets.get(item.category) ?? { income: 0n, cost: 0n };
-    if (scaled >= 0n) {
-      income += scaled;
-      bucket.income += scaled;
-    } else {
-      cost += -scaled;
-      bucket.cost += -scaled;
-    }
-    buckets.set(item.category, bucket);
+  for (const amount of salesAmounts) {
+    buckets.set('sales_revenue', (buckets.get('sales_revenue') ?? 0n) + toScaled(amount));
   }
-
+  for (const line of cashLines) {
+    const target = CASH_CATEGORY_TO_BUSINESS[line.category];
+    if (!target) {
+      continue;
+    }
+    buckets.set(target, (buckets.get(target) ?? 0n) + toScaled(line.amount));
+  }
+  const totalIncome =
+    (buckets.get('sales_revenue') ?? 0n) + (buckets.get('other_revenue') ?? 0n);
+  const totalExpense =
+    (buckets.get('purchase_payment') ?? 0n) +
+    (buckets.get('labor_cost') ?? 0n) +
+    (buckets.get('operating_expense') ?? 0n);
   return {
-    totalIncome: fromScaled(income),
-    totalCost: fromScaled(cost),
-    netProfit: fromScaled(income - cost),
-    byCategory: FINANCE_CATEGORIES.map((category) => {
-      const bucket = buckets.get(category) ?? { income: 0n, cost: 0n };
-      return {
-        category,
-        income: fromScaled(bucket.income),
-        cost: fromScaled(bucket.cost),
-        net: fromScaled(bucket.income - bucket.cost),
-      };
-    }),
+    totalIncome: fromScaled(totalIncome),
+    totalExpense: fromScaled(totalExpense),
+    netAmount: fromScaled(totalIncome - totalExpense),
+    byCategory: BUSINESS_SUMMARY_CATEGORIES.map((category) => ({
+      category,
+      amount: fromScaled(buckets.get(category) ?? 0n),
+    })),
   };
+}
+
+// ── 资金收付与应收账款（R-财务-002）──────────────────────────
+
+export type FinanceAccountKind = 'corporate' | 'personal';
+export type FinanceAccountChannel = 'bank' | 'wechat' | 'alipay' | 'cash' | 'bill';
+export type FinanceCashDirection = 'in' | 'out' | 'transfer';
+export type FinanceCashMethod = 'bank' | 'wechat' | 'alipay' | 'cash' | 'acceptance';
+
+export const FINANCE_ACCOUNT_KIND_LABELS: Record<FinanceAccountKind, string> = {
+  corporate: '对公',
+  personal: '对私',
+};
+
+export const FINANCE_ACCOUNT_CHANNEL_LABELS: Record<FinanceAccountChannel, string> = {
+  bank: '银行',
+  wechat: '微信',
+  alipay: '支付宝',
+  cash: '现金',
+  bill: '承兑汇票',
+};
+
+export const FINANCE_CASH_DIRECTION_LABELS: Record<FinanceCashDirection, string> = {
+  in: '收款',
+  out: '付款',
+  transfer: '内部转账',
+};
+
+export const FINANCE_CASH_METHOD_LABELS: Record<FinanceCashMethod, string> = {
+  bank: '银行转账',
+  wechat: '微信',
+  alipay: '支付宝',
+  cash: '现金',
+  acceptance: '承兑汇票',
+};
+
+// 客户欠款 = 累计销售 − 累计收款；负数为预收（不截断）
+export function calcReceivable(salesAmounts: string[], receiptAmounts: string[]): string {
+  return sumMoney([...salesAmounts, ...receiptAmounts.map((value) => `-${value}`)]);
+}
+
+// 结算差额 = 合计 − 实收：正数为折让 / 抹零，负数为预收；只作单据信息
+export function calcSettlementDifference(totalAmount: string, receivedAmount: string): string {
+  return sumMoney([totalAmount, `-${receivedAmount}`]);
+}
+
+export interface CashBalanceLine {
+  direction: FinanceCashDirection;
+  amount: string;
+  accountId: string;
+  toAccountId?: string | null;
+}
+
+// 账户余额 = 期初 + 收款 − 付款 + 转入 − 转出；内部转账不计入收支统计
+export function calcAccountBalance(
+  accountId: string,
+  openingBalance: string,
+  entries: CashBalanceLine[],
+): string {
+  const deltas: string[] = [openingBalance];
+  for (const entry of entries) {
+    if (entry.direction === 'transfer') {
+      if (entry.accountId === accountId) {
+        deltas.push(`-${entry.amount}`);
+      }
+      if (entry.toAccountId === accountId) {
+        deltas.push(entry.amount);
+      }
+      continue;
+    }
+    if (entry.accountId !== accountId) {
+      continue;
+    }
+    deltas.push(entry.direction === 'in' ? entry.amount : `-${entry.amount}`);
+  }
+  return sumMoney(deltas);
 }

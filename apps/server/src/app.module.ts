@@ -5,6 +5,7 @@ import { AuthGuard } from './common/guards/auth.guard.js';
 import { PrismaModule } from './common/prisma.module.js';
 import { RateLimitGuard } from './common/rate-limit.guard.js';
 import { RedisModule } from './common/redis.module.js';
+import { AuditModule } from './modules/audit/index.js';
 import { AuthModule } from './modules/auth/index.js';
 import { CustomerModule } from './modules/customer/index.js';
 import { FinanceModule } from './modules/finance/index.js';
@@ -17,6 +18,7 @@ import { OrderModule } from './modules/order/index.js';
     // 全局基础设施（单一 Prisma/Redis 实例，供横切件与各模块共用）
     PrismaModule,
     RedisModule,
+    AuditModule,
     AuthModule,
     CustomerModule,
     FinanceModule,

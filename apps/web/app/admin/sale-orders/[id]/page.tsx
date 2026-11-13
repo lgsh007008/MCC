@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
@@ -51,12 +51,16 @@ interface SaleOrderDetail {
   otherAmount: string;
   totalAmount: string;
   note: string;
+  settlementMode: 'credit' | 'settled';
+  receivedAmount: string;
+  settleAccountId?: string | null;
   items: SaleOrderItemDetail[];
 }
 
 export default function SaleOrderDetailPage(): React.ReactElement {
   const params = useParams<{ id: string }>();
   const [printOpen, setPrintOpen] = useState(false);
+  const [settleAccountName, setSettleAccountName] = useState('');
   const canManage = useCan('order:manage');
   // 查询带缓存（技术方案 §7.4）：切回标签先用缓存渲染，后台刷新，避免闪「加载中」
   const { data: order, error: queryError } = useQuery({
@@ -72,6 +76,31 @@ export default function SaleOrderDetailPage(): React.ReactElement {
     },
   });
   const error = queryError ? '销售单不存在或加载失败' : null;
+
+  // 现结收款账户名称（详情只读展示）
+  useEffect(() => {
+    if (!order?.settleAccountId) {
+      setSettleAccountName('');
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { data, response } = await api.GET('/api/v1/finance/accounts');
+        if (!cancelled && response.ok && data) {
+          const account = data.items.find((item) => item.id === order.settleAccountId);
+          setSettleAccountName(account?.name ?? '');
+        }
+      } catch {
+        if (!cancelled) {
+          setSettleAccountName('');
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [order?.settleAccountId]);
 
   // 面包屑页面标识 = 销售单编号（product/order.md 详情页）
   usePageCrumb(order ? [{ title: order.code }] : []);
@@ -134,6 +163,16 @@ export default function SaleOrderDetailPage(): React.ReactElement {
             <span>
               合计金额：<strong>{order.totalAmount}</strong> 元
             </span>
+            <span>
+              结算方式：
+              <strong>{order.settlementMode === 'settled' ? '现结' : '赊销'}</strong>
+              {order.settlementMode === 'settled' ? (
+                <>
+                  （实收 {order.receivedAmount}
+                  {settleAccountName ? ` · ${settleAccountName}` : ''}）
+                </>
+              ) : null}
+            </span>
             {order.note ? <span>备注：{order.note}</span> : null}
           </div>
 
@@ -179,7 +218,12 @@ export default function SaleOrderDetailPage(): React.ReactElement {
         </div>
       </PageFrame>
 
-      <PrintPreviewDialog open={printOpen} onOpenChange={setPrintOpen} order={order} />
+      <PrintPreviewDialog
+        open={printOpen}
+        onOpenChange={setPrintOpen}
+        order={order}
+        orderId={order.id}
+      />
     </>
   );
 }

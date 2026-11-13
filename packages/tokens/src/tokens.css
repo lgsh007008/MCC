@@ -9,6 +9,15 @@
   --mcc-space-unit: 4px;
   --mcc-radius-base: 8px;
   --mcc-touch-target: 44px;
+
+  /* 字号角色（product/平台布局.md「字号与控件角色」）：页面只引用角色，不写像素 */
+  --mcc-text-title: 16px;
+  --mcc-text-body: 15px;
+  --mcc-text-label: 13px;
+  --mcc-text-caption: 12px;
+  --mcc-text-numeric: 18px;
+  --mcc-text-numeric-strong: 20px;
+  --mcc-control-h: 36px;
 }
 
 /* 移动 Web 适老化基线（ADR-011）：按端生效，不是用户可切换的模式 */
@@ -17,4 +26,13 @@
   --mcc-touch-target: 52px;
   --mcc-color-fg: #000000;
   --mcc-color-border: #6b7280;
+
+  /* 移动端字号角色：body 与正文基准一致，label 用于非必读辅助信息 */
+  --mcc-text-title: 18px;
+  --mcc-text-body: 18px;
+  --mcc-text-label: 14px;
+  --mcc-text-caption: 12px;
+  --mcc-text-numeric: 20px;
+  --mcc-text-numeric-strong: 24px;
+  --mcc-control-h: 48px;
 }

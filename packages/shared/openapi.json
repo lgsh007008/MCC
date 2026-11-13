@@ -1,6 +1,105 @@
 {
   "openapi": "3.0.0",
   "paths": {
+    "/api/v1/audit-logs": {
+      "get": {
+        "operationId": "AuditController_list",
+        "parameters": [
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "description": "每页条数，默认 20（最大 100）",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "页码，默认 1",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "result",
+            "required": false,
+            "in": "query",
+            "description": "结果",
+            "schema": {
+              "enum": [
+                "ok",
+                "failed"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "action",
+            "required": false,
+            "in": "query",
+            "description": "动作标识",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "domain",
+            "required": false,
+            "in": "query",
+            "description": "领域",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "actor",
+            "required": false,
+            "in": "query",
+            "description": "操作人账号模糊",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateTo",
+            "required": false,
+            "in": "query",
+            "description": "结束日期 YYYY-MM-DD",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateFrom",
+            "required": false,
+            "in": "query",
+            "description": "开始日期 YYYY-MM-DD",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditLogListDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "审计日志列表：时间范围、操作人、领域、动作、结果 + 分页",
+        "tags": [
+          "audit-logs"
+        ]
+      }
+    },
     "/api/v1/auth/login": {
       "post": {
         "operationId": "AuthController_login",
@@ -648,146 +747,6 @@
         ]
       }
     },
-    "/api/v1/finance/events": {
-      "get": {
-        "operationId": "FinanceController_list",
-        "parameters": [
-          {
-            "name": "sortOrder",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
-            }
-          },
-          {
-            "name": "sortBy",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "enum": [
-                "occurredDate",
-                "amount"
-              ],
-              "type": "string"
-            }
-          },
-          {
-            "name": "pageSize",
-            "required": false,
-            "in": "query",
-            "description": "每页条数，默认 20（最大 100）",
-            "schema": {
-              "type": "number"
-            }
-          },
-          {
-            "name": "page",
-            "required": false,
-            "in": "query",
-            "description": "页码，默认 1",
-            "schema": {
-              "type": "number"
-            }
-          },
-          {
-            "name": "source",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "enum": [
-                "auto",
-                "manual"
-              ],
-              "type": "string"
-            }
-          },
-          {
-            "name": "category",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "enum": [
-                "sales_revenue",
-                "other_revenue",
-                "purchase_cost",
-                "labor_cost",
-                "other_expense"
-              ],
-              "type": "string"
-            }
-          },
-          {
-            "name": "dateTo",
-            "required": false,
-            "in": "query",
-            "description": "发生日期止（YYYY-MM-DD）",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "dateFrom",
-            "required": false,
-            "in": "query",
-            "description": "发生日期起（YYYY-MM-DD）",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FinanceEventListDto"
-                }
-              }
-            }
-          }
-        },
-        "summary": "财务事件列表：筛选（发生日期区间、分类、来源）+ 排序 + 分页",
-        "tags": [
-          "finance"
-        ]
-      },
-      "post": {
-        "operationId": "FinanceController_create",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/FinanceEventBodyDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FinanceEventDto"
-                }
-              }
-            }
-          }
-        },
-        "summary": "手工记账（仅其他收入 / 其他支出；金额按正数提交）",
-        "tags": [
-          "finance"
-        ]
-      }
-    },
     "/api/v1/finance/summary": {
       "get": {
         "operationId": "FinanceController_summary",
@@ -823,44 +782,67 @@
             }
           }
         },
-        "summary": "收支汇总（日期区间实时聚合：总收入 / 总成本 / 净利润 / 分类小计）",
+        "summary": "经营收支汇总（日期区间实时聚合：销售单 + 流水分类；总收入 / 总支出 / 净额）",
         "tags": [
           "finance"
         ]
       }
     },
-    "/api/v1/finance/events/{id}": {
+    "/api/v1/finance/accounts": {
       "get": {
-        "operationId": "FinanceController_detail",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
+        "operationId": "FinanceController_listAccounts",
+        "parameters": [],
         "responses": {
           "200": {
             "description": "",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FinanceEventDto"
+                  "$ref": "#/components/schemas/FinanceAccountListDto"
                 }
               }
             }
           }
         },
-        "summary": "财务事件详情",
+        "summary": "资金账户列表（不分页；余额 = 期初 + 收 − 付 + 转入 − 转出）",
         "tags": [
           "finance"
         ]
       },
+      "post": {
+        "operationId": "FinanceController_createAccount",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FinanceAccountBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FinanceAccountDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "新建资金账户（对公 / 对私级联渠道）",
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/accounts/{id}": {
       "put": {
-        "operationId": "FinanceController_update",
+        "operationId": "FinanceController_updateAccount",
         "parameters": [
           {
             "name": "id",
@@ -876,7 +858,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/FinanceEventUpdateBodyDto"
+                "$ref": "#/components/schemas/FinanceAccountBodyDto"
               }
             }
           }
@@ -887,19 +869,19 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FinanceEventDto"
+                  "$ref": "#/components/schemas/FinanceAccountDto"
                 }
               }
             }
           }
         },
-        "summary": "更新手工事件（自动生成的事件不可编辑）",
+        "summary": "更新资金账户（改名称 / 期初 / 启用状态）",
         "tags": [
           "finance"
         ]
       },
       "delete": {
-        "operationId": "FinanceController_remove",
+        "operationId": "FinanceController_removeAccount",
         "parameters": [
           {
             "name": "id",
@@ -915,22 +897,239 @@
             "description": ""
           }
         },
-        "summary": "删除手工事件（软删除；自动事件拒绝）",
+        "summary": "删除资金账户（软删除；历史流水保留账户名，编号不复用）",
         "tags": [
           "finance"
         ]
       }
     },
-    "/api/v1/finance/events/batch-delete": {
+    "/api/v1/finance/cash-entries": {
+      "get": {
+        "operationId": "FinanceController_listCashEntries",
+        "parameters": [
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "description": "每页条数，默认 20（最大 100）",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "页码，默认 1",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "dateTo",
+            "required": false,
+            "in": "query",
+            "description": "发生日期止（YYYY-MM-DD）",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateFrom",
+            "required": false,
+            "in": "query",
+            "description": "发生日期起（YYYY-MM-DD）",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "customerId",
+            "required": false,
+            "in": "query",
+            "description": "客户 id（收款流水）",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "accountId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "category",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "sales_receipt",
+                "other_revenue",
+                "loan_in",
+                "purchase_payment",
+                "labor_cost",
+                "operating_expense",
+                "asset_purchase",
+                "loan_repay"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "direction",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "in",
+                "out",
+                "transfer"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FinanceCashEntryListDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "资金流水列表：方向 / 收支分类 / 账户 / 客户 / 日期区间筛选 + 分页 + 筛选全量合计",
+        "tags": [
+          "finance"
+        ]
+      },
       "post": {
-        "operationId": "FinanceController_batchDelete",
+        "operationId": "FinanceController_createCashEntry",
         "parameters": [],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/FinanceEventBatchDeleteBodyDto"
+                "$ref": "#/components/schemas/FinanceCashEntryBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FinanceCashEntryDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "登记资金流水（收支分类按方向必选；销售回款挂客户）",
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/cash-summary": {
+      "get": {
+        "operationId": "FinanceController_cashSummary",
+        "parameters": [
+          {
+            "name": "dateTo",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateFrom",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FinanceCashSummaryDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "资金汇总（期间收款 / 付款 / 净流入 + 各账户当前余额）",
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/receivables": {
+      "get": {
+        "operationId": "FinanceController_receivables",
+        "parameters": [
+          {
+            "name": "customerIds",
+            "required": true,
+            "in": "query",
+            "description": "逗号分隔的客户 id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FinanceReceivableListDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "客户应收（批量）：累计销售 / 累计收款 / 欠款（负数为预收）",
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/cash-entries/{id}": {
+      "put": {
+        "operationId": "FinanceController_updateCashEntry",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FinanceCashEntryBodyDto"
               }
             }
           }
@@ -941,13 +1140,64 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FinanceEventBatchDeleteResponseDto"
+                  "$ref": "#/components/schemas/FinanceCashEntryDto"
                 }
               }
             }
           }
         },
-        "summary": "批量删除手工事件（软删除；自动事件与不存在行静默跳过）",
+        "summary": "更新资金流水",
+        "tags": [
+          "finance"
+        ]
+      },
+      "get": {
+        "operationId": "FinanceController_cashEntryDetail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FinanceCashEntryDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "资金流水详情（单条，含来源与可编辑标记）",
+        "tags": [
+          "finance"
+        ]
+      },
+      "delete": {
+        "operationId": "FinanceController_removeCashEntry",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "删除资金流水（软删除；余额随之回退）",
         "tags": [
           "finance"
         ]
@@ -1242,6 +1492,37 @@
           "sale-orders"
         ]
       }
+    },
+    "/api/v1/sale-orders/{id}/print-events": {
+      "post": {
+        "operationId": "OrderController_recordPrint",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaleOrderPrintEventDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "记录销售单打印审计（无业务副作用）",
+        "tags": [
+          "sale-orders"
+        ]
+      }
     }
   },
   "info": {
@@ -1267,6 +1548,106 @@
       }
     },
     "schemas": {
+      "AuditLogItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "ISO 时间"
+          },
+          "actorId": {
+            "type": "string",
+            "nullable": true
+          },
+          "actorUsername": {
+            "type": "string",
+            "nullable": true
+          },
+          "actorRole": {
+            "type": "string",
+            "nullable": true
+          },
+          "domain": {
+            "type": "string",
+            "description": "领域"
+          },
+          "action": {
+            "type": "string",
+            "description": "动作标识"
+          },
+          "actionLabel": {
+            "type": "string",
+            "nullable": true,
+            "description": "中文动作名"
+          },
+          "objectType": {
+            "type": "string",
+            "nullable": true
+          },
+          "objectId": {
+            "type": "string",
+            "nullable": true
+          },
+          "objectCode": {
+            "type": "string",
+            "nullable": true,
+            "description": "业务编号快照"
+          },
+          "result": {
+            "type": "string",
+            "description": "ok / failed（旧记录可能为状态码）"
+          },
+          "statusCode": {
+            "type": "number",
+            "nullable": true
+          },
+          "errorCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "ip": {
+            "type": "string",
+            "nullable": true
+          },
+          "userAgent": {
+            "type": "string",
+            "nullable": true
+          },
+          "requestId": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "createdAt",
+          "domain",
+          "action",
+          "result"
+        ]
+      },
+      "AuditLogListDto": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "number",
+            "description": "筛选后总数"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditLogItemDto"
+            }
+          }
+        },
+        "required": [
+          "total",
+          "items"
+        ]
+      },
       "LoginBodyDto": {
         "type": "object",
         "properties": {
@@ -1670,19 +2051,71 @@
           "deleted"
         ]
       },
-      "FinanceEventSummaryDto": {
+      "FinanceCategorySubtotalDto": {
         "type": "object",
         "properties": {
+          "category": {
+            "type": "string",
+            "enum": [
+              "sales_revenue",
+              "other_revenue",
+              "purchase_payment",
+              "labor_cost",
+              "operating_expense"
+            ],
+            "description": "经营收支项（固定五项输出）"
+          },
           "amount": {
             "type": "string",
-            "description": "金额合计（有符号，筛选全量）"
+            "description": "金额（正数，无数据为 0.00）"
           }
         },
         "required": [
+          "category",
           "amount"
         ]
       },
-      "FinanceEventListItemDto": {
+      "FinanceSummaryDto": {
+        "type": "object",
+        "properties": {
+          "totalIncome": {
+            "type": "string",
+            "description": "总收入 = 销售收入 + 其他收入"
+          },
+          "totalExpense": {
+            "type": "string",
+            "description": "总支出 = 采购付款 + 工资 + 费用"
+          },
+          "netAmount": {
+            "type": "string",
+            "description": "净额 = 总收入 − 总支出"
+          },
+          "orderCount": {
+            "type": "number",
+            "description": "期间销售单数"
+          },
+          "cashEntryCount": {
+            "type": "number",
+            "description": "计入经营收支的流水条数"
+          },
+          "categories": {
+            "description": "分类小计（五项固定输出）",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FinanceCategorySubtotalDto"
+            }
+          }
+        },
+        "required": [
+          "totalIncome",
+          "totalExpense",
+          "netAmount",
+          "orderCount",
+          "cashEntryCount",
+          "categories"
+        ]
+      },
+      "FinanceAccountDto": {
         "type": "object",
         "properties": {
           "id": {
@@ -1690,42 +2123,212 @@
           },
           "code": {
             "type": "string",
-            "description": "事件编号（年月+当月流水）"
+            "description": "账户编号（AC + 5 位流水）"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "corporate",
+              "personal"
+            ]
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "bank",
+              "wechat",
+              "alipay",
+              "cash",
+              "bill"
+            ]
+          },
+          "openingBalance": {
+            "type": "string",
+            "description": "期初余额"
+          },
+          "balance": {
+            "type": "string",
+            "description": "当前余额（期初 + 收 − 付 + 转入 − 转出）"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "entryCount": {
+            "type": "number",
+            "description": "该账户的流水条数（列表返回，用于删除确认）"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "kind",
+          "channel",
+          "openingBalance",
+          "balance",
+          "active"
+        ]
+      },
+      "FinanceAccountListDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FinanceAccountDto"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "FinanceAccountBodyDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "账户名称",
+            "example": "对公账户"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "corporate",
+              "personal"
+            ],
+            "description": "类型：对公 / 对私"
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "bank",
+              "wechat",
+              "alipay",
+              "cash",
+              "bill"
+            ],
+            "description": "渠道：银行 / 微信 / 支付宝 / 现金 / 承兑"
+          },
+          "openingBalance": {
+            "type": "string",
+            "description": "期初余额（非负数）",
+            "example": "0.00"
+          },
+          "active": {
+            "type": "boolean",
+            "description": "是否启用",
+            "default": true
+          }
+        },
+        "required": [
+          "name",
+          "kind",
+          "channel",
+          "openingBalance"
+        ]
+      },
+      "FinanceCashEntryListSummaryDto": {
+        "type": "object",
+        "properties": {
+          "receipts": {
+            "type": "string",
+            "description": "筛选全量收款合计"
+          },
+          "payments": {
+            "type": "string",
+            "description": "筛选全量付款合计"
+          },
+          "net": {
+            "type": "string",
+            "description": "净额 = 收款 − 付款"
+          }
+        },
+        "required": [
+          "receipts",
+          "payments",
+          "net"
+        ]
+      },
+      "FinanceCashEntryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "description": "流水编号（CF + 5 位流水）"
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "in",
+              "out",
+              "transfer"
+            ]
           },
           "occurredDate": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "string"
+          },
+          "accountId": {
+            "type": "string"
+          },
+          "accountName": {
+            "type": "string"
+          },
+          "toAccountId": {
             "type": "string",
-            "description": "发生日期"
+            "nullable": true
+          },
+          "toAccountName": {
+            "type": "string",
+            "nullable": true
+          },
+          "customerId": {
+            "type": "string",
+            "nullable": true
+          },
+          "customerName": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "bank",
+              "wechat",
+              "alipay",
+              "cash",
+              "acceptance"
+            ]
           },
           "category": {
             "type": "string",
             "enum": [
-              "sales_revenue",
+              "sales_receipt",
               "other_revenue",
-              "purchase_cost",
+              "loan_in",
+              "purchase_payment",
               "labor_cost",
-              "other_expense"
+              "operating_expense",
+              "asset_purchase",
+              "loan_repay"
             ],
-            "description": "分类"
-          },
-          "amount": {
-            "type": "string",
-            "description": "金额（有符号：收入正、支出负）"
+            "nullable": true
           },
           "note": {
             "type": "string"
           },
-          "source": {
-            "type": "string",
-            "enum": [
-              "auto",
-              "manual"
-            ],
-            "description": "来源：自动 / 手工"
-          },
           "sourceType": {
             "type": "string",
             "nullable": true,
-            "description": "源单类型（如 sale_order）"
+            "description": "源单类型（sale_order）"
           },
           "sourceId": {
             "type": "string",
@@ -1736,37 +2339,49 @@
             "type": "string",
             "nullable": true,
             "description": "源单编号"
+          },
+          "sourceLabel": {
+            "type": "string",
+            "nullable": true,
+            "description": "来源显示名"
+          },
+          "editable": {
+            "type": "boolean",
+            "description": "是否可手工编辑 / 删除（源单流水为 false）"
           }
         },
         "required": [
           "id",
           "code",
+          "direction",
           "occurredDate",
-          "category",
           "amount",
+          "accountId",
+          "accountName",
+          "customerName",
+          "method",
           "note",
-          "source"
+          "editable"
         ]
       },
-      "FinanceEventListDto": {
+      "FinanceCashEntryListDto": {
         "type": "object",
         "properties": {
           "total": {
-            "type": "number",
-            "description": "总数"
+            "type": "number"
           },
           "summary": {
             "description": "筛选全量汇总（合计行）",
             "allOf": [
               {
-                "$ref": "#/components/schemas/FinanceEventSummaryDto"
+                "$ref": "#/components/schemas/FinanceCashEntryListSummaryDto"
               }
             ]
           },
           "items": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/FinanceEventListItemDto"
+              "$ref": "#/components/schemas/FinanceCashEntryDto"
             }
           }
         },
@@ -1776,231 +2391,143 @@
           "items"
         ]
       },
-      "FinanceCategorySubtotalDto": {
+      "FinanceCashSummaryDto": {
         "type": "object",
         "properties": {
-          "category": {
+          "receipts": {
             "type": "string",
-            "enum": [
-              "sales_revenue",
-              "other_revenue",
-              "purchase_cost",
-              "labor_cost",
-              "other_expense"
-            ]
+            "description": "期间收款合计"
           },
-          "income": {
+          "payments": {
             "type": "string",
-            "description": "收入小计"
+            "description": "期间付款合计"
           },
-          "cost": {
+          "netFlow": {
             "type": "string",
-            "description": "成本小计（绝对值）"
+            "description": "净流入 = 收款 − 付款"
           },
-          "net": {
+          "totalFunds": {
             "type": "string",
-            "description": "净额（收入 − 成本）"
-          }
-        },
-        "required": [
-          "category",
-          "income",
-          "cost",
-          "net"
-        ]
-      },
-      "FinanceSummaryDto": {
-        "type": "object",
-        "properties": {
-          "totalIncome": {
-            "type": "string",
-            "description": "总收入"
+            "description": "全部账户当前资金总额（含票据）"
           },
-          "totalCost": {
-            "type": "string",
-            "description": "总成本（绝对值）"
-          },
-          "netProfit": {
-            "type": "string",
-            "description": "净利润 = 总收入 − 总成本"
-          },
-          "eventCount": {
-            "type": "number",
-            "description": "事件条数"
-          },
-          "categories": {
-            "description": "分类小计（五类固定输出）",
+          "accounts": {
+            "description": "各账户当前余额",
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/FinanceCategorySubtotalDto"
+              "$ref": "#/components/schemas/FinanceAccountDto"
             }
           }
         },
         "required": [
-          "totalIncome",
-          "totalCost",
-          "netProfit",
-          "eventCount",
-          "categories"
+          "receipts",
+          "payments",
+          "netFlow",
+          "totalFunds",
+          "accounts"
         ]
       },
-      "FinanceEventDto": {
+      "FinanceReceivableDto": {
         "type": "object",
         "properties": {
-          "id": {
+          "customerId": {
             "type": "string"
           },
-          "code": {
+          "sales": {
             "type": "string",
-            "description": "事件编号（年月+当月流水）"
+            "description": "累计销售（现结取实收、赊销取合计）"
+          },
+          "receipts": {
+            "type": "string",
+            "description": "累计收款（销售回款流水合计）"
+          },
+          "outstanding": {
+            "type": "string",
+            "description": "欠款 = 销售 − 收款；负数为预收"
+          }
+        },
+        "required": [
+          "customerId",
+          "sales",
+          "receipts",
+          "outstanding"
+        ]
+      },
+      "FinanceReceivableListDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FinanceReceivableDto"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "FinanceCashEntryBodyDto": {
+        "type": "object",
+        "properties": {
+          "direction": {
+            "type": "string",
+            "enum": [
+              "in",
+              "out",
+              "transfer"
+            ],
+            "description": "方向：收款 / 付款 / 内部转账"
           },
           "occurredDate": {
             "type": "string",
-            "description": "发生日期"
+            "description": "发生日期",
+            "example": "2026-11-12"
+          },
+          "amount": {
+            "type": "string",
+            "description": "金额（正数，最多 2 位小数）",
+            "example": "1200.00"
+          },
+          "accountId": {
+            "type": "string",
+            "description": "资金账户 id"
+          },
+          "toAccountId": {
+            "type": "string",
+            "nullable": true,
+            "description": "内部转账的转入账户 id"
           },
           "category": {
             "type": "string",
             "enum": [
-              "sales_revenue",
+              "sales_receipt",
               "other_revenue",
-              "purchase_cost",
+              "loan_in",
+              "purchase_payment",
               "labor_cost",
-              "other_expense"
+              "operating_expense",
+              "asset_purchase",
+              "loan_repay"
             ],
-            "description": "分类"
+            "nullable": true,
+            "description": "收支分类：收款 3 项 / 付款 5 项；内部转账为空"
           },
-          "amount": {
+          "customerId": {
             "type": "string",
-            "description": "金额（有符号：收入正、支出负）"
+            "nullable": true,
+            "description": "客户 id（仅销售回款必填）"
           },
           "note": {
-            "type": "string"
-          },
-          "source": {
             "type": "string",
-            "enum": [
-              "auto",
-              "manual"
-            ],
-            "description": "来源：自动 / 手工"
-          },
-          "sourceType": {
-            "type": "string",
-            "nullable": true,
-            "description": "源单类型（如 sale_order）"
-          },
-          "sourceId": {
-            "type": "string",
-            "nullable": true,
-            "description": "源单 id"
-          },
-          "sourceCode": {
-            "type": "string",
-            "nullable": true,
-            "description": "源单编号"
+            "description": "备注（付款写对象与事由；承兑写票号 / 到期日）",
+            "default": ""
           }
         },
         "required": [
-          "id",
-          "code",
+          "direction",
           "occurredDate",
-          "category",
           "amount",
-          "note",
-          "source"
-        ]
-      },
-      "FinanceEventBodyDto": {
-        "type": "object",
-        "properties": {
-          "category": {
-            "type": "string",
-            "enum": [
-              "other_revenue",
-              "other_expense"
-            ],
-            "description": "分类：手工记账仅允许 other_revenue（其他收入）/ other_expense（其他支出）"
-          },
-          "occurredDate": {
-            "type": "string",
-            "description": "发生日期",
-            "example": "2026-11-10"
-          },
-          "amount": {
-            "type": "string",
-            "description": "金额（按正数提交、最多 2 位小数；符号由分类决定）",
-            "example": "350.25"
-          },
-          "note": {
-            "type": "string",
-            "description": "备注（具体事由）",
-            "default": ""
-          }
-        },
-        "required": [
-          "category",
-          "occurredDate",
-          "amount"
-        ]
-      },
-      "FinanceEventUpdateBodyDto": {
-        "type": "object",
-        "properties": {
-          "category": {
-            "type": "string",
-            "enum": [
-              "other_revenue",
-              "other_expense"
-            ],
-            "description": "分类：手工记账仅允许 other_revenue（其他收入）/ other_expense（其他支出）"
-          },
-          "occurredDate": {
-            "type": "string",
-            "description": "发生日期",
-            "example": "2026-11-10"
-          },
-          "amount": {
-            "type": "string",
-            "description": "金额（按正数提交、最多 2 位小数；符号由分类决定）",
-            "example": "350.25"
-          },
-          "note": {
-            "type": "string",
-            "description": "备注（具体事由）",
-            "default": ""
-          }
-        },
-        "required": [
-          "category",
-          "occurredDate",
-          "amount"
-        ]
-      },
-      "FinanceEventBatchDeleteBodyDto": {
-        "type": "object",
-        "properties": {
-          "ids": {
-            "description": "要删除的事件 id 列表（1~200，仅手工事件）",
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        },
-        "required": [
-          "ids"
-        ]
-      },
-      "FinanceEventBatchDeleteResponseDto": {
-        "type": "object",
-        "properties": {
-          "deleted": {
-            "type": "number",
-            "description": "实际删除（软删除）条数"
-          }
-        },
-        "required": [
-          "deleted"
+          "accountId"
         ]
       },
       "SaleOrderSummaryDto": {
@@ -2065,6 +2592,23 @@
           },
           "note": {
             "type": "string"
+          },
+          "settlementMode": {
+            "type": "string",
+            "enum": [
+              "credit",
+              "settled"
+            ],
+            "description": "结算方式"
+          },
+          "receivedAmount": {
+            "type": "string",
+            "description": "实收金额（赊销为 0）"
+          },
+          "settleAccountId": {
+            "type": "string",
+            "nullable": true,
+            "description": "现结收款账户 id"
           }
         },
         "required": [
@@ -2077,7 +2621,9 @@
           "subtotalAmount",
           "otherAmount",
           "totalAmount",
-          "note"
+          "note",
+          "settlementMode",
+          "receivedAmount"
         ]
       },
       "SaleOrderListDto": {
@@ -2265,6 +2811,23 @@
           "note": {
             "type": "string"
           },
+          "settlementMode": {
+            "type": "string",
+            "enum": [
+              "credit",
+              "settled"
+            ],
+            "description": "结算方式"
+          },
+          "receivedAmount": {
+            "type": "string",
+            "description": "实收金额（赊销为 0）"
+          },
+          "settleAccountId": {
+            "type": "string",
+            "nullable": true,
+            "description": "现结收款账户 id"
+          },
           "customerCode": {
             "type": "string",
             "nullable": true,
@@ -2293,6 +2856,8 @@
           "otherAmount",
           "totalAmount",
           "note",
+          "settlementMode",
+          "receivedAmount",
           "customerDeleted",
           "items"
         ]
@@ -2375,6 +2940,25 @@
             "type": "string",
             "description": "备注",
             "default": ""
+          },
+          "settlementMode": {
+            "type": "string",
+            "enum": [
+              "credit",
+              "settled"
+            ],
+            "description": "结算方式：赊销（默认）/ 现结",
+            "default": "credit"
+          },
+          "settleAccountId": {
+            "type": "string",
+            "nullable": true,
+            "description": "现结收款账户 id（现结必填）"
+          },
+          "receivedAmount": {
+            "type": "string",
+            "nullable": true,
+            "description": "实收金额（现结默认等于合计，可抹零 / 约整）"
           },
           "items": {
             "description": "明细行（至少一行）",
@@ -2473,6 +3057,25 @@
             "description": "备注",
             "default": ""
           },
+          "settlementMode": {
+            "type": "string",
+            "enum": [
+              "credit",
+              "settled"
+            ],
+            "description": "结算方式：赊销（默认）/ 现结",
+            "default": "credit"
+          },
+          "settleAccountId": {
+            "type": "string",
+            "nullable": true,
+            "description": "现结收款账户 id（现结必填）"
+          },
+          "receivedAmount": {
+            "type": "string",
+            "nullable": true,
+            "description": "实收金额（现结默认等于合计）"
+          },
           "items": {
             "description": "明细行（至少一行；已有行带 id）",
             "type": "array",
@@ -2512,6 +3115,23 @@
         },
         "required": [
           "deleted"
+        ]
+      },
+      "SaleOrderPrintEventDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "销售单 id"
+          },
+          "code": {
+            "type": "string",
+            "description": "销售单编号快照"
+          }
+        },
+        "required": [
+          "id",
+          "code"
         ]
       }
     }

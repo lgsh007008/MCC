@@ -2,6 +2,7 @@ export * from './pagination.schemas';
 export * from './auth.permissions';
 export * from './auth.schemas';
 export * from './customer.schemas';
+export * from './audit.schemas';
 export * from './order.calc';
 export * from './order.schemas';
 export * from './finance.calc';

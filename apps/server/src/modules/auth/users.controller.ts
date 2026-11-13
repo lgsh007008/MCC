@@ -12,6 +12,7 @@ import {
   type UserRoleInput,
   type UserStatusInput,
 } from '@mcc/shared';
+import { AuditAction } from '../../common/decorators/audit-action.decorator.js';
 import { CurrentUser, type AuthUser } from '../../common/decorators/current-user.decorator.js';
 import { RequireScopes } from '../../common/decorators/require-scopes.decorator.js';
 import { ZodValidationPipe } from '../../common/zod-validation.pipe.js';
@@ -43,6 +44,7 @@ export class UsersController {
   }
 
   @Post()
+  @AuditAction({ domain: 'auth', action: 'create-user', label: '新建账号', objectType: 'user' })
   @HttpCode(201)
   @ApiOperation({ summary: '新建账号（租户内账号唯一；初始密码至少 8 位）' })
   @ApiBody({ type: UserCreateBodyDto })
@@ -54,6 +56,7 @@ export class UsersController {
   }
 
   @Patch(':id/status')
+  @AuditAction({ domain: 'auth', action: 'change-user-status', label: '启停用账号', objectType: 'user' })
   @ApiOperation({ summary: '启用 / 停用账号（不能停用自己或最后一个启用管理员）' })
   @ApiBody({ type: UserStatusBodyDto })
   @ApiOkResponse({ type: UserDto })
@@ -66,6 +69,7 @@ export class UsersController {
   }
 
   @Patch(':id/role')
+  @AuditAction({ domain: 'auth', action: 'change-user-role', label: '修改账号角色', objectType: 'user' })
   @ApiOperation({ summary: '修改角色（不能降级最后一个启用管理员）' })
   @ApiBody({ type: UserRoleBodyDto })
   @ApiOkResponse({ type: UserDto })
@@ -77,6 +81,7 @@ export class UsersController {
   }
 
   @Post(':id/reset-password')
+  @AuditAction({ domain: 'auth', action: 'reset-user-password', label: '重置账号密码', objectType: 'user' })
   @HttpCode(204)
   @ApiOperation({ summary: '重置账号密码并撤销该账号全部刷新会话' })
   @ApiBody({ type: UserResetPasswordBodyDto })

@@ -84,7 +84,7 @@ describe('账号管理与 RBAC（契约/集成）', () => {
   it('工人只读：可看销售单，客户 / 财务 / 账号与写操作均 403', async () => {
     expect((await auth(http().get(`/${API_PREFIX}/sale-orders`), workerToken)).status).toBe(200);
     expect((await auth(http().get(`/${API_PREFIX}/customers`), workerToken)).status).toBe(403);
-    expect((await auth(http().get(`/${API_PREFIX}/finance/events`), workerToken)).status).toBe(403);
+    expect((await auth(http().get(`/${API_PREFIX}/finance/cash-entries`), workerToken)).status).toBe(403);
     expect((await auth(http().get(`/${API_PREFIX}/users`), workerToken)).status).toBe(403);
 
     const write = await auth(http().post(`/${API_PREFIX}/sale-orders`), workerToken).send({});
@@ -165,7 +165,7 @@ describe('账号管理与 RBAC（契约/集成）', () => {
     expect(changed.body.role).toBe('FINANCE');
 
     const financeToken = (await login(workerName, 'NewSecret#123')).body.accessToken as string;
-    expect((await auth(http().get(`/${API_PREFIX}/finance/events`), financeToken)).status).toBe(200);
+    expect((await auth(http().get(`/${API_PREFIX}/finance/cash-entries`), financeToken)).status).toBe(200);
     expect((await auth(http().get(`/${API_PREFIX}/customers`), financeToken)).status).toBe(200);
   });
 });

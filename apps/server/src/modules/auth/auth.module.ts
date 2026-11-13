@@ -1,4 +1,5 @@
 ﻿import { Module } from '@nestjs/common';
+import { AuditModule } from '../audit/index.js';
 import { AuthController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';
 import { UsersController } from './users.controller.js';
@@ -8,6 +9,7 @@ import { UsersService } from './users.service.js';
 // user / refresh_token 表归本模块（数据所有权，技术方案 §4.2）。
 // Prisma/Redis 连接来自全局基础设施模块（common/prisma.module、common/redis.module），本模块不重复提供。
 @Module({
+  imports: [AuditModule],
   controllers: [AuthController, UsersController],
   providers: [AuthService, UsersService],
   exports: [AuthService],

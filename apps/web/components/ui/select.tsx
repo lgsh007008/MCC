@@ -22,6 +22,7 @@ export function Select({
   options,
   placeholder = '请选择',
   disabled,
+  ariaLabel,
   className,
 }: {
   id?: string;
@@ -30,6 +31,7 @@ export function Select({
   options: SelectOption[];
   placeholder?: string;
   disabled?: boolean;
+  ariaLabel?: string;
   className?: string;
 }): React.ReactElement {
   const selected = options.find((option) => option.value === value);
@@ -41,6 +43,7 @@ export function Select({
     >
       <SelectPrimitive.Trigger
         id={id}
+        aria-label={ariaLabel}
         className={cn(
           'flex h-8 items-center justify-between gap-2 rounded-md border border-input bg-background px-2 text-sm outline-none',
           'focus-visible:border-ring disabled:cursor-not-allowed disabled:opacity-50',

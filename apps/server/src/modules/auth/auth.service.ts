@@ -18,9 +18,16 @@ import {
 } from './auth.constants.js';
 
 export interface LoginResult {
+  userId: string;
   accessToken: string;
   refreshToken: string;
   rememberMe: boolean;
+  username: string;
+  role: UserRole;
+}
+
+export interface LogoutResult {
+  userId: string;
   username: string;
   role: UserRole;
 }
@@ -77,6 +84,7 @@ export class AuthService {
     });
 
     return {
+      userId: user.id,
       accessToken: this.signAccessToken(user),
       refreshToken,
       rememberMe,
@@ -106,15 +114,23 @@ export class AuthService {
     return { accessToken: this.signAccessToken(record.user) };
   }
 
-  // 登出：撤销当前刷新令牌（记录保留，供审计）。
-  async logout(refreshToken: string | undefined): Promise<void> {
+  // 登出：撤销当前刷新令牌（记录保留，供审计）；返回操作者供 controller 记录审计。
+  async logout(refreshToken: string | undefined): Promise<LogoutResult | null> {
     if (!refreshToken) {
-      return;
+      return null;
     }
+    const record = await this.prisma.client.refreshToken.findFirst({
+      where: { tokenHash: sha256(refreshToken) },
+      include: { user: true },
+    });
     await this.prisma.client.refreshToken.updateMany({
       where: { tokenHash: sha256(refreshToken), revokedAt: null },
       data: { revokedAt: new Date() },
     });
+    if (!record || record.user.deletedAt !== null) {
+      return null;
+    }
+    return { userId: record.user.id, username: record.user.username, role: record.user.role };
   }
 
   // 修改密码：校验旧密码 → 更新哈希 → 撤销该账号全部刷新会话（其他端需重新登录）。

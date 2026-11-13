@@ -6,6 +6,7 @@ import { CopyIcon, Trash2Icon } from 'lucide-react';
 import {
   calcLineAmount,
   calcOrderTotals,
+  calcSettlementDifference,
   calcVolumeM3,
   saleOrderUpdateSchema,
 } from '@mcc/shared';
@@ -13,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Segmented } from '@/components/ui/segmented';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { MobileActionBar, MobileHeader } from '@/components/mobile/mobile-shell';
@@ -43,6 +45,11 @@ interface CustomerOption {
   code: string;
   name: string;
   status: string;
+}
+
+interface AccountOption {
+  id: string;
+  name: string;
 }
 
 const pad = (n: number): string => String(n).padStart(2, '0');
@@ -80,7 +87,7 @@ function MobileField({
 }): React.ReactElement {
   return (
     <div className="space-y-1.5">
-      <Label htmlFor={htmlFor} className="text-sm text-muted-foreground">
+      <Label htmlFor={htmlFor} className="text-mobile-label text-muted-foreground">
         {label}
       </Label>
       {children}
@@ -99,6 +106,14 @@ export function MobileSaleOrderForm({
   const [saleDate, setSaleDate] = useState(initial?.saleDate ?? localToday());
   const [customerId, setCustomerId] = useState(initial?.customerId ?? '');
   const [customerOptions, setCustomerOptions] = useState<CustomerOption[]>([]);
+  // 结算：与 PC 表单同口径，现结才落收款账户与实收金额
+  const [settlementMode, setSettlementMode] = useState<'credit' | 'settled'>(
+    initial?.settlementMode ?? 'credit',
+  );
+  const [settleAccountId, setSettleAccountId] = useState(initial?.settleAccountId ?? '');
+  const [receivedAmount, setReceivedAmount] = useState(initial?.receivedAmount ?? '');
+  const [receivedTouched, setReceivedTouched] = useState(false);
+  const [accountOptions, setAccountOptions] = useState<AccountOption[]>([]);
   const [otherAmount, setOtherAmount] = useState(initial?.otherAmount ?? '0');
   const [note, setNote] = useState(initial?.note ?? '');
   const [items, setItems] = useState<FormRow[]>(() =>
@@ -161,6 +176,34 @@ export function MobileSaleOrderForm({
     };
   }, [initial?.customerId]);
 
+  // 收款账户：只列启用账户；仅一个时自动选中，多个时必选（与 PC 同口径）
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { data, response } = await api.GET('/api/v1/finance/accounts');
+        if (cancelled || !response.ok || !data) {
+          return;
+        }
+        const options = data.items
+          .filter((item) => item.active)
+          .map((item) => ({ id: item.id, name: item.name }));
+        setAccountOptions(options);
+        const onlyId = options[0]?.id;
+        if (options.length === 1 && onlyId) {
+          setSettleAccountId((current) => current || onlyId);
+        }
+      } catch {
+        if (!cancelled) {
+          setAccountOptions([]);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const patchRow = (index: number, patch: Partial<FormRow>): void => {
     setItems((rows) => rows.map((row, i) => (i === index ? { ...row, ...patch } : row)));
   };
@@ -214,6 +257,23 @@ export function MobileSaleOrderForm({
     decimalOk(otherAmount, 2) ? otherAmount : '0.00',
   );
 
+  const settled = settlementMode === 'settled';
+  const effectiveReceived = settled
+    ? receivedTouched
+      ? receivedAmount
+      : totals.totalAmount
+    : '';
+  const settlementDiff =
+    settled && decimalOk(effectiveReceived, 2)
+      ? calcSettlementDifference(totals.totalAmount, effectiveReceived)
+      : '0.00';
+  // 差额白话化：小于合计为抹零、大于合计为预收
+  const settlementDiffText = settlementDiff.startsWith('-')
+    ? `预收 ${settlementDiff.slice(1)} 元`
+    : settlementDiff === '0.00'
+      ? '与合计一致'
+      : `抹零 ${settlementDiff} 元`;
+
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     setError(null);
@@ -222,6 +282,9 @@ export function MobileSaleOrderForm({
       customerId,
       otherAmount: normalizeMoney(otherAmount),
       note,
+      settlementMode,
+      settleAccountId: settled ? settleAccountId || null : null,
+      receivedAmount: settled ? effectiveReceived : null,
       items: items.map((row) => ({
         id: row.id,
         lengthMm: row.lengthMm,
@@ -300,9 +363,65 @@ export function MobileSaleOrderForm({
                         : `${option.code} ${option.name}${option.status === 'active' ? '' : '（已停用）'}`,
                   })),
                 ]}
-                className="h-12 w-full px-3 text-base"
+                className="h-12 w-full px-3 text-mobile-body"
               />
             </MobileField>
+
+            <MobileField label="结算方式">
+              <Segmented
+                ariaLabel="结算方式"
+                value={settlementMode}
+                options={[
+                  { value: 'credit', label: '赊销' },
+                  { value: 'settled', label: '现结' },
+                ]}
+                onValueChange={(next) => {
+                  setSettlementMode(next);
+                  if (next === 'credit') {
+                    setSettleAccountId('');
+                    setReceivedAmount('');
+                    setReceivedTouched(false);
+                  }
+                }}
+              />
+            </MobileField>
+
+            {settled ? (
+              <>
+                <MobileField label="收款账户" htmlFor="mobileSettleAccount">
+                  <Select
+                    id="mobileSettleAccount"
+                    value={settleAccountId}
+                    onChange={setSettleAccountId}
+                    options={[
+                      { value: '', label: '请选择收款账户' },
+                      ...accountOptions.map((account) => ({
+                        value: account.id,
+                        label: account.name,
+                      })),
+                    ]}
+                    className="h-12 w-full px-3 text-mobile-body"
+                  />
+                </MobileField>
+
+                <MobileField label="实收金额（元）" htmlFor="mobileReceivedAmount">
+                  <Input
+                    id="mobileReceivedAmount"
+                    value={effectiveReceived}
+                    onChange={(e) => {
+                      setReceivedTouched(true);
+                      setReceivedAmount(e.target.value);
+                    }}
+                    placeholder="0.00"
+                    inputMode="decimal"
+                    className="h-12 w-full text-mobile-body"
+                  />
+                  <p className="text-mobile-label text-muted-foreground tabular-nums">
+                    {settlementDiffText}
+                  </p>
+                </MobileField>
+              </>
+            ) : null}
 
             <MobileField label="其他金额（元）" htmlFor="mobileOtherAmount">
               <Input
@@ -311,7 +430,7 @@ export function MobileSaleOrderForm({
                 value={otherAmount}
                 onChange={(e) => setOtherAmount(e.target.value)}
                 placeholder="运费等"
-                className="h-12 text-base tabular-nums"
+                className="h-12 text-mobile-body tabular-nums"
               />
             </MobileField>
 
@@ -320,15 +439,15 @@ export function MobileSaleOrderForm({
                 id="mobileNote"
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
-                className="min-h-12 text-base"
+                className="min-h-12 text-mobile-body"
               />
             </MobileField>
           </section>
 
           <section className="space-y-3">
             <div className="flex items-center justify-between px-1">
-              <h2 className="text-base font-semibold">明细</h2>
-              <span className="text-sm text-muted-foreground">
+              <h2 className="text-mobile-body font-semibold">明细</h2>
+              <span className="text-mobile-caption text-muted-foreground">
                 共 {items.length} / {MAX_ROWS} 行
               </span>
             </div>
@@ -343,12 +462,12 @@ export function MobileSaleOrderForm({
                   className="rounded-xl border border-border bg-card p-4"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-base font-medium">第 {index + 1} 行</span>
+                    <span className="text-mobile-body font-medium">第 {index + 1} 行</span>
                     <div className="flex items-center gap-1">
                       <Button
                         type="button"
                         variant="ghost"
-                        className="h-11 px-3 text-sm"
+                        className="h-11 px-3 text-mobile-label"
                         disabled={rowFull}
                         onClick={() => copyRow(index)}
                       >
@@ -358,7 +477,7 @@ export function MobileSaleOrderForm({
                       <Button
                         type="button"
                         variant="ghost"
-                        className="h-11 px-3 text-sm text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        className="h-11 px-3 text-mobile-label text-destructive hover:bg-destructive/10 hover:text-destructive"
                         onClick={() => removeRow(index)}
                       >
                         <Trash2Icon className="size-4" />
@@ -374,7 +493,7 @@ export function MobileSaleOrderForm({
                         inputMode="numeric"
                         value={row.lengthMm}
                         onChange={(e) => patchRow(index, { lengthMm: e.target.value })}
-                        className="h-12 text-lg tabular-nums"
+                        className="h-12 text-mobile-numeric tabular-nums"
                       />
                     </MobileField>
                     <MobileField label="宽度(mm)">
@@ -383,7 +502,7 @@ export function MobileSaleOrderForm({
                         inputMode="numeric"
                         value={row.widthMm}
                         onChange={(e) => patchRow(index, { widthMm: e.target.value })}
-                        className="h-12 text-lg tabular-nums"
+                        className="h-12 text-mobile-numeric tabular-nums"
                       />
                     </MobileField>
                     <MobileField label="高度(mm)">
@@ -392,7 +511,7 @@ export function MobileSaleOrderForm({
                         inputMode="numeric"
                         value={row.heightMm}
                         onChange={(e) => patchRow(index, { heightMm: e.target.value })}
-                        className="h-12 text-lg tabular-nums"
+                        className="h-12 text-mobile-numeric tabular-nums"
                       />
                     </MobileField>
                     <MobileField label="根数">
@@ -401,7 +520,7 @@ export function MobileSaleOrderForm({
                         inputMode="numeric"
                         value={row.pieces}
                         onChange={(e) => patchRow(index, { pieces: e.target.value })}
-                        className="h-12 text-lg tabular-nums"
+                        className="h-12 text-mobile-numeric tabular-nums"
                       />
                     </MobileField>
                   </div>
@@ -417,7 +536,7 @@ export function MobileSaleOrderForm({
                           { value: 'volume', label: '按方量' },
                           { value: 'piece', label: '按根数' },
                         ]}
-                        className="h-12 w-full px-3 text-base"
+                        className="h-12 w-full px-3 text-mobile-body"
                       />
                     </MobileField>
                     <MobileField
@@ -428,7 +547,7 @@ export function MobileSaleOrderForm({
                         inputMode="decimal"
                         value={row.price}
                         onChange={(e) => patchRow(index, { price: e.target.value })}
-                        className="h-12 text-lg tabular-nums"
+                        className="h-12 text-mobile-numeric tabular-nums"
                       />
                     </MobileField>
                     <MobileField label="其他金额（元）">
@@ -436,19 +555,19 @@ export function MobileSaleOrderForm({
                         inputMode="decimal"
                         value={row.otherAmount}
                         onChange={(e) => patchRow(index, { otherAmount: e.target.value })}
-                        className="h-12 text-base tabular-nums"
+                        className="h-12 text-mobile-body tabular-nums"
                       />
                     </MobileField>
                     <MobileField label="备注">
                       <Input
                         value={row.note}
                         onChange={(e) => patchRow(index, { note: e.target.value })}
-                        className="h-12 text-base"
+                        className="h-12 text-mobile-body"
                       />
                     </MobileField>
                   </div>
 
-                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3 text-base">
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3 text-mobile-body">
                     <span>
                       方量 <strong className="tabular-nums">{volume ?? '—'}</strong> m³
                     </span>
@@ -463,7 +582,7 @@ export function MobileSaleOrderForm({
             <Button
               type="button"
               variant="outline"
-              className="h-12 w-full text-base"
+              className="h-12 w-full text-mobile-body"
               disabled={rowFull}
               onClick={addRow}
             >
@@ -477,7 +596,7 @@ export function MobileSaleOrderForm({
         <div className="fixed inset-x-0 bottom-[76px] z-30 mx-auto w-full max-w-[560px] px-4">
           <p
             role="alert"
-            className="rounded-lg border border-destructive/40 bg-background p-3 text-base text-destructive"
+            className="rounded-lg border border-destructive/40 bg-background p-3 text-mobile-body text-destructive"
           >
             {error}
           </p>
@@ -486,17 +605,17 @@ export function MobileSaleOrderForm({
 
       <MobileActionBar>
         <div className="min-w-0 flex-1">
-          <p className="text-xs text-muted-foreground">合计方量</p>
-          <p className="text-lg font-semibold tabular-nums">{totals.totalVolume} m³</p>
+          <p className="text-mobile-caption text-muted-foreground">合计方量</p>
+          <p className="text-mobile-numeric font-semibold tabular-nums">{totals.totalVolume} m³</p>
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-xs text-muted-foreground">合计金额</p>
-          <p className="text-lg font-semibold tabular-nums">{totals.totalAmount} 元</p>
+          <p className="text-mobile-caption text-muted-foreground">合计金额</p>
+          <p className="text-mobile-numeric font-semibold tabular-nums">{totals.totalAmount} 元</p>
         </div>
         <Button
           type="submit"
           form="mobile-sale-order-form"
-          className="h-12 px-6 text-base"
+          className="h-12 px-6 text-mobile-body"
           disabled={submitting}
         >
           {submitting ? '保存中…' : '保存'}
