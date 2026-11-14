@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Trash2Icon } from 'lucide-react';
-import { absMoney } from '@mcc/shared';
+import { absMoney, type ApiSchemas } from '@mcc/shared';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { useCan } from '@/components/auth/permission-context';
@@ -16,90 +17,65 @@ import { cn } from '@/lib/utils';
 
 // 客户移动详情（product/customer.md 移动页）：名称 + 状态 / 联系信息 / 备注 / 创建日期；
 // customer:manage 可停用（需确认）/ 启用（直接）/ 删除（确认前查销售单数量）；不展示编号与累计方量。
-interface CustomerDetail {
-  id: string;
-  name: string;
-  contact: string;
-  note: string;
-  status: string;
-  openingDebt: string;
-  createdAt: string;
-}
+type CustomerDetail = ApiSchemas['CustomerDto'];
 
 export default function MobileCustomerDetailPage(): React.ReactElement {
   const canManage = useCan('customer:manage');
   const params = useParams<{ id: string }>();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const confirm = useConfirm();
-  const [customer, setCustomer] = useState<CustomerDetail | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
-  // 四个累计（product/customer.md 移动详情）：方量取 order 聚合、应收三项取 finance
-  const [accrual, setAccrual] = useState({
-    volume: '0.0000',
-    sales: '0.00',
-    receipts: '0.00',
-    outstanding: '0.00',
+
+  const customerQuery = useQuery({
+    queryKey: ['customers', params.id],
+    queryFn: async (): Promise<CustomerDetail> => {
+      const { data: res, response } = await api.GET('/api/v1/customers/{id}', {
+        params: { path: { id: params.id } },
+      });
+      if (!response.ok || !res) {
+        throw new Error('客户不存在或加载失败');
+      }
+      return res;
+    },
   });
 
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      const [volumeRes, receivableRes] = await Promise.all([
-        api
-          .GET('/api/v1/sale-orders/customer-volume-summary', {
-            params: { query: { customerIds: params.id } },
-          })
-          .catch(() => null),
-        api
-          .GET('/api/v1/finance/receivables', {
-            params: { query: { customerIds: params.id } },
-          })
-          .catch(() => null),
-      ]);
-      if (cancelled) {
-        return;
-      }
-      const volume = volumeRes?.data?.items[0]?.totalVolume;
-      const receivable = receivableRes?.data?.items[0];
-      setAccrual({
-        volume: volume ?? '0.0000',
-        sales: receivable?.sales ?? '0.00',
-        receipts: receivable?.receipts ?? '0.00',
-        outstanding: receivable?.outstanding ?? '0.00',
+  // 四个累计（product/customer.md 移动详情）：方量取 order 聚合、应收三项取 finance；失败按 0 展示
+  const volumeQuery = useQuery({
+    queryKey: ['sale-orders', 'customer-volume-summary', params.id],
+    queryFn: async (): Promise<ApiSchemas['CustomerVolumeSummaryDto']> => {
+      const { data: res, response } = await api.GET('/api/v1/sale-orders/customer-volume-summary', {
+        params: { query: { customerIds: params.id } },
       });
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [params.id]);
-
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const { data, response } = await api.GET('/api/v1/customers/{id}', {
-          params: { path: { id: params.id } },
-        });
-        if (cancelled) {
-          return;
-        }
-        if (!response.ok || !data) {
-          setError('客户不存在或加载失败');
-          return;
-        }
-        setCustomer(data);
-      } catch {
-        if (!cancelled) {
-          setError('客户不存在或加载失败');
-        }
+      if (!response.ok || !res) {
+        throw new Error('加载失败，请稍后重试');
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [params.id]);
+      return res;
+    },
+  });
+  const receivableQuery = useQuery({
+    queryKey: ['finance-receivables', params.id],
+    queryFn: async (): Promise<ApiSchemas['FinanceReceivableListDto']> => {
+      const { data: res, response } = await api.GET('/api/v1/finance/receivables', {
+        params: { query: { customerIds: params.id } },
+      });
+      if (!response.ok || !res) {
+        throw new Error('加载失败，请稍后重试');
+      }
+      return res;
+    },
+  });
+
+  const customer = customerQuery.data;
+  const receivable = receivableQuery.data?.items[0];
+  const accrual = {
+    volume: volumeQuery.data?.items[0]?.totalVolume ?? '0.0000',
+    sales: receivable?.sales ?? '0.00',
+    receipts: receivable?.receipts ?? '0.00',
+    outstanding: receivable?.outstanding ?? '0.00',
+  };
+  const error = customerQuery.isError && !customer ? '客户不存在或加载失败' : null;
 
   async function handleToggleStatus(): Promise<void> {
     if (!customer) {
@@ -117,7 +93,7 @@ export default function MobileCustomerDetailPage(): React.ReactElement {
         if (!response.ok) {
           throw new Error('操作失败，请稍后重试');
         }
-        setCustomer({ ...customer, status: next });
+        await queryClient.invalidateQueries({ queryKey: ['customers'] });
       } finally {
         setBusy(false);
       }
@@ -171,6 +147,7 @@ export default function MobileCustomerDetailPage(): React.ReactElement {
             if (!response.ok) {
               throw new Error('删除失败，请稍后重试');
             }
+            await queryClient.invalidateQueries({ queryKey: ['customers'] });
             router.replace('/m/customers');
           } finally {
             setBusy(false);

@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
+import type { ApiSchemas } from '@mcc/shared';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { useCan } from '@/components/auth/permission-context';
 import { usePageCrumb } from '@/components/admin/page-breadcrumb';
@@ -21,86 +22,43 @@ import { api } from '@/lib/api';
 
 // 销售单详情页（product/order.md R-订单-001 页面设计）：主表信息 + 明细表 + 合计区（只读）。
 
-interface SaleOrderItemDetail {
-  id: string;
-  seq: number;
-  code: string;
-  productType: string;
-  pricingMode: 'volume' | 'piece';
-  lengthMm: number;
-  widthMm: number;
-  heightMm: number;
-  pieces: number;
-  volumeM3: string;
-  price: string;
-  lineAmount: string;
-  otherAmount: string;
-  note: string;
-}
-
-interface SaleOrderDetail {
-  id: string;
-  code: string;
-  saleDate: string;
-  customerId: string;
-  customerName: string;
-  customerCode?: string | null;
-  customerDeleted?: boolean;
-  totalVolume: string;
-  subtotalAmount: string;
-  otherAmount: string;
-  totalAmount: string;
-  note: string;
-  settlementMode: 'credit' | 'settled';
-  receivedAmount: string;
-  settleAccountId?: string | null;
-  items: SaleOrderItemDetail[];
-}
+type SaleOrderDetail = ApiSchemas['SaleOrderDto'];
 
 export default function SaleOrderDetailPage(): React.ReactElement {
   const params = useParams<{ id: string }>();
   const [printOpen, setPrintOpen] = useState(false);
-  const [settleAccountName, setSettleAccountName] = useState('');
   const canManage = useCan('order:manage');
   // 查询带缓存（技术方案 §7.4）：切回标签先用缓存渲染，后台刷新，避免闪「加载中」
-  const { data: order, error: queryError } = useQuery({
-    queryKey: ['sale-order', params.id],
+  const orderQuery = useQuery({
+    queryKey: ['sale-orders', params.id],
     queryFn: async (): Promise<SaleOrderDetail> => {
-      const { data, response } = await api.GET('/api/v1/sale-orders/{id}', {
+      const { data: res, response } = await api.GET('/api/v1/sale-orders/{id}', {
         params: { path: { id: params.id } },
       });
-      if (!response.ok || !data) {
+      if (!response.ok || !res) {
         throw new Error('销售单不存在或加载失败');
       }
-      return data;
+      return res;
     },
   });
-  const error = queryError ? '销售单不存在或加载失败' : null;
+  const order = orderQuery.data;
+  const error = orderQuery.isError ? '销售单不存在或加载失败' : null;
 
   // 现结收款账户名称（详情只读展示）
-  useEffect(() => {
-    if (!order?.settleAccountId) {
-      setSettleAccountName('');
-      return;
-    }
-    let cancelled = false;
-    void (async () => {
-      try {
-        const { data, response } = await api.GET('/api/v1/finance/accounts');
-        if (!cancelled && response.ok && data) {
-          const account = data.items.find((item) => item.id === order.settleAccountId);
-          setSettleAccountName(account?.name ?? '');
-        }
-      } catch {
-        if (!cancelled) {
-          setSettleAccountName('');
-        }
+  const accountsQuery = useQuery({
+    queryKey: ['finance-accounts', 'options'],
+    queryFn: async (): Promise<ApiSchemas['FinanceAccountDto'][]> => {
+      const { data: res, response } = await api.GET('/api/v1/finance/accounts');
+      if (!response.ok || !res) {
+        throw new Error('加载失败，请稍后重试');
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [order?.settleAccountId]);
+      return res.items;
+    },
+    enabled: Boolean(order?.settleAccountId),
+  });
+  const settleAccountName = order?.settleAccountId
+    ? (accountsQuery.data?.find((item) => item.id === order.settleAccountId)?.name ?? '')
+    : '';
 
   // 面包屑页面标识 = 销售单编号（product/order.md 详情页）
   usePageCrumb(order ? [{ title: order.code }] : []);
@@ -108,7 +66,7 @@ export default function SaleOrderDetailPage(): React.ReactElement {
   if (error) {
     return <p className="text-sm text-destructive">{error}</p>;
   }
-  if (!order) {
+  if (orderQuery.isPending || !order) {
     return <p className="text-sm text-muted-foreground">加载中…</p>;
   }
 

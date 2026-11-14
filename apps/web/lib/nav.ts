@@ -1,11 +1,13 @@
 import {
   ArrowLeftRightIcon,
   BarChart3Icon,
-  ContactIcon,
+  Building2Icon,
+  ClipboardListIcon,
   FileTextIcon,
   HomeIcon,
   ScrollTextIcon,
   ShoppingCartIcon,
+  TruckIcon,
   UserCogIcon,
   UsersIcon,
   WalletIcon,
@@ -50,16 +52,22 @@ export const homeItem: NavItem = { title: '首页', icon: HomeIcon, href: '/admi
 
 export const navGroups: NavGroup[] = [
   {
-    label: '订单',
+    label: '销售',
     domain: 'order',
     icon: ShoppingCartIcon,
-    items: [{ title: '销售单', icon: FileTextIcon, href: '/admin/sale-orders', scope: 'order:view' }],
+    items: [
+      { title: '销售单', icon: FileTextIcon, href: '/admin/sale-orders', scope: 'order:view' },
+      { title: '客户档案', icon: UsersIcon, href: '/admin/customers', scope: 'customer:view' },
+    ],
   },
   {
-    label: '客户',
-    domain: 'customer',
-    icon: ContactIcon,
-    items: [{ title: '客户档案', icon: UsersIcon, href: '/admin/customers', scope: 'customer:view' }],
+    label: '采购',
+    domain: 'purchase',
+    icon: TruckIcon,
+    items: [
+      { title: '采购单', icon: ClipboardListIcon, href: '/admin/purchases', scope: 'purchase:view' },
+      { title: '供应商', icon: Building2Icon, href: '/admin/suppliers', scope: 'supplier:view' },
+    ],
   },
   {
     label: '财务',
@@ -114,6 +122,43 @@ export function findNavByPath(pathname: string): NavMatch | null {
   return null;
 }
 
+/** 移动 Web 路径 → 所需 scope（与 PC 共用同一套权限，不按端拆分；服务端守卫仍是最终边界） */
+const MOBILE_MANAGE_PATHS: Array<[RegExp, Scope]> = [
+  [/^\/m\/sale-orders\/(new|[^/]+\/edit)$/, 'order:manage'],
+  [/^\/m\/customers\/(new|[^/]+\/edit)$/, 'customer:manage'],
+  [/^\/m\/purchase\/orders\/(new|[^/]+\/edit)$/, 'purchase:manage'],
+  [/^\/m\/purchase\/suppliers\/(new|[^/]+\/edit)$/, 'supplier:manage'],
+  [/^\/m\/finance\/cash\/(new|[^/]+\/edit)$/, 'finance:manage'],
+];
+
+export function scopeForMobilePath(pathname: string): Scope | null {
+  for (const [pattern, scope] of MOBILE_MANAGE_PATHS) {
+    if (pattern.test(pathname)) {
+      return scope;
+    }
+  }
+  if (pathname.startsWith('/m/sale-orders')) {
+    return 'order:view';
+  }
+  if (pathname.startsWith('/m/customers')) {
+    return 'customer:view';
+  }
+  // 销售二级入口本身只做分发，卡片的可见性由页面内 useCan 裁剪
+  if (pathname === '/m/sales') {
+    return null;
+  }
+  if (pathname.startsWith('/m/purchase/orders') || pathname === '/m/purchase') {
+    return 'purchase:view';
+  }
+  if (pathname.startsWith('/m/purchase/suppliers')) {
+    return 'supplier:view';
+  }
+  if (pathname.startsWith('/m/finance')) {
+    return 'finance:view';
+  }
+  return null;
+}
+
 /** 路径 → 所需 scope（前端路由裁剪；服务端守卫仍是最终边界） */
 export function scopeForPath(pathname: string): Scope | null {
   if (pathname === '/admin/users') {
@@ -121,6 +166,16 @@ export function scopeForPath(pathname: string): Scope | null {
   }
   if (pathname.startsWith('/admin/audit-logs')) {
     return 'audit:view';
+  }
+  if (pathname.startsWith('/admin/purchases')) {
+    return /^\/admin\/purchases\/(new|[^/]+\/edit)$/.test(pathname)
+      ? 'purchase:manage'
+      : 'purchase:view';
+  }
+  if (pathname.startsWith('/admin/suppliers')) {
+    return /^\/admin\/suppliers\/(new|[^/]+\/edit)$/.test(pathname)
+      ? 'supplier:manage'
+      : 'supplier:view';
   }
   if (pathname.startsWith('/admin/sale-orders')) {
     return /^\/admin\/sale-orders\/(new|[^/]+\/edit)$/.test(pathname)

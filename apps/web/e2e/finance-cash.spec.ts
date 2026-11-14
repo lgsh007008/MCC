@@ -160,6 +160,16 @@ test('资金流水 → 收支汇总资金卡', async ({ page }) => {
     await expect(rowA).toContainText(customerName);
     await expect(rowA).toContainText('销售回款');
     await expect(page.getByRole('cell', { name: '合计', exact: true })).toBeVisible();
+    // 合计行与表头同列宽：最后一格右边界对齐，背景完整覆盖到操作列
+    const lastHeaderCell = await page.locator('thead th').last().boundingBox();
+    const lastFooterCell = await page.locator('tfoot td').last().boundingBox();
+    expect(lastHeaderCell).not.toBeNull();
+    expect(lastFooterCell).not.toBeNull();
+    expect(
+      Math.abs(
+        (lastHeaderCell!.x + lastHeaderCell!.width) - (lastFooterCell!.x + lastFooterCell!.width),
+      ),
+    ).toBeLessThanOrEqual(1);
 
     // 客户筛选：只列该客户的收款流水（其他收入无客户，被排除）
     const rowC = page.getByRole('row').filter({ hasText: entryNoteC });

@@ -1,15 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   FINANCE_CASH_CATEGORY_LABELS,
   FINANCE_CASH_DIRECTION_LABELS,
   FINANCE_CASH_METHOD_LABELS,
-  type FinanceCashCategoryValue,
-  type FinanceCashDirection,
-  type FinanceCashMethod,
+  type ApiSchemas,
 } from '@mcc/shared';
 import { useCan } from '@/components/auth/permission-context';
 import { MobileInfoRow } from '@/components/mobile/info-row';
@@ -22,57 +20,30 @@ import { cn } from '@/lib/utils';
 
 // 资金流水移动详情（product/finance.md 移动页）：只读信息条；
 // 手工流水可编辑 / 删除（二次确认），源单流水只读并标注来源。
-
-interface CashEntryDetail {
-  id: string;
-  code: string;
-  direction: FinanceCashDirection;
-  occurredDate: string;
-  amount: string;
-  accountName: string;
-  toAccountName: string | null;
-  customerName: string;
-  method: FinanceCashMethod;
-  category: FinanceCashCategoryValue | null;
-  note: string;
-  sourceType: string | null;
-  sourceLabel: string | null;
-  editable: boolean;
-}
+type CashEntryDetail = ApiSchemas['FinanceCashEntryDto'];
 
 export default function MobileCashEntryDetailPage(): React.ReactElement {
   const canManage = useCan('finance:manage');
   const router = useRouter();
+  const queryClient = useQueryClient();
   const confirm = useConfirm();
   const params = useParams<{ id: string }>();
-  const [entry, setEntry] = useState<CashEntryDetail | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const { data, response } = await api.GET('/api/v1/finance/cash-entries/{id}', {
-          params: { path: { id: params.id } },
-        });
-        if (cancelled) {
-          return;
-        }
-        if (!response.ok || !data) {
-          setError('流水不存在或加载失败');
-          return;
-        }
-        setEntry(data as CashEntryDetail);
-      } catch {
-        if (!cancelled) {
-          setError('流水不存在或加载失败');
-        }
+  const entryQuery = useQuery({
+    queryKey: ['finance-cash-entries', params.id],
+    queryFn: async (): Promise<CashEntryDetail> => {
+      const { data: res, response } = await api.GET('/api/v1/finance/cash-entries/{id}', {
+        params: { path: { id: params.id } },
+      });
+      if (!response.ok || !res) {
+        throw new Error('流水不存在或加载失败');
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [params.id]);
+      return res;
+    },
+  });
+
+  const entry = entryQuery.data;
+  const error = entryQuery.isError && !entry ? '流水不存在或加载失败' : null;
 
   async function handleDelete(): Promise<void> {
     if (!entry) {
@@ -90,6 +61,7 @@ export default function MobileCashEntryDetailPage(): React.ReactElement {
         if (!response.ok) {
           throw new Error('删除失败');
         }
+        await queryClient.invalidateQueries({ queryKey: ['finance-cash-entries'] });
         router.replace('/m/finance/cash');
       },
     });
@@ -147,6 +119,10 @@ export default function MobileCashEntryDetailPage(): React.ReactElement {
               label="客户"
               value={entry.category === 'sales_receipt' ? entry.customerName || '—' : '—'}
             />
+            <MobileInfoRow
+              label="供应商"
+              value={entry.category === 'purchase_payment' ? entry.supplierName || '—' : '—'}
+            />
             <MobileInfoRow label="方式" value={FINANCE_CASH_METHOD_LABELS[entry.method]} />
             <MobileInfoRow label="来源" value={entry.sourceLabel ?? '手工'} />
             <MobileInfoRow label="备注" value={entry.note || '—'} />
@@ -155,7 +131,7 @@ export default function MobileCashEntryDetailPage(): React.ReactElement {
 
         {!editable ? (
           <p className="text-mobile-body text-muted-foreground">
-            {entry.editable ? '当前角色无操作权限' : '源单派生的流水只读，请回销售单修改'}
+            {entry.editable ? '当前角色无操作权限' : '源单派生的流水只读，请回来源单据修改'}
           </p>
         ) : null}
       </div>

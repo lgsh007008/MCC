@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Put, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Headers, HttpCode, Param, ParseUUIDPipe, Patch, Post, Put, Query } from '@nestjs/common';
 import {
   ApiBody,
   ApiCreatedResponse,
@@ -24,7 +24,10 @@ import {
   type CustomerUpdateInput,
 } from '@mcc/shared';
 import { AuditAction } from '../../common/decorators/audit-action.decorator.js';
+import { CurrentUser, type AuthUser } from '../../common/decorators/current-user.decorator.js';
 import { RequireScopes } from '../../common/decorators/require-scopes.decorator.js';
+import { withIdempotency } from '../../common/idempotency.js';
+import { RedisService } from '../../common/redis.service.js';
 import { ZodValidationPipe } from '../../common/zod-validation.pipe.js';
 import {
   CustomerBatchDeleteBodyDto,
@@ -43,7 +46,10 @@ import { CustomerService } from './customer.service.js';
 @ApiTags('customers')
 @Controller('customers')
 export class CustomerController {
-  constructor(private readonly customerService: CustomerService) {}
+  constructor(
+    private readonly customerService: CustomerService,
+    private readonly redis: RedisService,
+  ) {}
 
   @Get()
   @RequireScopes('customer:view')
@@ -86,8 +92,15 @@ export class CustomerController {
   @ApiOperation({ summary: '新建客户（编号自动生成；重名只提示不阻断）' })
   @ApiBody({ type: CustomerBodyDto })
   @ApiCreatedResponse({ type: CustomerDto })
-  create(@Body(new ZodValidationPipe(customerInputSchema)) body: CustomerInput): Promise<CustomerDto> {
-    return this.customerService.create(body);
+  async create(
+    @CurrentUser() user: AuthUser,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body(new ZodValidationPipe(customerInputSchema)) body: CustomerInput,
+  ): Promise<CustomerDto> {
+    // 幂等（技术方案 §6.3）：重复提交返回首请求结果，处理中返回 409
+    return withIdempotency(this.redis, user.userId, 'customers', idempotencyKey, () =>
+      this.customerService.create(body),
+    );
   }
 
   @Put(':id')

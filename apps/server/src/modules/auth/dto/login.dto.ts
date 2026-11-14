@@ -33,7 +33,7 @@ export class RefreshRequestDto {
   @ApiProperty({
     type: String,
     required: false,
-    description: '无 Cookie 端（如 miniapp）经请求体传递刷新令牌；web 走 Cookie 时无需此字段',
+    description: '无 Cookie 客户端经请求体传递刷新令牌；web 走 Cookie 时无需此字段',
   })
   refreshToken?: string;
 }

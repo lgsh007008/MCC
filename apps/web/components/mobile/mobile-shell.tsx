@@ -4,34 +4,17 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ArrowLeftIcon } from 'lucide-react';
-import { hasScope, type Scope, type UserRole } from '@mcc/shared';
+import { hasScope, type UserRole } from '@mcc/shared';
 import { RoleProvider } from '@/components/auth/permission-context';
 import { ConfirmProvider } from '@/components/ui/confirm-dialog';
 import { refreshSession } from '@/lib/api';
 import { authSession, currentRole } from '@/lib/auth/session';
+import { scopeForMobilePath } from '@/lib/nav';
 
 // 移动 Web 壳（design/平台布局.md §1.8；ADR-011）：与 PC 后台的 AdminShell 平行，
 // 只保留顶部返回、单列内容与页面自带的底部操作条；不引入侧边栏 / 多标签页 / 面包屑。
 // 根节点 data-mode="mobile" 挂载移动令牌作用域（适老化基线，不做用户开关）。
-
-// 移动路由 → scope（与 PC 共用同一套权限，不按端拆分）
-const MOBILE_ORDER_MANAGE_PATH = /^\/m\/sale-orders\/(new|[^/]+\/edit)$/;
-const MOBILE_CUSTOMER_MANAGE_PATH = /^\/m\/customers\/(new|[^/]+\/edit)$/;
-function scopeForMobilePath(pathname: string): Scope | null {
-  if (MOBILE_ORDER_MANAGE_PATH.test(pathname)) {
-    return 'order:manage';
-  }
-  if (pathname.startsWith('/m/sale-orders')) {
-    return 'order:view';
-  }
-  if (MOBILE_CUSTOMER_MANAGE_PATH.test(pathname)) {
-    return 'customer:manage';
-  }
-  if (pathname.startsWith('/m/customers')) {
-    return 'customer:view';
-  }
-  return null;
-}
+// 移动路由 → scope 的映射统一在 lib/nav.ts，与 PC 路由裁剪共用一套判定。
 
 export function MobileShell({ children }: { children: React.ReactNode }): React.ReactElement {
   const pathname = usePathname();

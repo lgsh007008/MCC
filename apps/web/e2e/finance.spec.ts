@@ -39,7 +39,7 @@ test('登录 → 收支汇总两个 Tab → 指标卡与分类表', async ({ pag
   await expect(page.getByText('总收入', { exact: true })).toBeVisible();
   await expect(page.getByText('总支出', { exact: true })).toBeVisible();
   await expect(page.getByText('净额', { exact: true }).first()).toBeVisible();
-  for (const label of ['销售收入', '其他收入', '采购付款', '工资', '费用']) {
+  for (const label of ['销售收入', '其他收入', '采购支出', '工资', '费用']) {
     await expect(page.getByRole('cell', { name: label, exact: true })).toBeVisible();
   }
   await expect(page.getByText(/本期计入/)).toBeVisible();

@@ -28,6 +28,7 @@ describe('资金流水收支分类', () => {
   const accountId = '11111111-1111-4111-8111-111111111111';
   const toAccountId = '22222222-2222-4222-8222-222222222222';
   const customerId = '33333333-3333-4333-8333-333333333333';
+  const supplierId = '44444444-4444-4444-8444-444444444444';
   const base = {
     occurredDate: '2026-11-13',
     amount: '100.00',
@@ -70,14 +71,22 @@ describe('资金流水收支分类', () => {
     ).toBe(true);
   });
 
-  it('付款分类只接受付款项，且不挂客户', () => {
+  it('付款分类只接受付款项，采购付款必须挂供应商', () => {
+    expect(
+      financeCashEntryInputSchema.safeParse({
+        ...base,
+        direction: 'out',
+        category: 'purchase_payment',
+        supplierId,
+      }).success,
+    ).toBe(true);
     expect(
       financeCashEntryInputSchema.safeParse({
         ...base,
         direction: 'out',
         category: 'purchase_payment',
       }).success,
-    ).toBe(true);
+    ).toBe(false);
     expect(
       financeCashEntryInputSchema.safeParse({
         ...base,
@@ -85,6 +94,14 @@ describe('资金流水收支分类', () => {
         category: 'asset_purchase',
       }).success,
     ).toBe(true);
+    expect(
+      financeCashEntryInputSchema.safeParse({
+        ...base,
+        direction: 'out',
+        category: 'operating_expense',
+        supplierId,
+      }).success,
+    ).toBe(false);
     expect(
       financeCashEntryInputSchema.safeParse({
         ...base,

@@ -2,34 +2,13 @@
 // 服务端落账与 web 实时预览调用同一套函数，单测为最高优先级（技术方案 §10）。
 // 金额/尺寸禁止浮点（技术方案 §5.1）：以字符串表示的小数全部经 BigInt 整数运算完成，
 // 舍入一律四舍五入（round half up）。入参格式由 zod schema（order.schemas.ts）保证。
+import { divRoundHalfUp, fromScaled, toScaled } from './money';
 
 const MONEY_SCALE = 2;
 const VOLUME_SCALE = 4;
 // 方量 = 厚mm × 宽mm × 长mm × 根数 ÷ 10^9（m³）；
 // 再 ×10^4 保留 4 位小数 → 分母 10^5
 const VOLUME_ROUND_DIVISOR = 10n ** 5n;
-
-// 把非负小数字符串放大 10^scale 转为 BigInt（小数位不足补零）
-function toScaled(value: string, scale: number): bigint {
-  const [intPart, fracPart = ''] = value.split('.');
-  const fracPadded = (fracPart + '0'.repeat(scale)).slice(0, scale);
-  return BigInt(intPart + fracPadded || '0');
-}
-
-// 缩放整数回写小数（补零至 scale 位），输出字符串
-function fromScaled(value: bigint, scale: number): string {
-  const digits = value.toString().padStart(scale + 1, '0');
-  const intPart = digits.slice(0, -scale);
-  const fracPart = scale > 0 ? digits.slice(-scale) : '';
-  return `${intPart}${fracPart ? `.${fracPart}` : ''}`;
-}
-
-// 非负整数除法，四舍五入（round half up）
-function divRoundHalfUp(numerator: bigint, divisor: bigint): bigint {
-  const quotient = numerator / divisor;
-  const remainder = numerator % divisor;
-  return remainder * 2n >= divisor ? quotient + 1n : quotient;
-}
 
 // 方量：lengthMm/widthMm/heightMm 为整数毫米，pieces 为整数根数。
 // 返回 4 位小数 m³ 字符串；每一行都计算（工资依据）。

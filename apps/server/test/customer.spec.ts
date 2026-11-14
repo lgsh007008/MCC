@@ -73,6 +73,21 @@ describe('客户接口（契约/集成）', () => {
     customerId = res.body.id as string;
   });
 
+  it('新建幂等：同 Idempotency-Key 不再重复建档（技术方案 §6.3）', async () => {
+    const key = `it-customer-idem-${Date.now()}`;
+    const name = `${customerName}-idem`;
+    const first = await auth(http().post(`/${API_PREFIX}/customers`))
+      .set('Idempotency-Key', key)
+      .send({ ...body(), name });
+    const second = await auth(http().post(`/${API_PREFIX}/customers`))
+      .set('Idempotency-Key', key)
+      .send({ ...body(), name });
+    expect(first.status).toBe(201);
+    expect(second.status).toBe(201);
+    expect(second.body.id).toBe(first.body.id);
+    expect(await prisma.client.customer.count({ where: { name } })).toBe(1);
+  });
+
   it('重名：允许保存（不唯一），name-check 返回 duplicate', async () => {
     const second = await auth(http().post(`/${API_PREFIX}/customers`)).send(body());
     expect(second.status).toBe(201);
@@ -101,7 +116,10 @@ describe('客户接口（契约/集成）', () => {
     });
     expect(res.status).toBe(200);
     expect(Number(res.body.total)).toBeGreaterThanOrEqual(2);
-    expect(res.body.items.every((item: { name: string }) => item.name === customerName)).toBe(true);
+    // 名称筛选为 contains：本次运行创建的客户（含 -idem）都应命中同一前缀
+    expect(
+      res.body.items.every((item: { name: string }) => item.name.startsWith(customerName)),
+    ).toBe(true);
   });
 
   it('更新：名称、联系信息、备注', async () => {

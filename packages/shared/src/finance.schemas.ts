@@ -1,22 +1,14 @@
 import { z } from 'zod';
+import { dateStringSchema } from './date.schemas';
 import { paginationQuerySchema } from './pagination.schemas';
 
 // 财务领域的边界校验 schema（design/finance.md）：前后端共用同一份，
 // 金额以字符串承载（禁浮点，技术方案 §5.1），服务层以 ZodValidationPipe 落地。
 // 资金流水是唯一录入入口：方向 + 收支分类决定经营口径。
 
-const dateRe = /^\d{4}-\d{2}-\d{2}$/;
 const positiveMoneyRe = /^\d+(\.\d{1,2})?$/; // 正数、最多 2 位小数
 
-const occurredDateSchema = z
-  .string()
-  .regex(dateRe, '发生日期须为 YYYY-MM-DD')
-  .refine(
-    (value) =>
-      !Number.isNaN(new Date(`${value}T00:00:00Z`).getTime()) &&
-      new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value,
-    { message: '发生日期不是有效日期' },
-  );
+const occurredDateSchema = dateStringSchema('发生日期');
 
 const positiveMoneySchema = z
   .string()
@@ -104,9 +96,10 @@ export const FINANCE_CASH_CATEGORIES_BY_DIRECTION: Record<
 };
 
 // 计入经营收支的分类（收款 / 付款各一组）；其余只影响资金与往来
+// 采购付款不在此列：采购成本按采购单应计，由业务汇总单独取数（R-财务-001）
 export const FINANCE_OPERATING_CATEGORIES = {
   revenue: ['other_revenue'] as FinanceCashCategoryValue[],
-  expense: ['purchase_payment', 'labor_cost', 'operating_expense'] as FinanceCashCategoryValue[],
+  expense: ['labor_cost', 'operating_expense'] as FinanceCashCategoryValue[],
 };
 
 export const financeCashEntryInputSchema = z
@@ -118,6 +111,7 @@ export const financeCashEntryInputSchema = z
     toAccountId: z.string().uuid().nullable().optional(),
     category: financeCashCategorySchema.nullable().optional(),
     customerId: z.string().uuid().nullable().optional(),
+    supplierId: z.string().uuid().nullable().optional(),
     note: z.string().trim().max(200).default(''),
   })
   .superRefine((value, ctx) => {
@@ -132,6 +126,9 @@ export const financeCashEntryInputSchema = z
       }
       if (value.customerId) {
         ctx.addIssue({ code: 'custom', message: '内部转账不关联客户', path: ['customerId'] });
+      }
+      if (value.supplierId) {
+        ctx.addIssue({ code: 'custom', message: '内部转账不关联供应商', path: ['supplierId'] });
       }
       return;
     }
@@ -155,9 +152,24 @@ export const financeCashEntryInputSchema = z
           path: ['customerId'],
         });
       }
+      if (value.supplierId) {
+        ctx.addIssue({ code: 'custom', message: '收款不关联供应商', path: ['supplierId'] });
+      }
     }
-    if (value.direction === 'out' && value.customerId) {
-      ctx.addIssue({ code: 'custom', message: '付款不关联客户', path: ['customerId'] });
+    if (value.direction === 'out') {
+      if (value.customerId) {
+        ctx.addIssue({ code: 'custom', message: '付款不关联客户', path: ['customerId'] });
+      }
+      if (value.category === 'purchase_payment' && !value.supplierId) {
+        ctx.addIssue({ code: 'custom', message: '采购付款须选择供应商', path: ['supplierId'] });
+      }
+      if (value.category !== 'purchase_payment' && value.supplierId) {
+        ctx.addIssue({
+          code: 'custom',
+          message: '仅采购付款可关联供应商',
+          path: ['supplierId'],
+        });
+      }
     }
   });
 export type FinanceCashEntryInput = z.infer<typeof financeCashEntryInputSchema>;
@@ -169,6 +181,7 @@ export const financeCashEntryListQuerySchema = paginationQuerySchema.extend({
   category: financeCashCategorySchema.optional(),
   accountId: z.string().uuid().optional(),
   customerId: z.string().uuid().optional(),
+  supplierId: z.string().uuid().optional(),
   dateFrom: occurredDateSchema.optional(),
   dateTo: occurredDateSchema.optional(),
 });
@@ -184,4 +197,9 @@ export const financeReceivablesQuerySchema = z.object({
   customerIds: z.string().trim().min(1, '缺少客户 id'),
 });
 export type FinanceReceivablesQuery = z.infer<typeof financeReceivablesQuerySchema>;
+
+export const financePayablesQuerySchema = z.object({
+  supplierIds: z.string().trim().min(1, '缺少供应商 id'),
+});
+export type FinancePayablesQuery = z.infer<typeof financePayablesQuerySchema>;
 

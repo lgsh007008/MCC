@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { Geist } from "next/font/google";
 import { cn } from "@/lib/utils";
+import { AppQueryProvider } from '@/components/providers/query-provider';
 
 const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
@@ -17,7 +18,9 @@ export default function RootLayout({
 }): React.ReactElement {
   return (
     <html lang="zh-CN" className={cn("font-sans", geist.variable)}>
-      <body className="bg-bg text-fg">{children}</body>
+      <body className="bg-bg text-fg">
+        <AppQueryProvider>{children}</AppQueryProvider>
+      </body>
     </html>
   );
 }

@@ -58,8 +58,10 @@ test('手机登录 → 移动入口 → 开单 → 详情 → 列表', async ({ 
   const account = (await accountRes.json()) as { id: string };
 
   try {
-    // 移动入口 → 销售单卡片列表
-    await page.getByRole('link', { name: /成品销售单/ }).click();
+    // 移动入口 → 销售二级入口 → 销售单卡片列表
+    await page.getByRole('link', { name: /销售/ }).click();
+    await expect(page).toHaveURL(/\/m\/sales$/);
+    await page.getByRole('link', { name: /销售单/ }).click();
     await expect(page).toHaveURL(/\/m\/sale-orders$/);
     await expect(page.getByRole('heading', { name: '成品销售单' })).toBeVisible();
     // 移动端不展示单据编号（product/order.md 移动页）
@@ -168,12 +170,16 @@ test('移动字号与控件尺寸取自 tokens 角色', async ({ page }) => {
   expect(control).not.toBe('');
 
   // 入口卡片标题用 title 角色
-  const entryTitle = page.getByRole('link', { name: /成品销售单/ }).locator('span.text-mobile-title');
+  const entryTitle = page.getByRole('link', { name: /销售/ }).locator('span.text-mobile-title');
   expect(await entryTitle.evaluate((el) => getComputedStyle(el).fontSize)).toBe(title);
 
   // 列表搜索框用 body 角色，高度等于控件高度角色
-  await page.getByRole('link', { name: /成品销售单/ }).click();
+  await page.getByRole('link', { name: /销售/ }).click();
+  await expect(page).toHaveURL(/\/m\/sales$/);
+  await page.getByRole('link', { name: /销售单/ }).click();
+  await expect(page).toHaveURL(/\/m\/sale-orders$/);
   const search = page.getByPlaceholder('搜索客户名称');
+  await expect(search).toBeVisible();
   expect(await search.evaluate((el) => getComputedStyle(el).fontSize)).toBe(body);
   expect(await search.evaluate((el) => getComputedStyle(el).height)).toBe(control);
 

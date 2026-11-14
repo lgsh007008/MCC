@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { MobileCustomerForm, type MobileCustomerFormInitial } from '@/components/mobile/customer-form';
+import { useQuery } from '@tanstack/react-query';
+import type { ApiSchemas } from '@mcc/shared';
+import { MobileCustomerForm } from '@/components/mobile/customer-form';
 import { MobileHeader } from '@/components/mobile/mobile-shell';
 import { MobileListState } from '@/components/mobile/list';
 import { api } from '@/lib/api';
@@ -10,34 +11,20 @@ import { api } from '@/lib/api';
 // 客户移动编辑页（product/customer.md 移动页）：加载现有档案后进入共用移动表单。
 export default function MobileCustomerEditPage(): React.ReactElement {
   const params = useParams<{ id: string }>();
-  const [initial, setInitial] = useState<MobileCustomerFormInitial | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const { data, response } = await api.GET('/api/v1/customers/{id}', {
-          params: { path: { id: params.id } },
-        });
-        if (cancelled) {
-          return;
-        }
-        if (!response.ok || !data) {
-          setError('客户不存在或加载失败');
-          return;
-        }
-        setInitial(data);
-      } catch {
-        if (!cancelled) {
-          setError('客户不存在或加载失败');
-        }
+  const { data: initial, isError } = useQuery({
+    queryKey: ['customers', params.id],
+    queryFn: async (): Promise<ApiSchemas['CustomerDto']> => {
+      const { data: res, response } = await api.GET('/api/v1/customers/{id}', {
+        params: { path: { id: params.id } },
+      });
+      if (!response.ok || !res) {
+        throw new Error('客户不存在或加载失败');
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [params.id]);
+      return res;
+    },
+  });
+
+  const error = isError && !initial ? '客户不存在或加载失败' : null;
 
   if (error) {
     return (

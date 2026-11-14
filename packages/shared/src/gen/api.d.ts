@@ -263,6 +263,111 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/suppliers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 供应商列表：筛选（名称模糊、状态）+ 排序 + 分页 */
+        get: operations["SupplierController_list"];
+        put?: never;
+        /** 新建供应商（编号自动生成；重名只提示不阻断） */
+        post: operations["SupplierController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/suppliers/name-check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 供应商重名检查（只提示不阻断） */
+        get: operations["SupplierController_nameCheck"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/suppliers/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 供应商详情 */
+        get: operations["SupplierController_detail"];
+        /** 更新供应商（名称、联系信息、期初应付、备注） */
+        put: operations["SupplierController_update"];
+        post?: never;
+        /** 删除供应商（软删除，编号不回收） */
+        delete: operations["SupplierController_remove"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/suppliers/{id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** 启用 / 停用供应商 */
+        patch: operations["SupplierController_setStatus"];
+        trace?: never;
+    };
+    "/api/v1/suppliers/batch-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 批量启用 / 停用供应商（已是目标状态或已删的跳过，返回实际变更条数） */
+        post: operations["SupplierController_setStatusMany"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/suppliers/batch-delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 批量删除供应商（软删除；不存在 / 已删行静默跳过，返回删除条数） */
+        post: operations["SupplierController_removeMany"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/finance/summary": {
         parameters: {
             query?: never;
@@ -360,6 +465,23 @@ export interface paths {
         };
         /** 客户应收（批量）：累计销售 / 累计收款 / 欠款（负数为预收） */
         get: operations["FinanceController_receivables"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/finance/payables": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 供应商应付（批量）：累计采购 / 累计付款 / 应付（负数为预付） */
+        get: operations["FinanceController_payables"];
         put?: never;
         post?: never;
         delete?: never;
@@ -475,6 +597,77 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/purchase-orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 采购单列表：筛选（编号模糊、供应商、供应商名称模糊、结算方式、日期区间）+ 排序 + 分页 */
+        get: operations["PurchaseController_list"];
+        put?: never;
+        /** 新建采购单（编号自动生成；现结同事务派生付款流水） */
+        post: operations["PurchaseController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/purchase-orders/supplier-summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 按供应商返回采购单数（供供应商删除确认） */
+        get: operations["PurchaseController_supplierSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/purchase-orders/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 采购单详情 */
+        get: operations["PurchaseController_detail"];
+        /** 更新采购单（同步金额、供应商、日期与派生付款流水） */
+        put: operations["PurchaseController_update"];
+        post?: never;
+        /** 删除采购单（软删除；派生付款流水一并软删，编号不回收） */
+        delete: operations["PurchaseController_remove"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/purchase-orders/batch-delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 批量删除采购单（软删除；派生付款流水一并软删；不存在/已删行静默跳过） */
+        post: operations["PurchaseController_batchDelete"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -535,7 +728,7 @@ export interface components {
             role: string;
         };
         RefreshRequestDto: {
-            /** @description 无 Cookie 端（如 miniapp）经请求体传递刷新令牌；web 走 Cookie 时无需此字段 */
+            /** @description 无 Cookie 客户端经请求体传递刷新令牌；web 走 Cookie 时无需此字段 */
             refreshToken?: string;
         };
         RefreshResponseDto: {
@@ -691,12 +884,92 @@ export interface components {
             /** @description 实际删除（软删除）条数 */
             deleted: number;
         };
+        SupplierDto: {
+            /** @description 供应商 id */
+            id: string;
+            /** @description 供应商编号（SP + 5 位流水） */
+            code: string;
+            /** @description 供应商名称 */
+            name: string;
+            /** @description 联系信息 */
+            contact: string;
+            /** @description 状态：active 启用 / inactive 停用 */
+            status: string;
+            /**
+             * @description 期初应付（上线前净应付）
+             * @example 0.00
+             */
+            openingPayable: string;
+            /** @description 备注 */
+            note: string;
+            /** @description 创建日期（YYYY-MM-DD） */
+            createdAt: string;
+        };
+        SupplierListDto: {
+            /** @description 总数 */
+            total: number;
+            items: components["schemas"]["SupplierDto"][];
+        };
+        SupplierNameCheckDto: {
+            /** @description 是否存在同名供应商（未软删） */
+            duplicate: boolean;
+        };
+        SupplierBodyDto: {
+            /**
+             * @description 供应商名称
+             * @example 某某木业
+             */
+            name: string;
+            /**
+             * @description 联系信息（电话等）
+             * @default
+             */
+            contact: string;
+            /**
+             * @description 期初应付（上线前净应付，非负、最多 2 位小数）
+             * @default 0.00
+             */
+            openingPayable: string;
+            /**
+             * @description 备注
+             * @default
+             */
+            note: string;
+        };
+        SupplierStatusBodyDto: {
+            /**
+             * @description 状态：active 启用 / inactive 停用
+             * @enum {string}
+             */
+            status: "active" | "inactive";
+        };
+        SupplierBatchStatusBodyDto: {
+            /** @description 供应商 id 列表（1~200） */
+            ids: string[];
+            /**
+             * @description 目标状态：active 启用 / inactive 停用
+             * @enum {string}
+             */
+            status: "active" | "inactive";
+        };
+        SupplierBatchStatusResponseDto: {
+            /** @description 实际变更条数（已软删或已处于目标状态的跳过） */
+            updated: number;
+        };
+        SupplierBatchDeleteBodyDto: {
+            /** @description 要删除的供应商 id 列表（1~200） */
+            ids: string[];
+        };
+        SupplierBatchDeleteResponseDto: {
+            /** @description 实际删除（软删除）条数 */
+            deleted: number;
+        };
         FinanceCategorySubtotalDto: {
             /**
              * @description 经营收支项（固定五项输出）
              * @enum {string}
              */
-            category: "sales_revenue" | "other_revenue" | "purchase_payment" | "labor_cost" | "operating_expense";
+            category: "sales_revenue" | "other_revenue" | "purchase_expense" | "labor_cost" | "operating_expense";
             /** @description 金额（正数，无数据为 0.00） */
             amount: string;
         };
@@ -709,6 +982,8 @@ export interface components {
             netAmount: string;
             /** @description 期间销售单数 */
             orderCount: number;
+            /** @description 期间采购单数 */
+            purchaseCount: number;
             /** @description 计入经营收支的流水条数 */
             cashEntryCount: number;
             /** @description 分类小计（五项固定输出） */
@@ -783,12 +1058,14 @@ export interface components {
             toAccountName?: string | null;
             customerId?: string | null;
             customerName: string;
+            supplierId?: string | null;
+            supplierName: string;
             /** @enum {string} */
             method: "bank" | "wechat" | "alipay" | "cash" | "acceptance";
             /** @enum {string|null} */
             category?: "sales_receipt" | "other_revenue" | "loan_in" | "purchase_payment" | "labor_cost" | "operating_expense" | "asset_purchase" | "loan_repay" | null;
             note: string;
-            /** @description 源单类型（sale_order） */
+            /** @description 源单类型（sale_order / purchase_order） */
             sourceType?: string | null;
             /** @description 源单 id */
             sourceId?: string | null;
@@ -831,6 +1108,20 @@ export interface components {
         FinanceReceivableListDto: {
             items: components["schemas"]["FinanceReceivableDto"][];
         };
+        FinancePayableDto: {
+            supplierId: string;
+            /** @description 期初应付（供应商档案录入的上线前净应付） */
+            openingPayable: string;
+            /** @description 累计采购（现结取实付、赊购取合计） */
+            purchases: string;
+            /** @description 累计付款（采购付款流水合计） */
+            payments: string;
+            /** @description 应付 = 期初应付 + 采购 − 付款；负数为预付 */
+            outstanding: string;
+        };
+        FinancePayableListDto: {
+            items: components["schemas"]["FinancePayableDto"][];
+        };
         FinanceCashEntryBodyDto: {
             /**
              * @description 方向：收款 / 付款 / 内部转账
@@ -858,6 +1149,8 @@ export interface components {
             category?: "sales_receipt" | "other_revenue" | "loan_in" | "purchase_payment" | "labor_cost" | "operating_expense" | "asset_purchase" | "loan_repay" | null;
             /** @description 客户 id（仅销售回款必填） */
             customerId?: string | null;
+            /** @description 供应商 id（仅采购付款必填） */
+            supplierId?: string | null;
             /**
              * @description 备注（付款写对象与事由；承兑写票号 / 到期日）
              * @default
@@ -1146,6 +1439,94 @@ export interface components {
             id: string;
             /** @description 销售单编号快照 */
             code: string;
+        };
+        PurchaseOrderListSummaryDto: {
+            /** @description 筛选全量合计金额 */
+            totalAmount: string;
+        };
+        PurchaseOrderDto: {
+            id: string;
+            /** @description 采购单编号（PO + 5 位流水） */
+            code: string;
+            purchaseDate: string;
+            supplierId: string;
+            supplierName: string;
+            deliveredTons: string;
+            settledTons: string;
+            unitPrice: string;
+            subtotalAmount: string;
+            otherAmount: string;
+            totalAmount: string;
+            /** @enum {string} */
+            settlementMode: "credit" | "settled";
+            settleAccountId?: string | null;
+            paidAmount?: string | null;
+            note: string;
+            createdAt: string;
+        };
+        PurchaseOrderListDto: {
+            total: number;
+            summary: components["schemas"]["PurchaseOrderListSummaryDto"];
+            items: components["schemas"]["PurchaseOrderDto"][];
+        };
+        PurchaseSupplierSummaryItemDto: {
+            supplierId: string;
+            purchaseCount: number;
+        };
+        PurchaseSupplierSummaryDto: {
+            items: components["schemas"]["PurchaseSupplierSummaryItemDto"][];
+        };
+        PurchaseOrderBodyDto: {
+            /** @description 供应商 id（须启用） */
+            supplierId: string;
+            /**
+             * @description 采购日期
+             * @example 2026-11-14
+             */
+            purchaseDate: string;
+            /**
+             * @description 送货吨数（实际过磅，最多 3 位小数）
+             * @example 1.500
+             */
+            deliveredTons: string;
+            /**
+             * @description 结算吨数（计价，最多 3 位小数）
+             * @example 1.000
+             */
+            settledTons: string;
+            /**
+             * @description 单价（元/吨，非负、2 位小数）
+             * @example 680.00
+             */
+            unitPrice: string;
+            /**
+             * @description 其他金额（运费等，非负）
+             * @default 0.00
+             */
+            otherAmount: string;
+            /**
+             * @description 结算方式：赊购 / 现结
+             * @default credit
+             * @enum {string}
+             */
+            settlementMode: "credit" | "settled";
+            /** @description 现结付款账户 id（现结必填） */
+            settleAccountId?: string | null;
+            /** @description 实付金额（现结默认等于合计、可改） */
+            paidAmount?: string | null;
+            /**
+             * @description 备注
+             * @default
+             */
+            note: string;
+        };
+        PurchaseOrderBatchDeleteBodyDto: {
+            /** @description 要删除的采购单 id 列表（1~200） */
+            ids: string[];
+        };
+        PurchaseOrderBatchDeleteResponseDto: {
+            /** @description 实际删除（软删除）条数 */
+            deleted: number;
         };
     };
     responses: never;
@@ -1611,6 +1992,221 @@ export interface operations {
             };
         };
     };
+    SupplierController_list: {
+        parameters: {
+            query?: {
+                /** @description 每页条数，默认 20（最大 100） */
+                pageSize?: number;
+                /** @description 页码，默认 1 */
+                page?: number;
+                /** @description 排序方向，默认 desc */
+                sortOrder?: "asc" | "desc";
+                /** @description 排序列，默认 createdAt */
+                sortBy?: "createdAt";
+                /** @description 状态 */
+                status?: "active" | "inactive";
+                /** @description 供应商名称模糊 */
+                name?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupplierListDto"];
+                };
+            };
+        };
+    };
+    SupplierController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SupplierBodyDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupplierDto"];
+                };
+            };
+        };
+    };
+    SupplierController_nameCheck: {
+        parameters: {
+            query: {
+                /** @description 排除的供应商 id（编辑时传自身） */
+                excludeId?: string;
+                /** @description 供应商名称 */
+                name: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupplierNameCheckDto"];
+                };
+            };
+        };
+    };
+    SupplierController_detail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupplierDto"];
+                };
+            };
+        };
+    };
+    SupplierController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SupplierBodyDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupplierDto"];
+                };
+            };
+        };
+    };
+    SupplierController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    SupplierController_setStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SupplierStatusBodyDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupplierDto"];
+                };
+            };
+        };
+    };
+    SupplierController_setStatusMany: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SupplierBatchStatusBodyDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupplierBatchStatusResponseDto"];
+                };
+            };
+        };
+    };
+    SupplierController_removeMany: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SupplierBatchDeleteBodyDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupplierBatchDeleteResponseDto"];
+                };
+            };
+        };
+    };
     FinanceController_summary: {
         parameters: {
             query?: {
@@ -1817,6 +2413,28 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FinanceReceivableListDto"];
+                };
+            };
+        };
+    };
+    FinanceController_payables: {
+        parameters: {
+            query: {
+                /** @description 逗号分隔的供应商 id */
+                supplierIds: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FinancePayableListDto"];
                 };
             };
         };
@@ -2072,6 +2690,178 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SaleOrderPrintEventDto"];
+                };
+            };
+        };
+    };
+    PurchaseController_list: {
+        parameters: {
+            query?: {
+                /** @description 每页条数，默认 20（最大 100） */
+                pageSize?: number;
+                /** @description 页码，默认 1 */
+                page?: number;
+                /** @description 排序方向，默认 desc */
+                sortOrder?: "asc" | "desc";
+                /** @description 排序列，默认 purchaseDate */
+                sortBy?: "purchaseDate" | "totalAmount";
+                /** @description 采购日期止（YYYY-MM-DD） */
+                dateTo?: string;
+                /** @description 采购日期起（YYYY-MM-DD） */
+                dateFrom?: string;
+                settlementMode?: "credit" | "settled";
+                /** @description 供应商名称模糊 */
+                supplierName?: string;
+                /** @description 供应商 id */
+                supplierId?: string;
+                /** @description 采购单编号模糊 */
+                code?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseOrderListDto"];
+                };
+            };
+        };
+    };
+    PurchaseController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PurchaseOrderBodyDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseOrderDto"];
+                };
+            };
+        };
+    };
+    PurchaseController_supplierSummary: {
+        parameters: {
+            query: {
+                /** @description 逗号分隔的供应商 id */
+                supplierIds: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseSupplierSummaryDto"];
+                };
+            };
+        };
+    };
+    PurchaseController_detail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseOrderDto"];
+                };
+            };
+        };
+    };
+    PurchaseController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PurchaseOrderBodyDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseOrderDto"];
+                };
+            };
+        };
+    };
+    PurchaseController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PurchaseController_batchDelete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PurchaseOrderBatchDeleteBodyDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseOrderBatchDeleteResponseDto"];
                 };
             };
         };

@@ -75,4 +75,12 @@ describe('金额与方量汇总', () => {
     );
     expect(totals).toEqual({ totalVolume: '2.0600', subtotalAmount: '410.51', totalAmount: '440.51' });
   });
+
+  it('无明细时小计为 0.00，合计等于主表其他金额', () => {
+    expect(calcOrderTotals([], '30.00')).toEqual({
+      totalVolume: '0.0000',
+      subtotalAmount: '0.00',
+      totalAmount: '30.00',
+    });
+  });
 });

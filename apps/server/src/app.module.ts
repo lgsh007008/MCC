@@ -10,6 +10,8 @@ import { AuthModule } from './modules/auth/index.js';
 import { CustomerModule } from './modules/customer/index.js';
 import { FinanceModule } from './modules/finance/index.js';
 import { OrderModule } from './modules/order/index.js';
+import { PurchaseModule } from './modules/purchase/index.js';
+import { SupplierModule } from './modules/supplier/index.js';
 
 // 模块化单体的根模块。业务模块按领域在 src/modules/<domain>/ 下新增，
 // 每个模块自带 Controller / Service / 表，并只通过 index.ts 对外暴露（技术方案 §4）。
@@ -21,8 +23,10 @@ import { OrderModule } from './modules/order/index.js';
     AuditModule,
     AuthModule,
     CustomerModule,
+    SupplierModule,
     FinanceModule,
     OrderModule,
+    PurchaseModule,
   ],
   controllers: [],
   providers: [

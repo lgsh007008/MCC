@@ -55,7 +55,6 @@ import { findNavByPath, homeItem, scopeForPath, visibleNavGroups } from '@/lib/n
 import { RoleProvider } from '@/components/auth/permission-context';
 import { ConfirmProvider } from '@/components/ui/confirm-dialog';
 import { PageBreadcrumbProvider, usePageBreadcrumb } from './page-breadcrumb';
-import { AppQueryProvider } from './query-provider';
 import { TabBar, TabsProvider, useTabs } from './tabs';
 
 // 后台布局壳（design/平台布局.md §1）：经典三区——侧边栏 / 顶栏 / 主内容区。
@@ -70,15 +69,13 @@ export function AdminShell({
   defaultSidebarOpen?: boolean;
 }): React.ReactElement {
   return (
-    <AppQueryProvider>
-      <PageBreadcrumbProvider>
-        <TabsProvider>
-          <ConfirmProvider>
-            <AdminShellInner defaultSidebarOpen={defaultSidebarOpen}>{children}</AdminShellInner>
-          </ConfirmProvider>
-        </TabsProvider>
-      </PageBreadcrumbProvider>
-    </AppQueryProvider>
+    <PageBreadcrumbProvider>
+      <TabsProvider>
+        <ConfirmProvider>
+          <AdminShellInner defaultSidebarOpen={defaultSidebarOpen}>{children}</AdminShellInner>
+        </ConfirmProvider>
+      </TabsProvider>
+    </PageBreadcrumbProvider>
   );
 }
 

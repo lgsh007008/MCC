@@ -1,10 +1,12 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
   FINANCE_CASH_CATEGORIES_BY_DIRECTION,
   FINANCE_CASH_CATEGORY_LABELS,
   financeCashEntryInputSchema,
+  type ApiSchemas,
   type FinanceCashCategoryValue,
   type FinanceCashDirection,
 } from '@mcc/shared';
@@ -17,6 +19,7 @@ import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { api } from '@/lib/api';
+import { randomUuid } from '@/lib/uuid';
 
 // 资金流水弹窗（product/finance.md R-财务-002）：
 // 收款挂客户、付款对象自由填写、内部转账只搬钱（不计入收支统计）。
@@ -38,11 +41,13 @@ export interface FinanceCashEntryFormInitial {
   toAccountId: string | null;
   customerId: string | null;
   customerName: string;
+  supplierId: string | null;
+  supplierName: string;
   category: FinanceCashCategoryValue | null;
   note: string;
 }
 
-interface CustomerOption {
+interface PartyOption {
   id: string;
   name: string;
 }
@@ -104,6 +109,7 @@ export function FinanceCashEntryForm({
         : accounts.find((account) => account.active)?.id ?? ''),
     toAccountId: initial?.toAccountId ?? '',
     customerId: initial?.customerId ?? '',
+    supplierId: initial?.supplierId ?? '',
     category: (initial?.category ?? 'sales_receipt') as FinanceCashCategoryValue | null,
     note: initial?.note ?? '',
   }).current;
@@ -114,9 +120,9 @@ export function FinanceCashEntryForm({
   const [accountId, setAccountId] = useState(initialValues.accountId);
   const [toAccountId, setToAccountId] = useState(initialValues.toAccountId);
   const [customerId, setCustomerId] = useState(initialValues.customerId);
+  const [supplierId, setSupplierId] = useState(initialValues.supplierId);
   const [category, setCategory] = useState<FinanceCashCategoryValue | null>(initialValues.category);
   const [note, setNote] = useState(initialValues.note);
-  const [customerOptions, setCustomerOptions] = useState<CustomerOption[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -127,42 +133,99 @@ export function FinanceCashEntryForm({
     accountId !== initialValues.accountId ||
     toAccountId !== initialValues.toAccountId ||
     customerId !== initialValues.customerId ||
+    supplierId !== initialValues.supplierId ||
     category !== initialValues.category ||
     note !== initialValues.note;
 
   // 客户下拉：只列启用客户；编辑历史流水且其客户已停用 / 删除时补入快照，保证可保存
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const { data, response } = await api.GET('/api/v1/customers', {
-          params: { query: { page: 1, pageSize: 100, status: 'active' } },
-        });
-        let options: CustomerOption[] = response.ok && data ? data.items : [];
-        const currentId = initial?.customerId;
-        if (currentId && !options.some((option) => option.id === currentId)) {
-          const detail = await api.GET('/api/v1/customers/{id}', {
-            params: { path: { id: currentId } },
-          });
-          if (detail.response.ok && detail.data) {
-            options = [{ id: detail.data.id, name: detail.data.name }, ...options];
-          } else {
-            options = [{ id: currentId, name: initial?.customerName ?? '' }, ...options];
-          }
-        }
-        if (!cancelled) {
-          setCustomerOptions(options);
-        }
-      } catch {
-        if (!cancelled) {
-          setCustomerOptions([]);
-        }
+  const currentCustomerId = initial?.customerId ?? '';
+  const customersQuery = useQuery({
+    queryKey: ['customers', 'options', 'active'],
+    queryFn: async (): Promise<PartyOption[]> => {
+      const { data: res, response } = await api.GET('/api/v1/customers', {
+        params: { query: { page: 1, pageSize: 100, status: 'active' } },
+      });
+      if (!response.ok || !res) {
+        throw new Error('加载失败，请稍后重试');
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [initial?.customerId, initial?.customerName]);
+      return res.items.map((item) => ({ id: item.id, name: item.name }));
+    },
+  });
+  const activeCustomers = customersQuery.data ?? [];
+  const currentCustomerMissing =
+    Boolean(currentCustomerId) &&
+    customersQuery.isSuccess &&
+    !activeCustomers.some((option) => option.id === currentCustomerId);
+  const currentCustomerQuery = useQuery({
+    queryKey: ['customers', currentCustomerId],
+    enabled: currentCustomerMissing,
+    queryFn: async (): Promise<ApiSchemas['CustomerDto']> => {
+      const { data: res, response } = await api.GET('/api/v1/customers/{id}', {
+        params: { path: { id: currentCustomerId } },
+      });
+      if (!response.ok || !res) {
+        throw new Error('加载失败，请稍后重试');
+      }
+      return res;
+    },
+  });
+  const customerOptions: PartyOption[] =
+    customersQuery.isPending || (currentCustomerMissing && currentCustomerQuery.isPending)
+      ? []
+      : currentCustomerMissing
+        ? [
+            {
+              id: currentCustomerId,
+              name: currentCustomerQuery.data?.name ?? initial?.customerName ?? '',
+            },
+            ...activeCustomers,
+          ]
+        : activeCustomers;
+
+  // 供应商下拉：只列启用供应商；编辑历史流水且其供应商已停用 / 删除时补入快照
+  const currentSupplierId = initial?.supplierId ?? '';
+  const suppliersQuery = useQuery({
+    queryKey: ['suppliers', 'options', 'active'],
+    queryFn: async (): Promise<PartyOption[]> => {
+      const { data: res, response } = await api.GET('/api/v1/suppliers', {
+        params: { query: { page: 1, pageSize: 100, status: 'active' } },
+      });
+      if (!response.ok || !res) {
+        throw new Error('加载失败，请稍后重试');
+      }
+      return res.items.map((item) => ({ id: item.id, name: item.name }));
+    },
+  });
+  const activeSuppliers = suppliersQuery.data ?? [];
+  const currentSupplierMissing =
+    Boolean(currentSupplierId) &&
+    suppliersQuery.isSuccess &&
+    !activeSuppliers.some((option) => option.id === currentSupplierId);
+  const currentSupplierQuery = useQuery({
+    queryKey: ['suppliers', currentSupplierId],
+    enabled: currentSupplierMissing,
+    queryFn: async (): Promise<ApiSchemas['SupplierDto']> => {
+      const { data: res, response } = await api.GET('/api/v1/suppliers/{id}', {
+        params: { path: { id: currentSupplierId } },
+      });
+      if (!response.ok || !res) {
+        throw new Error('加载失败，请稍后重试');
+      }
+      return res;
+    },
+  });
+  const supplierOptions: PartyOption[] =
+    suppliersQuery.isPending || (currentSupplierMissing && currentSupplierQuery.isPending)
+      ? []
+      : currentSupplierMissing
+        ? [
+            {
+              id: currentSupplierId,
+              name: currentSupplierQuery.data?.name ?? initial?.supplierName ?? '',
+            },
+            ...activeSuppliers,
+          ]
+        : activeSuppliers;
 
   // 新建只列启用账户；编辑保留原账户（可能已停用）
   const accountOptions = accounts
@@ -195,6 +258,7 @@ export function FinanceCashEntryForm({
     if (next === 'transfer') {
       setCategory(null);
       setCustomerId('');
+      setSupplierId('');
       return;
     }
     const allowed = FINANCE_CASH_CATEGORIES_BY_DIRECTION[next];
@@ -203,6 +267,8 @@ export function FinanceCashEntryForm({
     );
     if (next === 'out') {
       setCustomerId('');
+    } else {
+      setSupplierId('');
     }
   };
 
@@ -211,6 +277,9 @@ export function FinanceCashEntryForm({
     setCategory(value);
     if (value !== 'sales_receipt') {
       setCustomerId('');
+    }
+    if (value !== 'purchase_payment') {
+      setSupplierId('');
     }
   };
 
@@ -246,6 +315,8 @@ export function FinanceCashEntryForm({
       category: direction === 'transfer' ? null : category,
       customerId:
         direction === 'in' && category === 'sales_receipt' ? customerId || null : null,
+      supplierId:
+        direction === 'out' && category === 'purchase_payment' ? supplierId || null : null,
       note,
     });
     if (!parsed.success) {
@@ -260,7 +331,10 @@ export function FinanceCashEntryForm({
             params: { path: { id: initial.id } },
             body: parsed.data,
           })
-        : await api.POST('/api/v1/finance/cash-entries', { body: parsed.data });
+        : await api.POST('/api/v1/finance/cash-entries', {
+            body: parsed.data,
+            headers: { 'Idempotency-Key': randomUuid() },
+          });
       if (!response.ok) {
         throw new Error('保存失败');
       }
@@ -345,6 +419,20 @@ export function FinanceCashEntryForm({
                     label: option.name,
                   }))}
                   placeholder="请选择客户"
+                  className="w-full"
+                />
+              </Field>
+            ) : null}
+            {direction === 'out' && category === 'purchase_payment' ? (
+              <Field label="供应商" className="col-span-2">
+                <Select
+                  value={supplierId}
+                  onChange={setSupplierId}
+                  options={supplierOptions.map((option) => ({
+                    value: option.id,
+                    label: option.name,
+                  }))}
+                  placeholder="请选择供应商"
                   className="w-full"
                 />
               </Field>

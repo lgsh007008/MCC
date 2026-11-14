@@ -1,10 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   FINANCE_CASH_CATEGORIES_BY_DIRECTION,
   FINANCE_CASH_CATEGORY_LABELS,
   financeCashEntryInputSchema,
+  type ApiSchemas,
   type FinanceCashCategoryValue,
   type FinanceCashDirection,
 } from '@mcc/shared';
@@ -17,6 +19,7 @@ import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { MobileActionBar } from '@/components/mobile/mobile-shell';
 import { api } from '@/lib/api';
+import { randomUuid } from '@/lib/uuid';
 
 // 移动端登记 / 编辑资金流水（product/finance.md 移动页；适老化基线）：
 // 单列、Label 在上、控件 48px；方向用分段按钮；分类随方向级联，内部转账无分类且禁用；
@@ -31,6 +34,8 @@ export interface MobileCashEntryFormInitial {
   toAccountId: string | null;
   customerId: string | null;
   customerName: string;
+  supplierId: string | null;
+  supplierName: string;
   category: FinanceCashCategoryValue | null;
   note: string;
 }
@@ -41,7 +46,7 @@ interface AccountOption {
   active: boolean;
 }
 
-interface CustomerOption {
+interface PartyOption {
   id: string;
   name: string;
 }
@@ -82,6 +87,7 @@ export function MobileCashEntryForm({
   onSaved: () => void;
   onCancel: () => void;
 }): React.ReactElement {
+  const queryClient = useQueryClient();
   const [direction, setDirection] = useState<FinanceCashDirection>(initial?.direction ?? 'in');
   const [occurredDate, setOccurredDate] = useState(initial?.occurredDate ?? localToday());
   const [amount, setAmount] = useState(initial?.amount ?? '');
@@ -89,79 +95,79 @@ export function MobileCashEntryForm({
   const [toAccountId, setToAccountId] = useState(initial?.toAccountId ?? '');
   const [category, setCategory] = useState<FinanceCashCategoryValue | ''>(initial?.category ?? '');
   const [customerId, setCustomerId] = useState(initial?.customerId ?? '');
+  const [supplierId, setSupplierId] = useState(initial?.supplierId ?? '');
   const [note, setNote] = useState(initial?.note ?? '');
-  const [accountOptions, setAccountOptions] = useState<AccountOption[]>([]);
-  const [customerOptions, setCustomerOptions] = useState<CustomerOption[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   // 账户：启用项；编辑历史流水时补入被停用的当前账户，保证可保存
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const { data, response } = await api.GET('/api/v1/finance/accounts');
-        if (cancelled || !response.ok || !data) {
-          return;
-        }
-        const enabled = data.items
-          .filter((item) => item.active)
-          .map((item) => ({ id: item.id, name: item.name, active: true }));
-        const current = data.items.find((item) => item.id === initial?.accountId);
-        if (current && !enabled.some((item) => item.id === current.id)) {
-          enabled.unshift({ id: current.id, name: `${current.name}（已停用）`, active: false });
-        }
-        setAccountOptions(enabled);
-        if (!initial && enabled.length === 1) {
-          const onlyId = enabled[0]?.id;
-          if (onlyId) {
-            setAccountId((prev) => prev || onlyId);
-          }
-        }
-      } catch {
-        if (!cancelled) {
-          setAccountOptions([]);
-        }
+  const accountsQuery = useQuery({
+    queryKey: ['finance-accounts', 'options'],
+    queryFn: async (): Promise<ApiSchemas['FinanceAccountDto'][]> => {
+      const { data: res, response } = await api.GET('/api/v1/finance/accounts');
+      if (!response.ok || !res) {
+        throw new Error('加载失败，请稍后重试');
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [initial]);
+      return res.items;
+    },
+  });
+  const accountOptions: AccountOption[] = (() => {
+    const items = accountsQuery.data ?? [];
+    const enabled: AccountOption[] = items
+      .filter((item) => item.active)
+      .map((item) => ({ id: item.id, name: item.name, active: true }));
+    const current = items.find((item) => item.id === initial?.accountId);
+    if (current && !enabled.some((item) => item.id === current.id)) {
+      enabled.unshift({ id: current.id, name: `${current.name}（已停用）`, active: false });
+    }
+    return enabled;
+  })();
+  useEffect(() => {
+    if (initial) {
+      return;
+    }
+    const enabled = (accountsQuery.data ?? []).filter((item) => item.active);
+    const onlyId = enabled[0]?.id;
+    if (enabled.length === 1 && onlyId) {
+      setAccountId((prev) => prev || onlyId);
+    }
+  }, [accountsQuery.data, initial]);
 
   // 客户：只列启用；编辑历史流水时补入快照客户
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const { data, response } = await api.GET('/api/v1/customers', {
-          params: { query: { page: 1, pageSize: 100, status: 'active' } },
-        });
-        if (cancelled || !response.ok || !data) {
-          return;
-        }
-        const options: CustomerOption[] = data.items.map((item) => ({
-          id: item.id,
-          name: item.name,
-        }));
-        if (
-          initial?.customerId &&
-          !options.some((option) => option.id === initial.customerId)
-        ) {
-          options.unshift({ id: initial.customerId, name: initial.customerName });
-        }
-        setCustomerOptions(options);
-      } catch {
-        if (!cancelled) {
-          setCustomerOptions([]);
-        }
+  const customersQuery = useQuery({
+    queryKey: ['customers', 'options', 'active'],
+    queryFn: async (): Promise<PartyOption[]> => {
+      const { data: res, response } = await api.GET('/api/v1/customers', {
+        params: { query: { page: 1, pageSize: 100, status: 'active' } },
+      });
+      if (!response.ok || !res) {
+        throw new Error('加载失败，请稍后重试');
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [initial]);
+      return res.items.map((item) => ({ id: item.id, name: item.name }));
+    },
+  });
+  const customerOptions: PartyOption[] = [...(customersQuery.data ?? [])];
+  if (initial?.customerId && !customerOptions.some((item) => item.id === initial.customerId)) {
+    customerOptions.unshift({ id: initial.customerId, name: initial.customerName });
+  }
 
+  // 供应商：只列启用；编辑历史流水时补入快照供应商
+  const suppliersQuery = useQuery({
+    queryKey: ['suppliers', 'options', 'active'],
+    queryFn: async (): Promise<PartyOption[]> => {
+      const { data: res, response } = await api.GET('/api/v1/suppliers', {
+        params: { query: { page: 1, pageSize: 100, status: 'active' } },
+      });
+      if (!response.ok || !res) {
+        throw new Error('加载失败，请稍后重试');
+      }
+      return res.items.map((item) => ({ id: item.id, name: item.name }));
+    },
+  });
+  const supplierOptions: PartyOption[] = [...(suppliersQuery.data ?? [])];
+  if (initial?.supplierId && !supplierOptions.some((item) => item.id === initial.supplierId)) {
+    supplierOptions.unshift({ id: initial.supplierId, name: initial.supplierName });
+  }
   const categoryOptions: Array<{ value: string; label: string }> =
     direction === 'transfer'
       ? []
@@ -170,18 +176,21 @@ export function MobileCashEntryForm({
           label: FINANCE_CASH_CATEGORY_LABELS[value],
         }));
   const showCustomer = direction === 'in' && category === 'sales_receipt';
+  const showSupplier = direction === 'out' && category === 'purchase_payment';
 
   function handleDirectionChange(next: FinanceCashDirection): void {
     setDirection(next);
     if (next === 'transfer') {
       setCategory('');
       setCustomerId('');
+      setSupplierId('');
       return;
     }
     const allowed = FINANCE_CASH_CATEGORIES_BY_DIRECTION[next];
     if (category && !allowed.includes(category)) {
       setCategory('');
       setCustomerId('');
+      setSupplierId('');
     }
   }
 
@@ -195,6 +204,7 @@ export function MobileCashEntryForm({
       toAccountId: direction === 'transfer' ? toAccountId || null : null,
       category: direction === 'transfer' ? null : category || null,
       customerId: showCustomer ? customerId || null : null,
+      supplierId: showSupplier ? supplierId || null : null,
       note,
     });
     if (!parsed.success) {
@@ -209,12 +219,16 @@ export function MobileCashEntryForm({
             params: { path: { id: entryId } },
             body: parsed.data,
           })
-        : await api.POST('/api/v1/finance/cash-entries', { body: parsed.data });
+        : await api.POST('/api/v1/finance/cash-entries', {
+            body: parsed.data,
+            headers: { 'Idempotency-Key': randomUuid() },
+          });
       if (!response.ok) {
         const body = (await response.json().catch(() => null)) as { message?: string } | null;
         setError(body?.message ?? '保存失败，请稍后重试');
         return;
       }
+      await queryClient.invalidateQueries({ queryKey: ['finance-cash-entries'] });
       onSaved();
     } catch {
       setError('保存失败，请稍后重试');
@@ -319,6 +333,24 @@ export function MobileCashEntryForm({
                 ...customerOptions.map((customer) => ({
                   value: customer.id,
                   label: customer.name,
+                })),
+              ]}
+              className="h-12 w-full px-3 text-mobile-body"
+            />
+          </MobileField>
+        ) : null}
+
+        {showSupplier ? (
+          <MobileField label="供应商" htmlFor="mobileCashSupplier">
+            <Select
+              id="mobileCashSupplier"
+              value={supplierId}
+              onChange={setSupplierId}
+              options={[
+                { value: '', label: '请选择供应商' },
+                ...supplierOptions.map((supplier) => ({
+                  value: supplier.id,
+                  label: supplier.name,
                 })),
               ]}
               className="h-12 w-full px-3 text-mobile-body"

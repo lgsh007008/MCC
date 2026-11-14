@@ -11,7 +11,6 @@ export default function MobileFinanceHomePage(): React.ReactElement {
     <div>
       <MobileHeader title="资金" backHref="/m" />
       <div className="space-y-4 p-4">
-        <p className="text-mobile-body text-muted-foreground">选择要办理的业务</p>
         <MobileEntryCard
           href="/m/finance/cash"
           icon={ArrowLeftRightIcon}

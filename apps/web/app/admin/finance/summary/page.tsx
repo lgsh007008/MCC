@@ -7,9 +7,7 @@ import {
   BUSINESS_SUMMARY_CATEGORY_LABELS,
   FINANCE_ACCOUNT_CHANNEL_LABELS,
   FINANCE_ACCOUNT_KIND_LABELS,
-  type BusinessSummaryCategory,
-  type FinanceAccountChannel,
-  type FinanceAccountKind,
+  type ApiSchemas,
 } from '@mcc/shared';
 import { BusinessSummaryHelpDialog } from '@/components/finance/business-summary-help-dialog';
 import { CashSummaryHelpDialog } from '@/components/finance/cash-summary-help-dialog';
@@ -30,34 +28,9 @@ import { api } from '@/lib/api';
 // Tab 1 经营收支（三卡 + 分类小计 + 口径说明弹窗）；Tab 2 资金收付（期间三卡 + 当前资金总额 + 账户余额）。
 // Tab 写入 ?tab=funds，默认经营收支；两个 Tab 共用一份日期筛选。
 
-interface FinanceSummary {
-  totalIncome: string;
-  totalExpense: string;
-  netAmount: string;
-  orderCount: number;
-  cashEntryCount: number;
-  categories: Array<{
-    category: BusinessSummaryCategory;
-    amount: string;
-  }>;
-}
-
-interface CashSummary {
-  receipts: string;
-  payments: string;
-  netFlow: string;
-  totalFunds: string;
-  accounts: Array<{
-    id: string;
-    code: string;
-    name: string;
-    kind: FinanceAccountKind;
-    channel: FinanceAccountChannel;
-    openingBalance: string;
-    balance: string;
-    active: boolean;
-  }>;
-}
+// 类型取自契约生成产物（ADR-006），不手写 DTO
+type FinanceSummary = ApiSchemas['FinanceSummaryDto'];
+type CashSummary = ApiSchemas['FinanceCashSummaryDto'];
 
 const pad = (n: number): string => String(n).padStart(2, '0');
 const localToday = (): string => {
@@ -98,10 +71,7 @@ export default function FinanceSummaryPage(): React.ReactElement {
       if (!response.ok || !res) {
         throw new Error('汇总加载失败');
       }
-      return {
-        ...res,
-        categories: res.categories as FinanceSummary['categories'],
-      };
+      return res;
     },
   });
 
@@ -119,7 +89,7 @@ export default function FinanceSummaryPage(): React.ReactElement {
       if (!response.ok || !res) {
         throw new Error('资金汇总加载失败');
       }
-      return res as CashSummary;
+      return res;
     },
   });
 
@@ -215,24 +185,21 @@ export default function FinanceSummaryPage(): React.ReactElement {
                 </div>
               ))}
             </div>
-            <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="flex items-start justify-between gap-2">
               <p className="text-xs text-muted-foreground">
-                看这段时间生意赚了多少：收入按销售单确认（赊销也计入），支出按实际付款计入，所以净额不等于手里的现金。
+                看这段时间生意赚了多少：收入按销售单、采购按采购单确认（赊销赊购都计入），工资费用按实付计入，所以净额不等于手里的现金。本期计入{' '}
+                {data?.orderCount ?? 0} 张销售单、{data?.purchaseCount ?? 0} 张采购单、
+                {data?.cashEntryCount ?? 0} 条收支流水。
               </p>
-              <div className="flex shrink-0 items-center gap-3 text-xs text-muted-foreground">
-                <span>
-                  本期计入 {data?.orderCount ?? 0} 张销售单、{data?.cashEntryCount ?? 0} 条收支流水
-                </span>
-                <Button
-                  type="button"
-                  variant="link"
-                  size="xs"
-                  className="px-0 text-xs"
-                  onClick={() => setBusinessHelpOpen(true)}
-                >
-                  分类口径说明
-                </Button>
-              </div>
+              <Button
+                type="button"
+                variant="link"
+                size="xs"
+                className="shrink-0 px-0 text-xs"
+                onClick={() => setBusinessHelpOpen(true)}
+              >
+                分类口径说明
+              </Button>
             </div>
           </div>
 

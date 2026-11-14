@@ -8,7 +8,7 @@ import { ApiProperty } from '@nestjs/swagger';
 export class FinanceCategorySubtotalDto {
   @ApiProperty({
     type: String,
-    enum: ['sales_revenue', 'other_revenue', 'purchase_payment', 'labor_cost', 'operating_expense'],
+    enum: ['sales_revenue', 'other_revenue', 'purchase_expense', 'labor_cost', 'operating_expense'],
     description: '经营收支项（固定五项输出）',
   })
   category!: string;
@@ -26,6 +26,8 @@ export class FinanceSummaryDto {
   netAmount!: string;
   @ApiProperty({ type: Number, description: '期间销售单数' })
   orderCount!: number;
+  @ApiProperty({ type: Number, description: '期间采购单数' })
+  purchaseCount!: number;
   @ApiProperty({ type: Number, description: '计入经营收支的流水条数' })
   cashEntryCount!: number;
   @ApiProperty({ type: () => [FinanceCategorySubtotalDto], description: '分类小计（五项固定输出）' })

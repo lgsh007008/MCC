@@ -1,15 +1,17 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
+import { useQueries, useQuery } from '@tanstack/react-query';
 import {
   FINANCE_CASH_CATEGORIES_BY_DIRECTION,
   FINANCE_CASH_CATEGORY_LABELS,
+  type ApiSchemas,
   type FinanceCashCategoryValue,
   type FinanceCashDirection,
 } from '@mcc/shared';
 import { useCan } from '@/components/auth/permission-context';
-import { FinanceCashCard, type MobileCashEntry } from '@/components/mobile/finance-cash-card';
+import { FinanceCashCard } from '@/components/mobile/finance-cash-card';
 import { MobileListState } from '@/components/mobile/list';
 import { MobileActionBar, MobileHeader } from '@/components/mobile/mobile-shell';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -23,19 +25,14 @@ import { cn } from '@/lib/utils';
 // 单列、无左栏；账户用大号下拉替代主从筛选；流水为卡片列表 + 加载更多；
 // 底部固定合计与「登记流水」；不做批量与横向滚动。
 
-interface AccountOption {
-  id: string;
-  name: string;
-}
+// 类型取自契约生成产物（ADR-006）
+type CashEntryPage = ApiSchemas['FinanceCashEntryListDto'];
 
-interface CashEntryRow extends MobileCashEntry {
-  code: string;
-}
-
-interface CashEntrySummary {
-  receipts: string;
-  payments: string;
-  net: string;
+interface CashFilters {
+  dateFrom: string;
+  dateTo: string;
+  direction: FinanceCashDirection | '';
+  category: FinanceCashCategoryValue | '';
 }
 
 const PAGE_SIZE = 20;
@@ -54,94 +51,69 @@ const defaultRange = (): { dateFrom: string; dateTo: string } => ({
   dateTo: localToday(),
 });
 
+async function fetchCashEntries(
+  page: number,
+  accountId: string,
+  applied: CashFilters,
+): Promise<CashEntryPage> {
+  const { data: res, response } = await api.GET('/api/v1/finance/cash-entries', {
+    params: {
+      query: {
+        page,
+        pageSize: PAGE_SIZE,
+        direction: applied.direction || undefined,
+        category: applied.category || undefined,
+        accountId: accountId || undefined,
+        dateFrom: applied.dateFrom || undefined,
+        dateTo: applied.dateTo || undefined,
+      },
+    },
+  });
+  if (!response.ok || !res) {
+    throw new Error('加载失败，请稍后重试');
+  }
+  return res;
+}
+
 export default function MobileFinanceCashPage(): React.ReactElement {
   const canManage = useCan('finance:manage');
-  const [accounts, setAccounts] = useState<AccountOption[]>([]);
   const [accountId, setAccountId] = useState('');
-  const [filters, setFilters] = useState({
+  const [filters, setFilters] = useState<CashFilters>({
     ...defaultRange(),
-    direction: '' as FinanceCashDirection | '',
-    category: '' as FinanceCashCategoryValue | '',
+    direction: '',
+    category: '',
   });
-  const [applied, setApplied] = useState(filters);
-  const [items, setItems] = useState<CashEntryRow[]>([]);
-  const [total, setTotal] = useState(0);
-  const [summary, setSummary] = useState<CashEntrySummary>({
-    receipts: '0.00',
-    payments: '0.00',
-    net: '0.00',
-  });
+  const [applied, setApplied] = useState<CashFilters>(filters);
   const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const { data, response } = await api.GET('/api/v1/finance/accounts');
-        if (!cancelled && response.ok && data) {
-          setAccounts(
-            data.items
-              .filter((item) => item.active)
-              .map((item) => ({ id: item.id, name: item.name })),
-          );
-        }
-      } catch {
-        if (!cancelled) {
-          setAccounts([]);
-        }
+  const accountsQuery = useQuery({
+    queryKey: ['finance-accounts'],
+    queryFn: async (): Promise<ApiSchemas['FinanceAccountDto'][]> => {
+      const { data: res, response } = await api.GET('/api/v1/finance/accounts');
+      if (!response.ok || !res) {
+        throw new Error('加载失败，请稍后重试');
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+      return res.items;
+    },
+  });
+  const accounts = (accountsQuery.data ?? []).filter((item) => item.active);
 
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      setLoading(true);
-      try {
-        const { data: res, response } = await api.GET('/api/v1/finance/cash-entries', {
-          params: {
-            query: {
-              page,
-              pageSize: PAGE_SIZE,
-              direction: (applied.direction || undefined) as FinanceCashDirection | undefined,
-              category: (applied.category || undefined) as FinanceCashCategoryValue | undefined,
-              accountId: accountId || undefined,
-              dateFrom: applied.dateFrom || undefined,
-              dateTo: applied.dateTo || undefined,
-            },
-          },
-        });
-        if (cancelled) {
-          return;
-        }
-        if (response.ok && res) {
-          const rows = res.items as CashEntryRow[];
-          setItems((prev) => (page === 1 ? rows : [...prev, ...rows]));
-          setTotal(res.total);
-          setSummary(res.summary);
-          setError(null);
-        } else {
-          setError('加载失败，请稍后重试');
-        }
-      } catch {
-        if (!cancelled) {
-          setError('加载失败，请稍后重试');
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [page, applied, accountId]);
+  const appliedQuery = { ...applied, accountId };
+  const listQueries = useQueries({
+    queries: Array.from({ length: page }, (_, index) => ({
+      queryKey: ['finance-cash-entries', index + 1, appliedQuery],
+      queryFn: () => fetchCashEntries(index + 1, accountId, applied),
+    })),
+  });
+  const items = listQueries.flatMap((query) => query.data?.items ?? []);
+  const lastQuery = listQueries[listQueries.length - 1];
+  const total = listQueries.reduce((acc, query) => query.data?.total ?? acc, 0);
+  const summary = listQueries.reduce(
+    (acc, query) => query.data?.summary ?? acc,
+    { receipts: '0.00', payments: '0.00', net: '0.00' },
+  );
+  const loading = listQueries.some((query) => query.isFetching);
+  const error = lastQuery?.isError ? '加载失败，请稍后重试' : null;
 
   const categoryOptions: FinanceCashCategoryValue[] =
     filters.direction === 'transfer'
@@ -263,7 +235,11 @@ export default function MobileFinanceCashPage(): React.ReactElement {
               variant="outline"
               className="h-12 flex-1 text-mobile-body"
               onClick={() => {
-                const defaults = { ...defaultRange(), direction: '' as const, category: '' as const };
+                const defaults: CashFilters = {
+                  ...defaultRange(),
+                  direction: '',
+                  category: '',
+                };
                 setFilters(defaults);
                 setApplied(defaults);
                 setAccountId('');

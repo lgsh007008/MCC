@@ -7,5 +7,23 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['src/**/*.spec.ts'],
+    // 核心计算纯函数设硬门槛（技术方案 §10）：这些文件是全系统金额/方量口径的唯一实现，
+    // 不追求全包覆盖率，只锁计算与权限判定，避免门禁被大量非计算代码稀释。
+    coverage: {
+      provider: 'v8',
+      include: [
+        'src/order.calc.ts',
+        'src/purchase.calc.ts',
+        'src/finance.calc.ts',
+        'src/money.ts',
+        'src/auth.permissions.ts',
+      ],
+      thresholds: {
+        statements: 95,
+        branches: 90,
+        functions: 95,
+        lines: 95,
+      },
+    },
   },
 });

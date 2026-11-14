@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  Headers,
   HttpCode,
   Param,
   ParseUUIDPipe,
@@ -16,17 +17,22 @@ import {
   financeCashEntryInputSchema,
   financeCashEntryListQuerySchema,
   financeCashSummaryQuerySchema,
+  financePayablesQuerySchema,
   financeReceivablesQuerySchema,
   financeSummaryQuerySchema,
   type FinanceAccountInput,
   type FinanceCashEntryInput,
   type FinanceCashEntryListQuery,
   type FinanceCashSummaryQuery,
+  type FinancePayablesQuery,
   type FinanceReceivablesQuery,
   type FinanceSummaryQuery,
 } from '@mcc/shared';
 import { AuditAction } from '../../common/decorators/audit-action.decorator.js';
+import { CurrentUser, type AuthUser } from '../../common/decorators/current-user.decorator.js';
 import { RequireScopes } from '../../common/decorators/require-scopes.decorator.js';
+import { withIdempotency } from '../../common/idempotency.js';
+import { RedisService } from '../../common/redis.service.js';
 import { ZodValidationPipe } from '../../common/zod-validation.pipe.js';
 import {
   FinanceAccountBodyDto,
@@ -36,6 +42,7 @@ import {
   FinanceCashEntryDto,
   FinanceCashEntryListDto,
   FinanceCashSummaryDto,
+  FinancePayableListDto,
   FinanceReceivableListDto,
 } from './dto/cash.dto.js';
 import { FinanceSummaryDto } from './dto/finance.dto.js';
@@ -45,7 +52,10 @@ import { FinanceService } from './finance.service.js';
 @ApiTags('finance')
 @Controller('finance')
 export class FinanceController {
-  constructor(private readonly financeService: FinanceService) {}
+  constructor(
+    private readonly financeService: FinanceService,
+    private readonly redis: RedisService,
+  ) {}
 
   @Get('summary')
   @RequireScopes('finance:view')
@@ -78,10 +88,15 @@ export class FinanceController {
   @ApiOperation({ summary: '新建资金账户（对公 / 对私级联渠道）' })
   @ApiBody({ type: FinanceAccountBodyDto })
   @ApiCreatedResponse({ type: FinanceAccountDto })
-  createAccount(
+  async createAccount(
+    @CurrentUser() user: AuthUser,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Body(new ZodValidationPipe(financeAccountInputSchema)) body: FinanceAccountInput,
   ): Promise<FinanceAccountDto> {
-    return this.financeService.createAccount(body);
+    // 幂等（技术方案 §6.3）：重复提交返回首请求结果，处理中返回 409
+    return withIdempotency(this.redis, user.userId, 'finance-accounts', idempotencyKey, () =>
+      this.financeService.createAccount(body),
+    );
   }
 
   @Put('accounts/:id')
@@ -165,6 +180,17 @@ export class FinanceController {
     return this.financeService.receivables(query);
   }
 
+  @Get('payables')
+  @RequireScopes('finance:view')
+  @ApiOperation({ summary: '供应商应付（批量）：累计采购 / 累计付款 / 应付（负数为预付）' })
+  @ApiQuery({ name: 'supplierIds', required: true, type: String, description: '逗号分隔的供应商 id' })
+  @ApiOkResponse({ type: FinancePayableListDto })
+  payables(
+    @Query(new ZodValidationPipe(financePayablesQuerySchema)) query: FinancePayablesQuery,
+  ): Promise<FinancePayableListDto> {
+    return this.financeService.payables(query);
+  }
+
   @Post('cash-entries')
   @RequireScopes('finance:manage')
   @AuditAction({ domain: 'finance', action: 'create-cash-entry', label: '登记资金流水', objectType: 'finance_cash_entry' })
@@ -172,10 +198,15 @@ export class FinanceController {
   @ApiOperation({ summary: '登记资金流水（收支分类按方向必选；销售回款挂客户）' })
   @ApiBody({ type: FinanceCashEntryBodyDto })
   @ApiCreatedResponse({ type: FinanceCashEntryDto })
-  createCashEntry(
+  async createCashEntry(
+    @CurrentUser() user: AuthUser,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Body(new ZodValidationPipe(financeCashEntryInputSchema)) body: FinanceCashEntryInput,
   ): Promise<FinanceCashEntryDto> {
-    return this.financeService.createCashEntry(body);
+    // 幂等（技术方案 §6.3）：重复提交返回首请求结果，处理中返回 409
+    return withIdempotency(this.redis, user.userId, 'finance-cash-entries', idempotencyKey, () =>
+      this.financeService.createCashEntry(body),
+    );
   }
 
   @Put('cash-entries/:id')

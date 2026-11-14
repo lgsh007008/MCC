@@ -82,6 +82,9 @@ export class FinanceCashEntryBodyDto {
   @ApiPropertyOptional({ type: String, nullable: true, description: '客户 id（仅销售回款必填）' })
   customerId?: string | null;
 
+  @ApiPropertyOptional({ type: String, nullable: true, description: '供应商 id（仅采购付款必填）' })
+  supplierId?: string | null;
+
   @ApiPropertyOptional({ type: String, description: '备注（付款写对象与事由；承兑写票号 / 到期日）', default: '' })
   note?: string;
 }
@@ -98,11 +101,13 @@ export class FinanceCashEntryDto {
   @ApiPropertyOptional({ type: String, nullable: true }) toAccountName!: string | null;
   @ApiPropertyOptional({ type: String, nullable: true }) customerId!: string | null;
   @ApiProperty({ type: String }) customerName!: string;
+  @ApiPropertyOptional({ type: String, nullable: true }) supplierId!: string | null;
+  @ApiProperty({ type: String }) supplierName!: string;
   @ApiProperty({ type: String, enum: CASH_METHODS }) method!: string;
   @ApiPropertyOptional({ type: String, enum: CASH_CATEGORIES, nullable: true })
   category!: string | null;
   @ApiProperty({ type: String }) note!: string;
-  @ApiPropertyOptional({ type: String, nullable: true, description: '源单类型（sale_order）' })
+  @ApiPropertyOptional({ type: String, nullable: true, description: '源单类型（sale_order / purchase_order）' })
   sourceType!: string | null;
   @ApiPropertyOptional({ type: String, nullable: true, description: '源单 id' })
   sourceId!: string | null;
@@ -150,4 +155,20 @@ export class FinanceReceivableDto {
 
 export class FinanceReceivableListDto {
   @ApiProperty({ type: () => [FinanceReceivableDto] }) items!: FinanceReceivableDto[];
+}
+
+// ── 应付（供应商欠款）───────────────────────────────────
+
+export class FinancePayableDto {
+  @ApiProperty({ type: String }) supplierId!: string;
+  @ApiProperty({ type: String, description: '期初应付（供应商档案录入的上线前净应付）' })
+  openingPayable!: string;
+  @ApiProperty({ type: String, description: '累计采购（现结取实付、赊购取合计）' }) purchases!: string;
+  @ApiProperty({ type: String, description: '累计付款（采购付款流水合计）' }) payments!: string;
+  @ApiProperty({ type: String, description: '应付 = 期初应付 + 采购 − 付款；负数为预付' })
+  outstanding!: string;
+}
+
+export class FinancePayableListDto {
+  @ApiProperty({ type: () => [FinancePayableDto] }) items!: FinancePayableDto[];
 }

@@ -36,15 +36,15 @@ test('登录 → 首页 → 订单菜单 → 销售单列表 → 退出 → 未�
   await expect(page.getByRole('heading', { name: '首页' })).toBeVisible();
   await expect(page.getByText('欢迎使用梅好木业数字化系统', { exact: false })).toBeVisible();
 
-  // 侧边菜单：首页 + 订单组（销售单）+ 客户组（客户档案），未建分组不再预置、无「待建」标注
+  // 侧边菜单：首页 + 销售组（销售单 / 客户档案），未建分组不再预置、无「待建」标注
   await expect(page.getByRole('link', { name: '销售单', exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: '客户档案', exact: true })).toBeVisible();
   await expect(page.getByText('待建', { exact: true })).toHaveCount(0);
 
   // 分组树状折叠：点组标题收起子项，再点展开
-  await page.getByRole('button', { name: '订单', exact: true }).click();
+  await page.getByRole('button', { name: '销售', exact: true }).click();
   await expect(page.getByRole('link', { name: '销售单', exact: true })).toHaveCount(0);
-  await page.getByRole('button', { name: '订单', exact: true }).click();
+  await page.getByRole('button', { name: '销售', exact: true }).click();
   await expect(page.getByRole('link', { name: '销售单', exact: true })).toBeVisible();
 
   // 边栏折叠后点击菜单不自动展开（sidebar_state cookie 保持 false）

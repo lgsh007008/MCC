@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Trash2Icon } from 'lucide-react';
-import { calcSettlementDifference } from '@mcc/shared';
+import { calcSettlementDifference, type ApiSchemas } from '@mcc/shared';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { useCan } from '@/components/auth/permission-context';
@@ -15,71 +16,47 @@ import { cn } from '@/lib/utils';
 
 // 销售单移动详情（product/order.md 移动页）：只读卡片，无面包屑 / 标签页；
 // 底部固定「编辑」「返回列表」；`order:manage` 在明细下方可删除整单（二次确认）。
-interface SaleOrderItemDetail {
-  id: string;
-  pricingMode: 'volume' | 'piece';
-  lengthMm: number;
-  widthMm: number;
-  heightMm: number;
-  pieces: number;
-  volumeM3: string;
-  price: string;
-  lineAmount: string;
-  otherAmount: string;
-  note: string;
-}
-
-interface SaleOrderDetail {
-  id: string;
-  saleDate: string;
-  customerName: string;
-  totalVolume: string;
-  subtotalAmount: string;
-  otherAmount: string;
-  totalAmount: string;
-  note: string;
-  settlementMode: 'credit' | 'settled';
-  receivedAmount: string;
-  settleAccountId?: string | null;
-  items: SaleOrderItemDetail[];
-}
+type SaleOrderDetail = ApiSchemas['SaleOrderDto'];
 
 export default function MobileSaleOrderDetailPage(): React.ReactElement {
   const canManage = useCan('order:manage');
   const router = useRouter();
+  const queryClient = useQueryClient();
   const confirm = useConfirm();
   const params = useParams<{ id: string }>();
-  const [order, setOrder] = useState<SaleOrderDetail | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  const [settleAccountName, setSettleAccountName] = useState('');
+
+  const orderQuery = useQuery({
+    queryKey: ['sale-orders', params.id],
+    queryFn: async (): Promise<SaleOrderDetail> => {
+      const { data: res, response } = await api.GET('/api/v1/sale-orders/{id}', {
+        params: { path: { id: params.id } },
+      });
+      if (!response.ok || !res) {
+        throw new Error('销售单不存在或加载失败');
+      }
+      return res;
+    },
+  });
 
   // 现结收款账户名称：DTO 只带 id，经账户列表匹配（与 PC 详情同法）
-  useEffect(() => {
-    if (!order?.settleAccountId) {
-      setSettleAccountName('');
-      return;
-    }
-    let cancelled = false;
-    void (async () => {
-      try {
-        const { data, response } = await api.GET('/api/v1/finance/accounts');
-        if (cancelled || !response.ok || !data) {
-          return;
-        }
-        const matched = data.items.find((item) => item.id === order.settleAccountId);
-        setSettleAccountName(matched?.name ?? '');
-      } catch {
-        if (!cancelled) {
-          setSettleAccountName('');
-        }
+  const accountsQuery = useQuery({
+    queryKey: ['finance-accounts'],
+    queryFn: async (): Promise<ApiSchemas['FinanceAccountDto'][]> => {
+      const { data: res, response } = await api.GET('/api/v1/finance/accounts');
+      if (!response.ok || !res) {
+        throw new Error('加载失败，请稍后重试');
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [order?.settleAccountId]);
+      return res.items;
+    },
+    enabled: Boolean(orderQuery.data?.settleAccountId),
+  });
+
+  const order = orderQuery.data;
+  const settleAccountName =
+    accountsQuery.data?.find((item) => item.id === order?.settleAccountId)?.name ?? '';
+  const error = orderQuery.isError && !order ? '销售单不存在或加载失败' : null;
 
   async function handleDelete(): Promise<void> {
     setDeleteError(null);
@@ -98,6 +75,7 @@ export default function MobileSaleOrderDetailPage(): React.ReactElement {
             if (!response.ok) {
               throw new Error('删除失败，请稍后重试');
             }
+            await queryClient.invalidateQueries({ queryKey: ['sale-orders'] });
             router.replace('/m/sale-orders');
           } finally {
             setDeleting(false);
@@ -108,32 +86,6 @@ export default function MobileSaleOrderDetailPage(): React.ReactElement {
       setDeleteError('删除失败，请稍后重试');
     }
   }
-
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const { data, response } = await api.GET('/api/v1/sale-orders/{id}', {
-          params: { path: { id: params.id } },
-        });
-        if (cancelled) {
-          return;
-        }
-        if (!response.ok || !data) {
-          setError('销售单不存在或加载失败');
-          return;
-        }
-        setOrder(data);
-      } catch {
-        if (!cancelled) {
-          setError('销售单不存在或加载失败');
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [params.id]);
 
   if (error) {
     return (

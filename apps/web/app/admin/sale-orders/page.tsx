@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useQuery } from '@tanstack/react-query';
+import type { ApiSchemas } from '@mcc/shared';
 import { ArrowDownIcon, ArrowUpIcon, EyeIcon, PencilIcon, Trash2Icon } from 'lucide-react';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { useCan } from '@/components/auth/permission-context';
@@ -23,24 +25,11 @@ import { api } from '@/lib/api';
 // 销售单列表页（product/order.md R-订单-001；页面模式规范见 product/平台布局.md）：
 // 筛选 → 批量操作（新建 / 批量删除）→ 表格（首列多选、可排序列、图标行操作）→ 分页。
 
-interface OrderListItem {
-  id: string;
-  code: string;
-  saleDate: string;
-  customerName: string;
-  totalVolume: string;
-  subtotalAmount: string;
-  otherAmount: string;
-  totalAmount: string;
-  note: string;
-}
-
-interface OrderSummary {
-  totalVolume: string;
-  subtotalAmount: string;
-  otherAmount: string;
-  totalAmount: string;
-}
+// 类型一律取自契约生成产物（ADR-006），不手写 DTO
+type SaleOrderList = ApiSchemas['SaleOrderListDto'];
+type OrderListItem = ApiSchemas['SaleOrderListItemDto'];
+type OrderSummary = ApiSchemas['SaleOrderSummaryDto'];
+type CustomerOption = ApiSchemas['CustomerDto'];
 
 const EMPTY_SUMMARY: OrderSummary = {
   totalVolume: '0.0000',
@@ -49,15 +38,10 @@ const EMPTY_SUMMARY: OrderSummary = {
   totalAmount: '0.00',
 };
 
+const EMPTY_LIST: SaleOrderList = { total: 0, summary: EMPTY_SUMMARY, items: [] };
+
 type SortField = 'saleDate' | 'totalVolume' | 'totalAmount';
 type SortOrder = 'asc' | 'desc';
-
-interface CustomerOption {
-  id: string;
-  code: string;
-  name: string;
-  status: string;
-}
 
 const PAGE_SIZE = 20;
 
@@ -66,96 +50,72 @@ export default function SaleOrdersPage(): React.ReactElement {
   const confirm = useConfirm();
   const [filters, setFilters] = useState({ customerId: '', dateFrom: '', dateTo: '' });
   const [applied, setApplied] = useState({ customerId: '', dateFrom: '', dateTo: '' });
-  const [customerOptions, setCustomerOptions] = useState<CustomerOption[]>([]);
   const [sort, setSort] = useState<{ field: SortField; order: SortOrder }>({
     field: 'saleDate',
     order: 'desc',
   });
   const [page, setPage] = useState(1);
-  const [data, setData] = useState<{ total: number; summary: OrderSummary; items: OrderListItem[] }>({
-    total: 0,
-    summary: EMPTY_SUMMARY,
-    items: [],
-  });
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    // 翻页 / 改筛选 / 改排序即清空选择（页面模式规范）
-    setSelected(new Set());
-    void (async () => {
-      try {
-        const { data: res, response } = await api.GET('/api/v1/sale-orders', {
-          params: {
-            query: {
-              page,
-              pageSize: PAGE_SIZE,
-              customerId: applied.customerId || undefined,
-              dateFrom: applied.dateFrom || undefined,
-              dateTo: applied.dateTo || undefined,
-              sortBy: sort.field,
-              sortOrder: sort.order,
-            },
+  const listQuery = useQuery({
+    queryKey: ['sale-orders', page, applied, sort],
+    queryFn: async (): Promise<SaleOrderList> => {
+      const { data: res, response } = await api.GET('/api/v1/sale-orders', {
+        params: {
+          query: {
+            page,
+            pageSize: PAGE_SIZE,
+            customerId: applied.customerId || undefined,
+            dateFrom: applied.dateFrom || undefined,
+            dateTo: applied.dateTo || undefined,
+            sortBy: sort.field,
+            sortOrder: sort.order,
           },
-        });
-        if (!cancelled) {
-          if (response.ok && res) {
-            setData(res);
-            setError(null);
-          } else {
-            setError('加载失败，请稍后重试');
-          }
-        }
-      } catch {
-        if (!cancelled) {
-          setError('加载失败，请稍后重试');
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
+        },
+      });
+      if (!response.ok || !res) {
+        throw new Error('加载失败，请稍后重试');
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [page, applied, sort]);
+      return res;
+    },
+  });
 
   // 客户筛选下拉：含停用客户（便于查历史单），来源 customer 列表接口
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const { data: res, response } = await api.GET('/api/v1/customers', {
-          params: { query: { page: 1, pageSize: 100 } },
-        });
-        if (!cancelled && response.ok && res) {
-          setCustomerOptions(res.items);
-        }
-      } catch {
-        if (!cancelled) {
-          setCustomerOptions([]);
-        }
+  const customersQuery = useQuery({
+    queryKey: ['customers', 'options'],
+    queryFn: async (): Promise<CustomerOption[]> => {
+      const { data: res, response } = await api.GET('/api/v1/customers', {
+        params: { query: { page: 1, pageSize: 100 } },
+      });
+      if (!response.ok || !res) {
+        throw new Error('加载客户失败');
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+      return res.items;
+    },
+  });
+
+  const data = listQuery.data ?? EMPTY_LIST;
+  const customerOptions = customersQuery.data ?? [];
+  const loading = listQuery.isPending;
+  const error = actionError ?? (listQuery.isError ? '加载失败，请稍后重试' : null);
+
+  // 翻页 / 改筛选 / 改排序即清空选择（页面模式规范）
+  useEffect(() => {
+    setSelected(new Set());
+  }, [page, applied, sort]);
 
   async function reload(): Promise<void> {
     if (data.items.length <= 1 && page > 1) {
       setPage(page - 1);
     } else {
-      setApplied({ ...applied });
+      await listQuery.refetch();
     }
   }
 
   async function handleDelete(order: OrderListItem): Promise<void> {
     try {
+      setActionError(null);
       const ok = await confirm({
         title: '删除销售单',
         description: `将删除销售单 ${order.code}。删除后不可恢复，编号不回收。`,
@@ -174,7 +134,7 @@ export default function SaleOrdersPage(): React.ReactElement {
         await reload();
       }
     } catch {
-      setError('删除失败，请稍后重试');
+      setActionError('删除失败，请稍后重试');
     }
   }
 
@@ -183,6 +143,7 @@ export default function SaleOrdersPage(): React.ReactElement {
       return;
     }
     try {
+      setActionError(null);
       const ok = await confirm({
         title: '批量删除销售单',
         description: `将删除选中的 ${selected.size} 张销售单。删除后不可恢复，编号不回收。`,
@@ -201,7 +162,7 @@ export default function SaleOrdersPage(): React.ReactElement {
         await reload();
       }
     } catch {
-      setError('批量删除失败，请稍后重试');
+      setActionError('批量删除失败，请稍后重试');
     }
   }
 

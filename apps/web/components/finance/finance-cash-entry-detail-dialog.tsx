@@ -4,10 +4,8 @@ import {
   FINANCE_CASH_CATEGORY_LABELS,
   FINANCE_CASH_DIRECTION_LABELS,
   FINANCE_CASH_METHOD_LABELS,
-  type FinanceCashCategoryValue,
-  type FinanceCashDirection,
-  type FinanceCashMethod,
 } from '@mcc/shared';
+import type { ApiSchemas } from '@mcc/shared';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
@@ -15,23 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 // 只读展示，信息条两列排布，备注为长文本独占整行并强制换行（本页局部决定）；
 // 编辑 = 关闭详情后切换到流水弹窗，源单流水不提供编辑。
 
-export interface FinanceCashEntryDetail {
-  id: string;
-  code: string;
-  direction: FinanceCashDirection;
-  occurredDate: string;
-  amount: string;
-  accountName: string;
-  toAccountName: string | null;
-  customerName: string;
-  method: FinanceCashMethod;
-  category: FinanceCashCategoryValue | null;
-  note: string;
-  sourceType: string | null;
-  sourceCode: string | null;
-  sourceLabel: string | null;
-  editable: boolean;
-}
+export type FinanceCashEntryDetail = ApiSchemas['FinanceCashEntryDto'];
 
 function Row({
   label,
@@ -99,6 +81,9 @@ export function FinanceCashEntryDetailDialog({
               <Row label="资金账户">{entry.accountName}</Row>
               <Row label="客户">
                 {entry.category === 'sales_receipt' ? entry.customerName || '—' : '—'}
+              </Row>
+              <Row label="供应商">
+                {entry.category === 'purchase_payment' ? entry.supplierName || '—' : '—'}
               </Row>
             </>
           )}

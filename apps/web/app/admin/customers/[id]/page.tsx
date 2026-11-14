@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
 import { absMoney } from '@mcc/shared';
+import type { ApiSchemas } from '@mcc/shared';
 import { buttonVariants } from '@/components/ui/button';
 import { useCan } from '@/components/auth/permission-context';
 import { PageFrame } from '@/components/admin/page-frame';
@@ -14,104 +15,71 @@ import { api } from '@/lib/api';
 // 不嵌该客户的销售单列表（需求明确不做）；累计下单方量取 order 的汇总接口，
 // 应收三项（累计销售 / 累计收款 / 欠款）取 finance 的批量应收接口。
 
-interface CustomerDetail {
-  id: string;
-  code: string;
-  name: string;
-  contact: string;
-  status: string;
-  note: string;
-  openingDebt: string;
-  createdAt: string;
-}
+type CustomerDetail = ApiSchemas['CustomerDto'];
 
 export default function CustomerDetailPage(): React.ReactElement {
   const canManage = useCan('customer:manage');
   const params = useParams<{ id: string }>();
-  const [customer, setCustomer] = useState<CustomerDetail | null>(null);
-  const [volume, setVolume] = useState('0.0000');
-  const [receivable, setReceivable] = useState({ sales: '0.00', receipts: '0.00', outstanding: '0.00' });
-  const [error, setError] = useState<string | null>(null);
+
+  const customerQuery = useQuery({
+    queryKey: ['customers', params.id],
+    queryFn: async (): Promise<CustomerDetail> => {
+      const { data: res, response } = await api
+        .GET('/api/v1/customers/{id}', {
+          params: { path: { id: params.id } },
+        })
+        .catch(() => {
+          throw new Error('加载失败，请稍后重试');
+        });
+      if (!response.ok || !res) {
+        throw new Error('客户不存在或加载失败');
+      }
+      return res;
+    },
+  });
+
+  const volumeQuery = useQuery({
+    queryKey: ['sale-orders', 'customer-volume-summary', params.id],
+    queryFn: async (): Promise<ApiSchemas['CustomerVolumeSummaryDto']> => {
+      const { data: res, response } = await api.GET('/api/v1/sale-orders/customer-volume-summary', {
+        params: { query: { customerIds: params.id } },
+      });
+      if (!response.ok || !res) {
+        throw new Error('加载失败，请稍后重试');
+      }
+      return res;
+    },
+  });
+
+  const receivableQuery = useQuery({
+    queryKey: ['finance', 'receivables', params.id],
+    queryFn: async (): Promise<ApiSchemas['FinanceReceivableListDto']> => {
+      const { data: res, response } = await api.GET('/api/v1/finance/receivables', {
+        params: { query: { customerIds: params.id } },
+      });
+      if (!response.ok || !res) {
+        throw new Error('加载失败，请稍后重试');
+      }
+      return res;
+    },
+  });
+
+  const customer = customerQuery.data;
+  const volume = volumeQuery.data?.items[0]?.totalVolume ?? '0.0000';
+  const receivableItem = receivableQuery.data?.items[0];
+  const receivable = {
+    sales: receivableItem?.sales ?? '0.00',
+    receipts: receivableItem?.receipts ?? '0.00',
+    outstanding: receivableItem?.outstanding ?? '0.00',
+  };
 
   // 面包屑页面标识 = 客户编号
   usePageCrumb(customer ? [{ title: customer.code }] : []);
 
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const { data, response } = await api.GET('/api/v1/customers/{id}', {
-          params: { path: { id: params.id } },
-        });
-        if (!cancelled) {
-          if (response.ok && data) {
-            setCustomer(data);
-          } else {
-            setError('客户不存在或加载失败');
-          }
-        }
-      } catch {
-        if (!cancelled) {
-          setError('加载失败，请稍后重试');
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [params.id]);
-
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const { data, response } = await api.GET('/api/v1/sale-orders/customer-volume-summary', {
-          params: { query: { customerIds: params.id } },
-        });
-        if (!cancelled && response.ok && data) {
-          setVolume(data.items[0]?.totalVolume ?? '0.0000');
-        }
-      } catch {
-        if (!cancelled) {
-          setVolume('0.0000');
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [params.id]);
-
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const { data, response } = await api.GET('/api/v1/finance/receivables', {
-          params: { query: { customerIds: params.id } },
-        });
-        if (!cancelled && response.ok && data) {
-          const item = data.items[0];
-          setReceivable({
-            sales: item?.sales ?? '0.00',
-            receipts: item?.receipts ?? '0.00',
-            outstanding: item?.outstanding ?? '0.00',
-          });
-        }
-      } catch {
-        if (!cancelled) {
-          setReceivable({ sales: '0.00', receipts: '0.00', outstanding: '0.00' });
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [params.id]);
-
-  if (error) {
-    return <p className="text-sm text-destructive">{error}</p>;
+  if (customerQuery.isError) {
+    return <p className="text-sm text-destructive">{customerQuery.error.message}</p>;
   }
-  if (!customer) {
+  if (customerQuery.isPending || !customer) {
     return <p className="text-sm text-muted-foreground">加载中…</p>;
   }
 

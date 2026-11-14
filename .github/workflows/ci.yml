@@ -1,7 +1,7 @@
 # CI 门禁（技术方案 §10：lint + 类型检查 + 构建 + 单测 + 契约校验 + E2E 冒烟）
 # 覆盖：数据库迁移与 Prisma Client 生成、OpenAPI 契约校验、全仓 lint（含 §4.2 模块边界规则）、
 # 类型检查（server / shared / db）、全仓构建（server 的 NodeNext 编译问题只能由构建暴露）、
-# 单测与集成测试（server / shared）、E2E 冒烟（web + server 由 Playwright 本机拉起）。
+# 单测与集成测试（server / shared）、shared 计算纯函数覆盖率门槛、E2E 冒烟（web + server 由 Playwright 本机拉起）。
 
 name: CI
 
@@ -59,10 +59,11 @@ jobs:
           pnpm prisma migrate deploy
           pnpm prisma generate
 
-      - name: 契约校验（openapi.json 与实现同步，ADR-006）
+      - name: 契约校验（openapi.json 与生成的 api.d.ts 均须与实现同步，ADR-006）
         run: |
           pnpm --filter @mcc/server run gen:openapi
-          git diff --exit-code -- packages/shared/openapi.json
+          pnpm --filter @mcc/shared run gen:client
+          git diff --exit-code -- packages/shared/openapi.json packages/shared/src/gen/api.d.ts
 
       - name: Lint（含 §4.2 模块边界规则）
         run: pnpm lint
@@ -75,6 +76,9 @@ jobs:
 
       - name: 单测与集成测试（server / shared / web）
         run: pnpm --filter @mcc/server --filter @mcc/shared --filter @mcc/web run test
+
+      - name: 计算纯函数覆盖率门槛（shared：金额/方量/权限，技术方案 §10）
+        run: pnpm --filter @mcc/shared run test:coverage
 
       - name: E2E 冒烟（Playwright：web + server 本机拉起）
         run: |

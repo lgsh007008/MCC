@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { api } from '@/lib/api';
+import { randomUuid } from '@/lib/uuid';
 
 // 资金账户弹窗（product/finance.md R-财务-002；弹窗表单规范见 product/平台布局.md）：
 // 新建与编辑共用；状态由列表行内的启用 / 停用操作独占，表单不出现状态字段。
@@ -142,7 +143,10 @@ export function FinanceAccountForm({
             params: { path: { id: initial.id } },
             body: parsed.data,
           })
-        : await api.POST('/api/v1/finance/accounts', { body: parsed.data });
+        : await api.POST('/api/v1/finance/accounts', {
+            body: parsed.data,
+            headers: { 'Idempotency-Key': randomUuid() },
+          });
       if (!response.ok) {
         throw new Error('保存失败');
       }

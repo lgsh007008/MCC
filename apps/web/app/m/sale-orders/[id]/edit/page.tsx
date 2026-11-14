@@ -1,42 +1,28 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
+import type { ApiSchemas } from '@mcc/shared';
 import { MobileSaleOrderForm } from '@/components/mobile/sale-order-form';
-import type { SaleOrderFormInitial } from '@/components/order/sale-order-form';
 import { api } from '@/lib/api';
 
 // 销售单移动编辑页（product/order.md 移动页）：加载现有单据后进入共用移动表单。
 export default function MobileSaleOrderEditPage(): React.ReactElement {
   const params = useParams<{ id: string }>();
-  const [initial, setInitial] = useState<SaleOrderFormInitial | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const { data, response } = await api.GET('/api/v1/sale-orders/{id}', {
-          params: { path: { id: params.id } },
-        });
-        if (cancelled) {
-          return;
-        }
-        if (!response.ok || !data) {
-          setError('销售单不存在或加载失败');
-          return;
-        }
-        setInitial(data);
-      } catch {
-        if (!cancelled) {
-          setError('销售单不存在或加载失败');
-        }
+  const { data: initial, isError } = useQuery({
+    queryKey: ['sale-orders', params.id],
+    queryFn: async (): Promise<ApiSchemas['SaleOrderDto']> => {
+      const { data: res, response } = await api.GET('/api/v1/sale-orders/{id}', {
+        params: { path: { id: params.id } },
+      });
+      if (!response.ok || !res) {
+        throw new Error('销售单不存在或加载失败');
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [params.id]);
+      return res;
+    },
+  });
+
+  const error = isError && !initial ? '销售单不存在或加载失败' : null;
 
   if (error) {
     return <p className="p-4 text-mobile-body text-destructive">{error}</p>;

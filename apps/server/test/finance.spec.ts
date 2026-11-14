@@ -9,7 +9,7 @@ import { API_PREFIX } from '../src/common/api-prefix.js';
 import { PrismaService } from '../src/common/prisma.service.js';
 
 // 财务接口关键路径（契约/集成层，技术方案 §10）：
-// 经营收支汇总只取「销售单 + 计入经营的流水分类」，非经营分类全部排除。
+// 经营收支汇总取「销售单 + 采购单 + 计入经营的流水分类」，销售回款与采购付款不重复计入。
 // 使用独特日期（2030-02-xx），与其他用例隔离；测试结束清理。
 
 describe('财务经营收支汇总（契约/集成）', () => {
@@ -17,10 +17,12 @@ describe('财务经营收支汇总（契约/集成）', () => {
   let prisma: PrismaService;
   let accessToken: string;
   let customerId: string;
+  let supplierId: string;
   let accountId: string;
   const username = `it-finance-user-${Date.now()}`;
   const password = 'Secret#12345';
   const customerName = `it-finance-customer-${Date.now()}`;
+  const supplierName = `it-finance-supplier-${Date.now()}`;
   const accountName = `it-finance-account-${Date.now()}`;
   const summaryDate = '2030-02-05';
 
@@ -49,13 +51,22 @@ describe('财务经营收支汇总（契约/集成）', () => {
       .set('Authorization', `Bearer ${accessToken}`)
       .send({ name: accountName, kind: 'personal', channel: 'cash', openingBalance: '0.00' });
     accountId = account.body.id as string;
+    const supplier = await request(app.getHttpServer())
+      .post(`/${API_PREFIX}/suppliers`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ name: supplierName, contact: '', note: '' });
+    supplierId = supplier.body.id as string;
   });
 
   afterAll(async () => {
     await prisma.client.financeCashEntry.deleteMany({
       where: { occurredDate: new Date(`${summaryDate}T00:00:00Z`) },
     });
+    await prisma.client.purchaseOrder.deleteMany({ where: { supplierId } });
     await prisma.client.financeAccount.deleteMany({ where: { name: accountName } });
+    await prisma.client.supplier.deleteMany({
+      where: { name: { startsWith: 'it-finance-supplier-' } },
+    });
     await prisma.client.customer.deleteMany({ where: { name: { startsWith: 'it-finance-' } } });
     await prisma.client.user.deleteMany({ where: { username: { startsWith: 'it-finance-user-' } } });
     await prisma.client.eventLog.deleteMany({ where: { actorUsername: username } });
@@ -74,10 +85,22 @@ describe('财务经营收支汇总（契约/集成）', () => {
       ...body,
     });
 
-  it('汇总只计入其他收入 / 采购付款 / 工资 / 费用', async () => {
+  it('汇总只计入销售 / 采购应计与其他收入 / 工资 / 费用，收付款不重复计入', async () => {
+    const purchase = await auth(http().post(`/${API_PREFIX}/purchase-orders`)).send({
+      supplierId,
+      purchaseDate: summaryDate,
+      deliveredTons: '1.000',
+      settledTons: '1.000',
+      unitPrice: '600.00',
+      otherAmount: '0.00',
+      settlementMode: 'credit',
+      note: '',
+    });
+    expect(purchase.status).toBe(201);
+
     const entries = [
       { direction: 'in', category: 'other_revenue', amount: '200.50' },
-      { direction: 'out', category: 'purchase_payment', amount: '300.00' },
+      { direction: 'out', category: 'purchase_payment', amount: '300.00', supplierId },
       { direction: 'out', category: 'labor_cost', amount: '400.00' },
       { direction: 'out', category: 'operating_expense', amount: '150.25' },
       { direction: 'in', category: 'loan_in', amount: '1000.00' },
@@ -96,18 +119,38 @@ describe('财务经营收支汇总（契约/集成）', () => {
     expect(summary.status).toBe(200);
     expect(summary.body).toMatchObject({
       totalIncome: '200.50',
-      totalExpense: '850.25',
-      netAmount: '-649.75',
+      totalExpense: '1150.25',
+      netAmount: '-949.75',
       orderCount: 0,
-      cashEntryCount: 4,
+      purchaseCount: 1,
+      cashEntryCount: 3,
     });
     expect(summary.body.categories).toEqual([
       { category: 'sales_revenue', amount: '0.00' },
       { category: 'other_revenue', amount: '200.50' },
-      { category: 'purchase_payment', amount: '300.00' },
+      { category: 'purchase_expense', amount: '600.00' },
       { category: 'labor_cost', amount: '400.00' },
       { category: 'operating_expense', amount: '150.25' },
     ]);
+  });
+
+  it('采购付款必须挂供应商', async () => {
+    const missingSupplier = await createEntry({
+      direction: 'out',
+      category: 'purchase_payment',
+      amount: '50.00',
+    });
+    expect(missingSupplier.status).toBe(400);
+
+    const valid = await createEntry({
+      direction: 'out',
+      category: 'purchase_payment',
+      amount: '50.00',
+      supplierId,
+    });
+    expect(valid.status).toBe(201);
+    expect(valid.body.supplierId).toBe(supplierId);
+    expect(valid.body.supplierName).toBe(supplierName);
   });
 
   it('销售回款必须挂客户，其他收入不可挂客户', async () => {

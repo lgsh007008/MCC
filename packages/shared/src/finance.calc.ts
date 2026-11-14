@@ -3,53 +3,42 @@
 // 金额一律为字符串 + BigInt 运算（含负数），禁止浮点。
 
 import type { FinanceCashCategoryValue } from './finance.schemas';
+import { fromScaled, toScaled } from './money';
 
 const MONEY_SCALE = 2;
 
-// 有符号小数字符串 → BigInt（放大 10^2）
-function toScaled(value: string): bigint {
-  const negative = value.startsWith('-');
-  const unsigned = negative ? value.slice(1) : value;
-  const [intPart = '0', fracPart = ''] = unsigned.split('.');
-  const fracPadded = (fracPart + '0'.repeat(MONEY_SCALE)).slice(0, MONEY_SCALE);
-  const scaled = BigInt((intPart || '0') + fracPadded);
-  return negative ? -scaled : scaled;
-}
-
-// BigInt → 有符号 2 位小数字符串
-function fromScaled(value: bigint): string {
-  const negative = value < 0n;
-  const abs = negative ? -value : value;
-  const digits = abs.toString().padStart(MONEY_SCALE + 1, '0');
-  const intPart = digits.slice(0, -MONEY_SCALE);
-  const fracPart = digits.slice(-MONEY_SCALE);
-  return `${negative ? '-' : ''}${intPart}.${fracPart}`;
-}
-
 // 金额绝对值
 export function absMoney(value: string): string {
-  return fromScaled(toScaled(value) < 0n ? -toScaled(value) : toScaled(value));
+  return fromScaled(
+    toScaled(value, MONEY_SCALE) < 0n
+      ? -toScaled(value, MONEY_SCALE)
+      : toScaled(value, MONEY_SCALE),
+    MONEY_SCALE,
+  );
 }
 
 // 金额求和（任意项，含负数）
 export function sumMoney(values: string[]): string {
-  return fromScaled(values.reduce((acc, value) => acc + toScaled(value), 0n));
+  return fromScaled(
+    values.reduce((acc, value) => acc + toScaled(value, MONEY_SCALE), 0n),
+    MONEY_SCALE,
+  );
 }
 
 // ── 经营收支汇总（R-财务-001）────────────────────────────
-// 销售按应计（销售单合计，现结取实收、赊销取合计），其余按流水分类的实际收付。
+// 销售与采购均按应计（单据确认即计入，含赊销 / 赊购），其余按流水分类的实际收付。
 
 export type BusinessSummaryCategory =
   | 'sales_revenue'
   | 'other_revenue'
-  | 'purchase_payment'
+  | 'purchase_expense'
   | 'labor_cost'
   | 'operating_expense';
 
 export const BUSINESS_SUMMARY_CATEGORIES: BusinessSummaryCategory[] = [
   'sales_revenue',
   'other_revenue',
-  'purchase_payment',
+  'purchase_expense',
   'labor_cost',
   'operating_expense',
 ];
@@ -57,7 +46,7 @@ export const BUSINESS_SUMMARY_CATEGORIES: BusinessSummaryCategory[] = [
 export const BUSINESS_SUMMARY_CATEGORY_LABELS: Record<BusinessSummaryCategory, string> = {
   sales_revenue: '销售收入',
   other_revenue: '其他收入',
-  purchase_payment: '采购付款',
+  purchase_expense: '采购支出',
   labor_cost: '工资',
   operating_expense: '费用',
 };
@@ -74,46 +63,51 @@ export interface BusinessSummary {
   byCategory: Array<{ category: BusinessSummaryCategory; amount: string }>;
 }
 
-// 流水分类 → 经营收支项；销售回款 / 借款 / 还款 / 资产购置 / 内部转账不计入
+// 流水分类 → 经营收支项；销售回款 / 采购付款 / 借款 / 还款 / 资产购置 / 内部转账不计入
 const CASH_CATEGORY_TO_BUSINESS: Partial<
   Record<FinanceCashCategoryValue, BusinessSummaryCategory>
 > = {
   other_revenue: 'other_revenue',
-  purchase_payment: 'purchase_payment',
   labor_cost: 'labor_cost',
   operating_expense: 'operating_expense',
 };
 
 export function calcBusinessSummary(
   salesAmounts: string[],
+  purchaseAmounts: string[],
   cashLines: BusinessCashLine[],
 ): BusinessSummary {
-  const buckets = new Map<BusinessSummaryCategory, bigint>(
-    BUSINESS_SUMMARY_CATEGORIES.map((category) => [category, 0n]),
-  );
+  // 分类桶用 Record 穷举初始化（新增分类时 TS 会报缺键），避免 Map 取值处处兜底 0n
+  const buckets: Record<BusinessSummaryCategory, bigint> = {
+    sales_revenue: 0n,
+    other_revenue: 0n,
+    purchase_expense: 0n,
+    labor_cost: 0n,
+    operating_expense: 0n,
+  };
   for (const amount of salesAmounts) {
-    buckets.set('sales_revenue', (buckets.get('sales_revenue') ?? 0n) + toScaled(amount));
+    buckets.sales_revenue += toScaled(amount, MONEY_SCALE);
+  }
+  for (const amount of purchaseAmounts) {
+    buckets.purchase_expense += toScaled(amount, MONEY_SCALE);
   }
   for (const line of cashLines) {
     const target = CASH_CATEGORY_TO_BUSINESS[line.category];
     if (!target) {
       continue;
     }
-    buckets.set(target, (buckets.get(target) ?? 0n) + toScaled(line.amount));
+    buckets[target] += toScaled(line.amount, MONEY_SCALE);
   }
-  const totalIncome =
-    (buckets.get('sales_revenue') ?? 0n) + (buckets.get('other_revenue') ?? 0n);
+  const totalIncome = buckets.sales_revenue + buckets.other_revenue;
   const totalExpense =
-    (buckets.get('purchase_payment') ?? 0n) +
-    (buckets.get('labor_cost') ?? 0n) +
-    (buckets.get('operating_expense') ?? 0n);
+    buckets.purchase_expense + buckets.labor_cost + buckets.operating_expense;
   return {
-    totalIncome: fromScaled(totalIncome),
-    totalExpense: fromScaled(totalExpense),
-    netAmount: fromScaled(totalIncome - totalExpense),
+    totalIncome: fromScaled(totalIncome, MONEY_SCALE),
+    totalExpense: fromScaled(totalExpense, MONEY_SCALE),
+    netAmount: fromScaled(totalIncome - totalExpense, MONEY_SCALE),
     byCategory: BUSINESS_SUMMARY_CATEGORIES.map((category) => ({
       category,
-      amount: fromScaled(buckets.get(category) ?? 0n),
+      amount: fromScaled(buckets[category], MONEY_SCALE),
     })),
   };
 }
@@ -164,6 +158,21 @@ export function calcReceivable(
     openingDebt,
     ...salesAmounts,
     ...receiptAmounts.map((value) => `-${value}`),
+  ]);
+}
+
+// 应付 = 期初应付 + 累计采购 − 累计付款（R-财务-004）：
+// 累计采购对现结单取实付、赊购单取合计；累计付款只取挂该供应商的采购付款流水。
+// 负数为预付，不截断。
+export function calcPayable(
+  purchaseAmounts: string[],
+  paymentAmounts: string[],
+  openingPayable = '0.00',
+): string {
+  return sumMoney([
+    openingPayable,
+    ...purchaseAmounts,
+    ...paymentAmounts.map((value) => `-${value}`),
   ]);
 }
 

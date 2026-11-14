@@ -11,7 +11,7 @@ export const loginSchema = z.object({
 });
 export type LoginInput = z.infer<typeof loginSchema>;
 
-// 刷新令牌：web 经 httpOnly Cookie 传递；无 Cookie 端（如将来的 miniapp）
+// 刷新令牌：web 经 httpOnly Cookie 传递；无 Cookie 客户端
 // 可经请求体传递（design/账号与权限.md §4）。
 export const refreshSchema = z.object({
   refreshToken: z.string().min(1).max(512).optional(),

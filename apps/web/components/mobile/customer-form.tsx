@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { MobileActionBar, MobileHeader } from '@/components/mobile/mobile-shell';
 import { api } from '@/lib/api';
+import { randomUuid } from '@/lib/uuid';
 
 // 客户移动表单（product/customer.md 移动页）：新建与编辑共用；单列、Label 在上、保存吸底。
 // 名称失焦调 name-check，重名只提示不阻断（与 PC 同口径）。
@@ -87,7 +88,10 @@ export function MobileCustomerForm({
             params: { path: { id: customerId } },
             body: parsed.data,
           })
-        : await api.POST('/api/v1/customers', { body: parsed.data });
+        : await api.POST('/api/v1/customers', {
+            body: parsed.data,
+            headers: { 'Idempotency-Key': randomUuid() },
+          });
       if (!response.ok || !data) {
         const body = (await response.json().catch(() => null)) as { message?: string } | null;
         setError(body?.message ?? '保存失败，请稍后重试');

@@ -1,11 +1,9 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import {
-  BUSINESS_SUMMARY_CATEGORY_LABELS,
-  type BusinessSummaryCategory,
-} from '@mcc/shared';
+import { useQuery } from '@tanstack/react-query';
+import { BUSINESS_SUMMARY_CATEGORY_LABELS, type ApiSchemas } from '@mcc/shared';
 import { BusinessSummaryHelpDialog } from '@/components/finance/business-summary-help-dialog';
 import { CashSummaryHelpDialog } from '@/components/finance/cash-summary-help-dialog';
 import { MobileListState } from '@/components/mobile/list';
@@ -19,22 +17,8 @@ import { api } from '@/lib/api';
 // 收支汇总移动页（product/finance.md R-财务-001 移动页；适老化基线）：
 // 分段按钮切 Tab（写 ?tab=funds）；指标纵向单列；分类小计为单列行；口径弹窗复用 PC 组件。
 
-interface FinanceSummary {
-  totalIncome: string;
-  totalExpense: string;
-  netAmount: string;
-  orderCount: number;
-  cashEntryCount: number;
-  categories: Array<{ category: BusinessSummaryCategory; amount: string }>;
-}
-
-interface CashSummary {
-  receipts: string;
-  payments: string;
-  netFlow: string;
-  totalFunds: string;
-  accounts: Array<{ id: string; name: string; balance: string; active: boolean }>;
-}
+type FinanceSummary = ApiSchemas['FinanceSummaryDto'];
+type CashSummary = ApiSchemas['FinanceCashSummaryDto'];
 
 const pad = (n: number): string => String(n).padStart(2, '0');
 const localToday = (): string => {
@@ -59,75 +43,41 @@ function SummaryContent(): React.ReactElement {
   const [filters, setFilters] = useState(defaultRange());
   const [applied, setApplied] = useState(defaultRange());
 
-  // 移动端无 QueryClientProvider（只在 PC 壳挂载），用 effect 取数
-  const [data, setData] = useState<FinanceSummary | null>(null);
-  const [isError, setIsError] = useState(false);
-  const [cash, setCash] = useState<CashSummary | null>(null);
-  const [cashError, setCashError] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const { data: res, response } = await api.GET('/api/v1/finance/summary', {
-          params: {
-            query: {
-              dateFrom: applied.dateFrom || undefined,
-              dateTo: applied.dateTo || undefined,
-            },
+  const { data, isError } = useQuery({
+    queryKey: ['finance-summary', applied.dateFrom, applied.dateTo],
+    queryFn: async (): Promise<FinanceSummary> => {
+      const { data: res, response } = await api.GET('/api/v1/finance/summary', {
+        params: {
+          query: {
+            dateFrom: applied.dateFrom || undefined,
+            dateTo: applied.dateTo || undefined,
           },
-        });
-        if (cancelled) {
-          return;
-        }
-        if (!response.ok || !res) {
-          setIsError(true);
-          return;
-        }
-        setData({ ...res, categories: res.categories as FinanceSummary['categories'] });
-        setIsError(false);
-      } catch {
-        if (!cancelled) {
-          setIsError(true);
-        }
+        },
+      });
+      if (!response.ok || !res) {
+        throw new Error('加载失败，请稍后重试');
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [applied]);
+      return res;
+    },
+  });
 
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const { data: res, response } = await api.GET('/api/v1/finance/cash-summary', {
-          params: {
-            query: {
-              dateFrom: applied.dateFrom || undefined,
-              dateTo: applied.dateTo || undefined,
-            },
+  const { data: cash, isError: cashError } = useQuery({
+    queryKey: ['finance-cash-summary', applied.dateFrom, applied.dateTo],
+    queryFn: async (): Promise<CashSummary> => {
+      const { data: res, response } = await api.GET('/api/v1/finance/cash-summary', {
+        params: {
+          query: {
+            dateFrom: applied.dateFrom || undefined,
+            dateTo: applied.dateTo || undefined,
           },
-        });
-        if (cancelled) {
-          return;
-        }
-        if (!response.ok || !res) {
-          setCashError(true);
-          return;
-        }
-        setCash(res as CashSummary);
-        setCashError(false);
-      } catch {
-        if (!cancelled) {
-          setCashError(true);
-        }
+        },
+      });
+      if (!response.ok || !res) {
+        throw new Error('加载失败，请稍后重试');
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [applied]);
+      return res;
+    },
+  });
 
   return (
     <div className="pb-8">

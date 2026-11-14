@@ -1,17 +1,16 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { EyeIcon, MoreHorizontalIcon, PencilIcon, Trash2Icon } from 'lucide-react';
 import {
   FINANCE_CASH_CATEGORIES_BY_DIRECTION,
   FINANCE_CASH_CATEGORY_LABELS,
   FINANCE_CASH_DIRECTION_LABELS,
-  type FinanceAccountChannel,
-  type FinanceAccountKind,
   type FinanceCashCategoryValue,
   type FinanceCashDirection,
-  type FinanceCashMethod,
 } from '@mcc/shared';
+import type { ApiSchemas } from '@mcc/shared';
 import { useCan } from '@/components/auth/permission-context';
 import {
   FinanceAccountForm,
@@ -51,44 +50,17 @@ import { api } from '@/lib/api';
 // 两侧均提供详情弹窗（两列信息条），详情 → 编辑为状态切换、不嵌套。
 // 收款挂客户、付款对象自由填写、内部转账只在账户间搬钱（不计入收支统计）。
 
-interface AccountRow {
-  id: string;
-  code: string;
-  name: string;
-  kind: FinanceAccountKind;
-  channel: FinanceAccountChannel;
-  openingBalance: string;
-  balance: string;
-  active: boolean;
-  entryCount?: number;
-}
+// 类型一律取自契约生成产物（ADR-006），不手写 DTO
+type AccountRow = ApiSchemas['FinanceAccountDto'];
+type CustomerOption = Pick<ApiSchemas['CustomerDto'], 'id' | 'name'>;
+type CashEntryRow = ApiSchemas['FinanceCashEntryDto'];
+type CashEntryPage = ApiSchemas['FinanceCashEntryListDto'];
 
-interface CustomerOption {
-  id: string;
-  name: string;
-}
-
-interface CashEntryRow {
-  id: string;
-  code: string;
-  direction: FinanceCashDirection;
-  occurredDate: string;
-  amount: string;
-  accountId: string;
-  accountName: string;
-  toAccountId: string | null;
-  toAccountName: string | null;
-  customerId: string | null;
-  customerName: string;
-  method: FinanceCashMethod;
-  category: FinanceCashCategoryValue | null;
-  note: string;
-  sourceType: string | null;
-  sourceId: string | null;
-  sourceCode: string | null;
-  sourceLabel: string | null;
-  editable: boolean;
-}
+const EMPTY_ENTRIES: CashEntryPage = {
+  total: 0,
+  summary: { receipts: '0.00', payments: '0.00', net: '0.00' },
+  items: [],
+};
 
 const PAGE_SIZE = 20;
 
@@ -110,16 +82,20 @@ const accountDisplayOf = (entry: CashEntryRow): string =>
 const customerOf = (entry: CashEntryRow): string =>
   entry.category === 'sales_receipt' ? entry.customerName || '—' : '—';
 
+const supplierOf = (entry: CashEntryRow): string =>
+  entry.category === 'purchase_payment' ? entry.supplierName || '—' : '—';
+
 export default function FinanceCashPage(): React.ReactElement {
   const canManage = useCan('finance:manage');
   const confirm = useConfirm();
-  const [accounts, setAccounts] = useState<AccountRow[]>([]);
+  const queryClient = useQueryClient();
   // 左栏选中项：空串 = 全部；同时作为右栏的账户筛选条件
   const [selectedAccountId, setSelectedAccountId] = useState('');
   const [filters, setFilters] = useState({
     direction: '',
     category: '',
     customerId: '',
+    supplierId: '',
     dateFrom: '',
     dateTo: '',
   });
@@ -127,19 +103,12 @@ export default function FinanceCashPage(): React.ReactElement {
     direction: '',
     category: '',
     customerId: '',
+    supplierId: '',
     dateFrom: '',
     dateTo: '',
   });
-  const [customers, setCustomers] = useState<CustomerOption[]>([]);
   const [page, setPage] = useState(1);
-  const [data, setData] = useState<{
-    total: number;
-    summary: { receipts: string; payments: string; net: string };
-    items: CashEntryRow[];
-  }>({ total: 0, summary: { receipts: '0.00', payments: '0.00', net: '0.00' }, items: [] });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [reloadToken, setReloadToken] = useState(0);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [accountDialog, setAccountDialog] = useState<
     { mode: 'create' } | { mode: 'edit'; account: AccountRow } | null
   >(null);
@@ -149,88 +118,87 @@ export default function FinanceCashPage(): React.ReactElement {
   const [accountDetail, setAccountDetail] = useState<AccountRow | null>(null);
   const [entryDetail, setEntryDetail] = useState<CashEntryRow | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const { data: res, response } = await api.GET('/api/v1/finance/accounts');
-        if (!cancelled) {
-          if (response.ok && res) {
-            setAccounts(res.items);
-          } else {
-            setError('资金账户加载失败');
-          }
-        }
-      } catch {
-        if (!cancelled) {
-          setError('资金账户加载失败');
-        }
+  const accountsQuery = useQuery({
+    queryKey: ['finance-accounts'],
+    queryFn: async (): Promise<AccountRow[]> => {
+      const { data: res, response } = await api.GET('/api/v1/finance/accounts');
+      if (!response.ok || !res) {
+        throw new Error('资金账户加载失败');
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [reloadToken]);
+      return res.items;
+    },
+  });
 
   // 客户筛选选项：只列启用客户（与登记流水的客户下拉同源）
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
+  const customersQuery = useQuery({
+    queryKey: ['customers', 'options', 'active'],
+    queryFn: async (): Promise<CustomerOption[]> => {
       const { data: res, response } = await api.GET('/api/v1/customers', {
         params: { query: { page: 1, pageSize: 100, status: 'active' } },
       });
-      if (!cancelled && response.ok && res) {
-        setCustomers(res.items.map((item) => ({ id: item.id, name: item.name })));
+      if (!response.ok || !res) {
+        throw new Error('加载失败，请稍后重试');
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+      return res.items.map((item) => ({ id: item.id, name: item.name }));
+    },
+  });
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    void (async () => {
-      try {
-        const { data: res, response } = await api.GET('/api/v1/finance/cash-entries', {
-          params: {
-            query: {
-              page,
-              pageSize: PAGE_SIZE,
-              direction: (applied.direction || undefined) as FinanceCashDirection | undefined,
-              category: (applied.category || undefined) as FinanceCashCategoryValue | undefined,
-              accountId: selectedAccountId || undefined,
-              customerId: applied.customerId || undefined,
-              dateFrom: applied.dateFrom || undefined,
-              dateTo: applied.dateTo || undefined,
-            },
+  // 供应商筛选选项：只列启用供应商（与登记流水的供应商下拉同源）
+  const suppliersQuery = useQuery({
+    queryKey: ['suppliers', 'options', 'active'],
+    queryFn: async (): Promise<CustomerOption[]> => {
+      const { data: res, response } = await api.GET('/api/v1/suppliers', {
+        params: { query: { page: 1, pageSize: 100, status: 'active' } },
+      });
+      if (!response.ok || !res) {
+        throw new Error('加载失败，请稍后重试');
+      }
+      return res.items.map((item) => ({ id: item.id, name: item.name }));
+    },
+  });
+
+  const entriesQuery = useQuery({
+    queryKey: ['finance-cash-entries', page, applied, selectedAccountId],
+    queryFn: async (): Promise<CashEntryPage> => {
+      const { data: res, response } = await api.GET('/api/v1/finance/cash-entries', {
+        params: {
+          query: {
+            page,
+            pageSize: PAGE_SIZE,
+            direction: (applied.direction || undefined) as FinanceCashDirection | undefined,
+            category: (applied.category || undefined) as FinanceCashCategoryValue | undefined,
+            accountId: selectedAccountId || undefined,
+            customerId: applied.customerId || undefined,
+            supplierId: applied.supplierId || undefined,
+            dateFrom: applied.dateFrom || undefined,
+            dateTo: applied.dateTo || undefined,
           },
-        });
-        if (!cancelled) {
-          if (response.ok && res) {
-            setData(res as typeof data);
-            setError(null);
-          } else {
-            setError('加载失败，请稍后重试');
-          }
-        }
-      } catch {
-        if (!cancelled) {
-          setError('加载失败，请稍后重试');
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
+        },
+      });
+      if (!response.ok || !res) {
+        throw new Error('加载失败，请稍后重试');
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [page, applied, selectedAccountId, reloadToken]);
+      return res;
+    },
+  });
 
-  const reload = (): void => setReloadToken((token) => token + 1);
+  const accounts = accountsQuery.data ?? [];
+  const customers = customersQuery.data ?? [];
+  const suppliers = suppliersQuery.data ?? [];
+  const data = entriesQuery.data ?? EMPTY_ENTRIES;
+  const loading = entriesQuery.isPending;
+  const error =
+    actionError ??
+    (entriesQuery.isError
+      ? '加载失败，请稍后重试'
+      : accountsQuery.isError
+        ? '资金账户加载失败'
+        : null);
+
+  async function reload(): Promise<void> {
+    await queryClient.invalidateQueries({ queryKey: ['finance-accounts'] });
+    await queryClient.invalidateQueries({ queryKey: ['finance-cash-entries'] });
+  }
 
   const selectAccount = (id: string): void => {
     setSelectedAccountId(id);
@@ -256,6 +224,7 @@ export default function FinanceCashPage(): React.ReactElement {
 
   async function toggleAccountStatus(account: AccountRow): Promise<void> {
     try {
+      setActionError(null);
       if (account.active) {
         const ok = await confirm({
           title: '停用资金账户',
@@ -271,14 +240,15 @@ export default function FinanceCashPage(): React.ReactElement {
         // 单条启用为恢复性动作，不确认（product/平台布局.md 二次确认规范）
         await putAccountStatus(account, true);
       }
-      reload();
+      await reload();
     } catch {
-      setError('状态切换失败，请稍后重试');
+      setActionError('状态切换失败，请稍后重试');
     }
   }
 
   async function removeAccount(account: AccountRow): Promise<void> {
     try {
+      setActionError(null);
       const count = account.entryCount ?? 0;
       const ok = await confirm({
         title: '删除资金账户',
@@ -298,15 +268,16 @@ export default function FinanceCashPage(): React.ReactElement {
         if (selectedAccountId === account.id) {
           setSelectedAccountId('');
         }
-        reload();
+        await reload();
       }
     } catch {
-      setError('删除失败，请稍后重试');
+      setActionError('删除失败，请稍后重试');
     }
   }
 
   async function removeEntry(entry: CashEntryRow): Promise<void> {
     try {
+      setActionError(null);
       const ok = await confirm({
         title: '删除资金流水',
         description: `将删除流水 ${entry.code}。删除后账户余额随之回退，编号不回收。`,
@@ -325,10 +296,10 @@ export default function FinanceCashPage(): React.ReactElement {
         if (data.items.length <= 1 && page > 1) {
           setPage(page - 1);
         }
-        reload();
+        await reload();
       }
     } catch {
-      setError('删除失败，请稍后重试');
+      setActionError('删除失败，请稍后重试');
     }
   }
 
@@ -336,7 +307,7 @@ export default function FinanceCashPage(): React.ReactElement {
   const activeCount = accounts.filter((account) => account.active).length;
 
   const resetFilters = (): void => {
-    const empty = { direction: '', category: '', customerId: '', dateFrom: '', dateTo: '' };
+    const empty = { direction: '', category: '', customerId: '', supplierId: '', dateFrom: '', dateTo: '' };
     setFilters(empty);
     setApplied(empty);
     setSelectedAccountId('');
@@ -557,6 +528,19 @@ export default function FinanceCashPage(): React.ReactElement {
               className="w-40"
             />
           </div>
+          <div className="flex items-center gap-2">
+            <span className="shrink-0 whitespace-nowrap text-xs text-muted-foreground">供应商</span>
+            <Select
+              value={filters.supplierId}
+              onChange={(value) => setFilters({ ...filters, supplierId: value })}
+              ariaLabel="供应商"
+              options={[
+                { value: '', label: '全部供应商' },
+                ...suppliers.map((supplier) => ({ value: supplier.id, label: supplier.name })),
+              ]}
+              className="w-40"
+            />
+          </div>
           <Button type="submit" variant="secondary">
             查询
           </Button>
@@ -583,6 +567,7 @@ export default function FinanceCashPage(): React.ReactElement {
                 <TableHead>账户</TableHead>
                 <TableHead>收支分类</TableHead>
                 <TableHead>客户</TableHead>
+                <TableHead>供应商</TableHead>
                 <TableHead>备注</TableHead>
                 <TableHead className="text-right">金额</TableHead>
                 <TableHead>来源</TableHead>
@@ -592,13 +577,13 @@ export default function FinanceCashPage(): React.ReactElement {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={10} className="text-muted-foreground">
+                  <TableCell colSpan={11} className="text-muted-foreground">
                     加载中…
                   </TableCell>
                 </TableRow>
               ) : data.items.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={10} className="text-muted-foreground">
+                  <TableCell colSpan={11} className="text-muted-foreground">
                     暂无资金流水
                   </TableCell>
                 </TableRow>
@@ -622,6 +607,9 @@ export default function FinanceCashPage(): React.ReactElement {
                     </TableCell>
                     <TableCell className="max-w-40 truncate" title={customerOf(entry)}>
                       {customerOf(entry)}
+                    </TableCell>
+                    <TableCell className="max-w-40 truncate" title={supplierOf(entry)}>
+                      {supplierOf(entry)}
                     </TableCell>
                     <TableCell className="max-w-64 truncate" title={entry.note || undefined}>
                       {entry.note || '—'}
@@ -689,14 +677,14 @@ export default function FinanceCashPage(): React.ReactElement {
             </TableBody>
             <TableFooter className="sticky bottom-0 z-10 bg-muted [&_td]:bg-muted">
               <TableRow>
-                <TableCell colSpan={5} className="font-medium">
+                <TableCell colSpan={8} className="font-medium">
                   合计
                 </TableCell>
-                <TableCell colSpan={2} className="text-right tabular-nums">
+                <TableCell className="text-right tabular-nums">
                   收款 {data.summary.receipts} / 付款 {data.summary.payments}
                 </TableCell>
-                <TableCell className="text-right tabular-nums">净额 {data.summary.net}</TableCell>
-                <TableCell colSpan={2} />
+                <TableCell className="tabular-nums">净额 {data.summary.net}</TableCell>
+                <TableCell />
               </TableRow>
             </TableFooter>
           </Table>
@@ -736,7 +724,7 @@ export default function FinanceCashPage(): React.ReactElement {
           }}
           onSaved={() => {
             setAccountDialog(null);
-            reload();
+            void reload();
           }}
         />
       ) : null}
@@ -759,7 +747,7 @@ export default function FinanceCashPage(): React.ReactElement {
           }}
           onSaved={() => {
             setEntryDialog(null);
-            reload();
+            void reload();
           }}
         />
       ) : null}

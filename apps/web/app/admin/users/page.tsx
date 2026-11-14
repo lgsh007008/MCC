@@ -1,12 +1,14 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ROLE_DESCRIPTIONS,
   ROLE_LABELS,
   USER_ROLES,
   userCreateSchema,
   userResetPasswordSchema,
+  type ApiSchemas,
   type UserRoleValue,
 } from '@mcc/shared';
 import { RolePermissionsDialog } from '@/components/auth/role-permissions-dialog';
@@ -33,34 +35,27 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { api } from '@/lib/api';
+import { randomUuid } from '@/lib/uuid';
 
 // 账号管理页（product/账号与权限.md R-账号与权限-002）：
 // 列表 + 新建 / 重置密码 / 改角色 / 启停用弹窗；仅 account:manage 可见（菜单在顶栏头像下拉）。
 
-interface UserRow {
-  id: string;
-  username: string;
-  role: UserRoleValue;
-  roleLabel: string;
-  status: 'active' | 'inactive';
-  createdAt: string;
-}
+type UserRow = ApiSchemas['UserDto'];
 
 const PAGE_SIZE = 20;
+const EMPTY_LIST: ApiSchemas['UserListDto'] = { total: 0, items: [] };
 
 const roleOptions = USER_ROLES.map((role) => ({ value: role, label: ROLE_LABELS[role] }));
 
 export default function UsersPage(): React.ReactElement {
   const confirm = useConfirm();
+  const queryClient = useQueryClient();
   usePageCrumb([{ title: '账号管理' }]);
 
-  const [items, setItems] = useState<UserRow[]>([]);
-  const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [keyword, setKeyword] = useState('');
   const [appliedKeyword, setAppliedKeyword] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   const [createOpen, setCreateOpen] = useState(false);
@@ -73,73 +68,74 @@ export default function UsersPage(): React.ReactElement {
   const [roleValue, setRoleValue] = useState<UserRoleValue>('SALES');
   const [submitting, setSubmitting] = useState(false);
 
-  const load = useCallback(async (nextPage: number, search: string): Promise<void> => {
-    setLoading(true);
-    setError(null);
-    try {
-      const { data, response } = await api.GET('/api/v1/users', {
+  const listQuery = useQuery({
+    queryKey: ['users', page, appliedKeyword],
+    queryFn: async (): Promise<ApiSchemas['UserListDto']> => {
+      const { data: res, response } = await api.GET('/api/v1/users', {
         params: {
           query: {
-            page: nextPage,
+            page,
             pageSize: PAGE_SIZE,
-            keyword: search.trim() || undefined,
+            keyword: appliedKeyword.trim() || undefined,
           },
         },
       });
-      if (!response.ok || !data) {
-        setError('加载失败，请稍后重试');
-        return;
+      if (!response.ok || !res) {
+        throw new Error('加载失败，请稍后重试');
       }
-      setItems(data.items as UserRow[]);
-      setTotal(data.total);
-      setPage(nextPage);
-    } catch {
-      setError('加载失败，请稍后重试');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+      return res;
+    },
+  });
+  const data = listQuery.data ?? EMPTY_LIST;
+  const items = data.items;
+  const total = data.total;
+  const loading = listQuery.isPending;
+  const error = actionError ?? (listQuery.isError ? '加载失败，请稍后重试' : null);
 
-  useEffect(() => {
-    void load(1, '');
-  }, [load]);
-
-  const reload = (): Promise<void> => load(page, appliedKeyword);
+  const reload = (): Promise<void> =>
+    queryClient.invalidateQueries({ queryKey: ['users'] });
 
   const handleQuery = (event: React.FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
+    setActionError(null);
     setAppliedKeyword(keyword);
-    void load(1, keyword);
+    setPage(1);
+    void queryClient.invalidateQueries({ queryKey: ['users'] });
   };
 
   const resetFilters = (): void => {
+    setActionError(null);
     setKeyword('');
     setAppliedKeyword('');
     setPage(1);
-    void load(1, '');
+    void queryClient.invalidateQueries({ queryKey: ['users'] });
   };
 
   async function handleCreate(event: React.FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     setNotice(null);
-    setError(null);
+    setActionError(null);
     const parsed = userCreateSchema.safeParse(createForm);
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? '输入不合法');
+      setActionError(parsed.error.issues[0]?.message ?? '输入不合法');
       return;
     }
     setSubmitting(true);
     try {
-      const { response } = await api.POST('/api/v1/users', { body: parsed.data });
+      const { response } = await api.POST('/api/v1/users', {
+        body: parsed.data,
+        headers: { 'Idempotency-Key': randomUuid() },
+      });
       if (!response.ok) {
         const body = (await response.json().catch(() => null)) as { message?: string } | null;
-        setError(body?.message ?? '新建失败，请稍后重试');
+        setActionError(body?.message ?? '新建失败，请稍后重试');
         return;
       }
       setCreateOpen(false);
       setCreateForm({ username: '', password: '', role: 'SALES' });
       setNotice('账号已创建');
-      await load(1, appliedKeyword);
+      setPage(1);
+      await queryClient.invalidateQueries({ queryKey: ['users'] });
     } finally {
       setSubmitting(false);
     }
@@ -151,10 +147,10 @@ export default function UsersPage(): React.ReactElement {
       return;
     }
     setNotice(null);
-    setError(null);
+    setActionError(null);
     const parsed = userResetPasswordSchema.safeParse({ password: resetPassword });
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? '输入不合法');
+      setActionError(parsed.error.issues[0]?.message ?? '输入不合法');
       return;
     }
     setSubmitting(true);
@@ -165,7 +161,7 @@ export default function UsersPage(): React.ReactElement {
       });
       if (!response.ok) {
         const body = (await response.json().catch(() => null)) as { message?: string } | null;
-        setError(body?.message ?? '重置失败，请稍后重试');
+        setActionError(body?.message ?? '重置失败，请稍后重试');
         return;
       }
       setResetTarget(null);
@@ -182,7 +178,7 @@ export default function UsersPage(): React.ReactElement {
       return;
     }
     setNotice(null);
-    setError(null);
+    setActionError(null);
     setSubmitting(true);
     try {
       const { response } = await api.PATCH('/api/v1/users/{id}/role', {
@@ -191,7 +187,7 @@ export default function UsersPage(): React.ReactElement {
       });
       if (!response.ok) {
         const body = (await response.json().catch(() => null)) as { message?: string } | null;
-        setError(body?.message ?? '修改失败，请稍后重试');
+        setActionError(body?.message ?? '修改失败，请稍后重试');
         return;
       }
       setRoleTarget(null);
@@ -204,7 +200,7 @@ export default function UsersPage(): React.ReactElement {
 
   async function handleToggleStatus(user: UserRow): Promise<void> {
     setNotice(null);
-    setError(null);
+    setActionError(null);
     const nextStatus = user.status === 'active' ? 'inactive' : 'active';
     if (nextStatus === 'inactive') {
       const ok = await confirm({
@@ -223,7 +219,7 @@ export default function UsersPage(): React.ReactElement {
     });
     if (!response.ok) {
       const body = (await response.json().catch(() => null)) as { message?: string } | null;
-      setError(body?.message ?? '操作失败，请稍后重试');
+      setActionError(body?.message ?? '操作失败，请稍后重试');
       return;
     }
     setNotice(nextStatus === 'active' ? '账号已启用' : '账号已停用');
@@ -343,7 +339,7 @@ export default function UsersPage(): React.ReactElement {
           variant="outline"
           size="sm"
           disabled={page <= 1 || loading}
-          onClick={() => void load(page - 1, appliedKeyword)}
+          onClick={() => setPage(page - 1)}
         >
           上一页
         </Button>
@@ -352,7 +348,7 @@ export default function UsersPage(): React.ReactElement {
           variant="outline"
           size="sm"
           disabled={page >= pages || loading}
-          onClick={() => void load(page + 1, appliedKeyword)}
+          onClick={() => setPage(page + 1)}
         >
           下一页
         </Button>

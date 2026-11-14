@@ -747,6 +747,362 @@
         ]
       }
     },
+    "/api/v1/suppliers": {
+      "get": {
+        "operationId": "SupplierController_list",
+        "parameters": [
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "description": "每页条数，默认 20（最大 100）",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "页码，默认 1",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "required": false,
+            "in": "query",
+            "description": "排序方向，默认 desc",
+            "schema": {
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "description": "排序列，默认 createdAt",
+            "schema": {
+              "enum": [
+                "createdAt"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "状态",
+            "schema": {
+              "enum": [
+                "active",
+                "inactive"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "name",
+            "required": false,
+            "in": "query",
+            "description": "供应商名称模糊",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupplierListDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "供应商列表：筛选（名称模糊、状态）+ 排序 + 分页",
+        "tags": [
+          "suppliers"
+        ]
+      },
+      "post": {
+        "operationId": "SupplierController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SupplierBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupplierDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "新建供应商（编号自动生成；重名只提示不阻断）",
+        "tags": [
+          "suppliers"
+        ]
+      }
+    },
+    "/api/v1/suppliers/name-check": {
+      "get": {
+        "operationId": "SupplierController_nameCheck",
+        "parameters": [
+          {
+            "name": "excludeId",
+            "required": false,
+            "in": "query",
+            "description": "排除的供应商 id（编辑时传自身）",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "name",
+            "required": true,
+            "in": "query",
+            "description": "供应商名称",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupplierNameCheckDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "供应商重名检查（只提示不阻断）",
+        "tags": [
+          "suppliers"
+        ]
+      }
+    },
+    "/api/v1/suppliers/{id}": {
+      "get": {
+        "operationId": "SupplierController_detail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupplierDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "供应商详情",
+        "tags": [
+          "suppliers"
+        ]
+      },
+      "put": {
+        "operationId": "SupplierController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SupplierBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupplierDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "更新供应商（名称、联系信息、期初应付、备注）",
+        "tags": [
+          "suppliers"
+        ]
+      },
+      "delete": {
+        "operationId": "SupplierController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "删除供应商（软删除，编号不回收）",
+        "tags": [
+          "suppliers"
+        ]
+      }
+    },
+    "/api/v1/suppliers/{id}/status": {
+      "patch": {
+        "operationId": "SupplierController_setStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SupplierStatusBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupplierDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "启用 / 停用供应商",
+        "tags": [
+          "suppliers"
+        ]
+      }
+    },
+    "/api/v1/suppliers/batch-status": {
+      "post": {
+        "operationId": "SupplierController_setStatusMany",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SupplierBatchStatusBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupplierBatchStatusResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "批量启用 / 停用供应商（已是目标状态或已删的跳过，返回实际变更条数）",
+        "tags": [
+          "suppliers"
+        ]
+      }
+    },
+    "/api/v1/suppliers/batch-delete": {
+      "post": {
+        "operationId": "SupplierController_removeMany",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SupplierBatchDeleteBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupplierBatchDeleteResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "批量删除供应商（软删除；不存在 / 已删行静默跳过，返回删除条数）",
+        "tags": [
+          "suppliers"
+        ]
+      }
+    },
     "/api/v1/finance/summary": {
       "get": {
         "operationId": "FinanceController_summary",
@@ -1106,6 +1462,38 @@
           }
         },
         "summary": "客户应收（批量）：累计销售 / 累计收款 / 欠款（负数为预收）",
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/payables": {
+      "get": {
+        "operationId": "FinanceController_payables",
+        "parameters": [
+          {
+            "name": "supplierIds",
+            "required": true,
+            "in": "query",
+            "description": "逗号分隔的供应商 id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FinancePayableListDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "供应商应付（批量）：累计采购 / 累计付款 / 应付（负数为预付）",
         "tags": [
           "finance"
         ]
@@ -1523,6 +1911,316 @@
           "sale-orders"
         ]
       }
+    },
+    "/api/v1/purchase-orders": {
+      "get": {
+        "operationId": "PurchaseController_list",
+        "parameters": [
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "description": "每页条数，默认 20（最大 100）",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "页码，默认 1",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "required": false,
+            "in": "query",
+            "description": "排序方向，默认 desc",
+            "schema": {
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "description": "排序列，默认 purchaseDate",
+            "schema": {
+              "enum": [
+                "purchaseDate",
+                "totalAmount"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateTo",
+            "required": false,
+            "in": "query",
+            "description": "采购日期止（YYYY-MM-DD）",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateFrom",
+            "required": false,
+            "in": "query",
+            "description": "采购日期起（YYYY-MM-DD）",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "settlementMode",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "credit",
+                "settled"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "supplierName",
+            "required": false,
+            "in": "query",
+            "description": "供应商名称模糊",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "supplierId",
+            "required": false,
+            "in": "query",
+            "description": "供应商 id",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "code",
+            "required": false,
+            "in": "query",
+            "description": "采购单编号模糊",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurchaseOrderListDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "采购单列表：筛选（编号模糊、供应商、供应商名称模糊、结算方式、日期区间）+ 排序 + 分页",
+        "tags": [
+          "purchase-orders"
+        ]
+      },
+      "post": {
+        "operationId": "PurchaseController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PurchaseOrderBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurchaseOrderDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "新建采购单（编号自动生成；现结同事务派生付款流水）",
+        "tags": [
+          "purchase-orders"
+        ]
+      }
+    },
+    "/api/v1/purchase-orders/supplier-summary": {
+      "get": {
+        "operationId": "PurchaseController_supplierSummary",
+        "parameters": [
+          {
+            "name": "supplierIds",
+            "required": true,
+            "in": "query",
+            "description": "逗号分隔的供应商 id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurchaseSupplierSummaryDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "按供应商返回采购单数（供供应商删除确认）",
+        "tags": [
+          "purchase-orders"
+        ]
+      }
+    },
+    "/api/v1/purchase-orders/{id}": {
+      "get": {
+        "operationId": "PurchaseController_detail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurchaseOrderDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "采购单详情",
+        "tags": [
+          "purchase-orders"
+        ]
+      },
+      "put": {
+        "operationId": "PurchaseController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PurchaseOrderBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurchaseOrderDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "更新采购单（同步金额、供应商、日期与派生付款流水）",
+        "tags": [
+          "purchase-orders"
+        ]
+      },
+      "delete": {
+        "operationId": "PurchaseController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "删除采购单（软删除；派生付款流水一并软删，编号不回收）",
+        "tags": [
+          "purchase-orders"
+        ]
+      }
+    },
+    "/api/v1/purchase-orders/batch-delete": {
+      "post": {
+        "operationId": "PurchaseController_batchDelete",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PurchaseOrderBatchDeleteBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurchaseOrderBatchDeleteResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "批量删除采购单（软删除；派生付款流水一并软删；不存在/已删行静默跳过）",
+        "tags": [
+          "purchase-orders"
+        ]
+      }
     }
   },
   "info": {
@@ -1700,7 +2398,7 @@
         "properties": {
           "refreshToken": {
             "type": "string",
-            "description": "无 Cookie 端（如 miniapp）经请求体传递刷新令牌；web 走 Cookie 时无需此字段"
+            "description": "无 Cookie 客户端经请求体传递刷新令牌；web 走 Cookie 时无需此字段"
           }
         }
       },
@@ -2062,6 +2760,192 @@
           "deleted"
         ]
       },
+      "SupplierDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "供应商 id"
+          },
+          "code": {
+            "type": "string",
+            "description": "供应商编号（SP + 5 位流水）"
+          },
+          "name": {
+            "type": "string",
+            "description": "供应商名称"
+          },
+          "contact": {
+            "type": "string",
+            "description": "联系信息"
+          },
+          "status": {
+            "type": "string",
+            "description": "状态：active 启用 / inactive 停用"
+          },
+          "openingPayable": {
+            "type": "string",
+            "description": "期初应付（上线前净应付）",
+            "example": "0.00"
+          },
+          "note": {
+            "type": "string",
+            "description": "备注"
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "创建日期（YYYY-MM-DD）"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "contact",
+          "status",
+          "openingPayable",
+          "note",
+          "createdAt"
+        ]
+      },
+      "SupplierListDto": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "number",
+            "description": "总数"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SupplierDto"
+            }
+          }
+        },
+        "required": [
+          "total",
+          "items"
+        ]
+      },
+      "SupplierNameCheckDto": {
+        "type": "object",
+        "properties": {
+          "duplicate": {
+            "type": "boolean",
+            "description": "是否存在同名供应商（未软删）"
+          }
+        },
+        "required": [
+          "duplicate"
+        ]
+      },
+      "SupplierBodyDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "供应商名称",
+            "example": "某某木业"
+          },
+          "contact": {
+            "type": "string",
+            "description": "联系信息（电话等）",
+            "default": ""
+          },
+          "openingPayable": {
+            "type": "string",
+            "description": "期初应付（上线前净应付，非负、最多 2 位小数）",
+            "default": "0.00"
+          },
+          "note": {
+            "type": "string",
+            "description": "备注",
+            "default": ""
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "SupplierStatusBodyDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "inactive"
+            ],
+            "description": "状态：active 启用 / inactive 停用"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "SupplierBatchStatusBodyDto": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "description": "供应商 id 列表（1~200）",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "inactive"
+            ],
+            "description": "目标状态：active 启用 / inactive 停用"
+          }
+        },
+        "required": [
+          "ids",
+          "status"
+        ]
+      },
+      "SupplierBatchStatusResponseDto": {
+        "type": "object",
+        "properties": {
+          "updated": {
+            "type": "number",
+            "description": "实际变更条数（已软删或已处于目标状态的跳过）"
+          }
+        },
+        "required": [
+          "updated"
+        ]
+      },
+      "SupplierBatchDeleteBodyDto": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "description": "要删除的供应商 id 列表（1~200）",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "ids"
+        ]
+      },
+      "SupplierBatchDeleteResponseDto": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "number",
+            "description": "实际删除（软删除）条数"
+          }
+        },
+        "required": [
+          "deleted"
+        ]
+      },
       "FinanceCategorySubtotalDto": {
         "type": "object",
         "properties": {
@@ -2070,7 +2954,7 @@
             "enum": [
               "sales_revenue",
               "other_revenue",
-              "purchase_payment",
+              "purchase_expense",
               "labor_cost",
               "operating_expense"
             ],
@@ -2105,6 +2989,10 @@
             "type": "number",
             "description": "期间销售单数"
           },
+          "purchaseCount": {
+            "type": "number",
+            "description": "期间采购单数"
+          },
           "cashEntryCount": {
             "type": "number",
             "description": "计入经营收支的流水条数"
@@ -2122,6 +3010,7 @@
           "totalExpense",
           "netAmount",
           "orderCount",
+          "purchaseCount",
           "cashEntryCount",
           "categories"
         ]
@@ -2309,6 +3198,13 @@
           "customerName": {
             "type": "string"
           },
+          "supplierId": {
+            "type": "string",
+            "nullable": true
+          },
+          "supplierName": {
+            "type": "string"
+          },
           "method": {
             "type": "string",
             "enum": [
@@ -2339,7 +3235,7 @@
           "sourceType": {
             "type": "string",
             "nullable": true,
-            "description": "源单类型（sale_order）"
+            "description": "源单类型（sale_order / purchase_order）"
           },
           "sourceId": {
             "type": "string",
@@ -2370,6 +3266,7 @@
           "accountId",
           "accountName",
           "customerName",
+          "supplierName",
           "method",
           "note",
           "editable"
@@ -2482,6 +3379,51 @@
           "items"
         ]
       },
+      "FinancePayableDto": {
+        "type": "object",
+        "properties": {
+          "supplierId": {
+            "type": "string"
+          },
+          "openingPayable": {
+            "type": "string",
+            "description": "期初应付（供应商档案录入的上线前净应付）"
+          },
+          "purchases": {
+            "type": "string",
+            "description": "累计采购（现结取实付、赊购取合计）"
+          },
+          "payments": {
+            "type": "string",
+            "description": "累计付款（采购付款流水合计）"
+          },
+          "outstanding": {
+            "type": "string",
+            "description": "应付 = 期初应付 + 采购 − 付款；负数为预付"
+          }
+        },
+        "required": [
+          "supplierId",
+          "openingPayable",
+          "purchases",
+          "payments",
+          "outstanding"
+        ]
+      },
+      "FinancePayableListDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FinancePayableDto"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
       "FinanceCashEntryBodyDto": {
         "type": "object",
         "properties": {
@@ -2532,6 +3474,11 @@
             "type": "string",
             "nullable": true,
             "description": "客户 id（仅销售回款必填）"
+          },
+          "supplierId": {
+            "type": "string",
+            "nullable": true,
+            "description": "供应商 id（仅采购付款必填）"
           },
           "note": {
             "type": "string",
@@ -3148,6 +4095,237 @@
         "required": [
           "id",
           "code"
+        ]
+      },
+      "PurchaseOrderListSummaryDto": {
+        "type": "object",
+        "properties": {
+          "totalAmount": {
+            "type": "string",
+            "description": "筛选全量合计金额"
+          }
+        },
+        "required": [
+          "totalAmount"
+        ]
+      },
+      "PurchaseOrderDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "description": "采购单编号（PO + 5 位流水）"
+          },
+          "purchaseDate": {
+            "type": "string"
+          },
+          "supplierId": {
+            "type": "string"
+          },
+          "supplierName": {
+            "type": "string"
+          },
+          "deliveredTons": {
+            "type": "string"
+          },
+          "settledTons": {
+            "type": "string"
+          },
+          "unitPrice": {
+            "type": "string"
+          },
+          "subtotalAmount": {
+            "type": "string"
+          },
+          "otherAmount": {
+            "type": "string"
+          },
+          "totalAmount": {
+            "type": "string"
+          },
+          "settlementMode": {
+            "type": "string",
+            "enum": [
+              "credit",
+              "settled"
+            ]
+          },
+          "settleAccountId": {
+            "type": "string",
+            "nullable": true
+          },
+          "paidAmount": {
+            "type": "string",
+            "nullable": true
+          },
+          "note": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "purchaseDate",
+          "supplierId",
+          "supplierName",
+          "deliveredTons",
+          "settledTons",
+          "unitPrice",
+          "subtotalAmount",
+          "otherAmount",
+          "totalAmount",
+          "settlementMode",
+          "note",
+          "createdAt"
+        ]
+      },
+      "PurchaseOrderListDto": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "number"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/PurchaseOrderListSummaryDto"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PurchaseOrderDto"
+            }
+          }
+        },
+        "required": [
+          "total",
+          "summary",
+          "items"
+        ]
+      },
+      "PurchaseSupplierSummaryItemDto": {
+        "type": "object",
+        "properties": {
+          "supplierId": {
+            "type": "string"
+          },
+          "purchaseCount": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "supplierId",
+          "purchaseCount"
+        ]
+      },
+      "PurchaseSupplierSummaryDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PurchaseSupplierSummaryItemDto"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "PurchaseOrderBodyDto": {
+        "type": "object",
+        "properties": {
+          "supplierId": {
+            "type": "string",
+            "description": "供应商 id（须启用）"
+          },
+          "purchaseDate": {
+            "type": "string",
+            "description": "采购日期",
+            "example": "2026-11-14"
+          },
+          "deliveredTons": {
+            "type": "string",
+            "description": "送货吨数（实际过磅，最多 3 位小数）",
+            "example": "1.500"
+          },
+          "settledTons": {
+            "type": "string",
+            "description": "结算吨数（计价，最多 3 位小数）",
+            "example": "1.000"
+          },
+          "unitPrice": {
+            "type": "string",
+            "description": "单价（元/吨，非负、2 位小数）",
+            "example": "680.00"
+          },
+          "otherAmount": {
+            "type": "string",
+            "description": "其他金额（运费等，非负）",
+            "default": "0.00"
+          },
+          "settlementMode": {
+            "type": "string",
+            "enum": [
+              "credit",
+              "settled"
+            ],
+            "description": "结算方式：赊购 / 现结",
+            "default": "credit"
+          },
+          "settleAccountId": {
+            "type": "string",
+            "nullable": true,
+            "description": "现结付款账户 id（现结必填）"
+          },
+          "paidAmount": {
+            "type": "string",
+            "nullable": true,
+            "description": "实付金额（现结默认等于合计、可改）"
+          },
+          "note": {
+            "type": "string",
+            "description": "备注",
+            "default": ""
+          }
+        },
+        "required": [
+          "supplierId",
+          "purchaseDate",
+          "deliveredTons",
+          "settledTons",
+          "unitPrice"
+        ]
+      },
+      "PurchaseOrderBatchDeleteBodyDto": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "description": "要删除的采购单 id 列表（1~200）",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "ids"
+        ]
+      },
+      "PurchaseOrderBatchDeleteResponseDto": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "number",
+            "description": "实际删除（软删除）条数"
+          }
+        },
+        "required": [
+          "deleted"
         ]
       }
     }

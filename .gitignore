@@ -25,3 +25,6 @@ Thumbs.db
 # Playwright 产物
 playwright-report/
 test-results/
+
+# 覆盖率产物
+coverage/

@@ -54,3 +54,15 @@
     scrollbar-color: color-mix(in oklab, var(--foreground) 20%, transparent) transparent;
   }
 }
+
+/*
+ * 表格右缘：固定预留 10px 纵向滚动条槽，并用容器自身背景把槽染成表头 / 合计行的同色，
+ * 避免表头与合计行到表格右缘就断色、露出卡片白底（design/平台布局.md §1.4）。
+ * 不能用单元格 box-shadow：表格单元格的阴影会被表格盒裁剪，槽内看不到；
+ * 容器背景会绘制在滚动条轨道之下，轨道透明，因此槽内颜色可见。
+ */
+[data-slot='table-container'] {
+  scrollbar-gutter: stable;
+  background-image: linear-gradient(to left, var(--muted) 0 10px, transparent 10px);
+  background-repeat: no-repeat;
+}

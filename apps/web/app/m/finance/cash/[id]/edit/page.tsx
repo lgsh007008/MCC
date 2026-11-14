@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import type { FinanceCashCategoryValue, FinanceCashDirection } from '@mcc/shared';
+import { useQuery } from '@tanstack/react-query';
+import type { ApiSchemas } from '@mcc/shared';
 import {
   MobileCashEntryForm,
   type MobileCashEntryFormInitial,
@@ -15,49 +15,42 @@ import { api } from '@/lib/api';
 export default function MobileCashEntryEditPage(): React.ReactElement {
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  const [initial, setInitial] = useState<MobileCashEntryFormInitial | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { data, isError } = useQuery({
+    queryKey: ['finance-cash-entries', params.id],
+    queryFn: async (): Promise<ApiSchemas['FinanceCashEntryDto']> => {
+      const { data: res, response } = await api.GET('/api/v1/finance/cash-entries/{id}', {
+        params: { path: { id: params.id } },
+      });
+      if (!response.ok || !res) {
+        throw new Error('流水不存在或加载失败');
+      }
+      return res;
+    },
+  });
 
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const { data, response } = await api.GET('/api/v1/finance/cash-entries/{id}', {
-          params: { path: { id: params.id } },
-        });
-        if (cancelled) {
-          return;
-        }
-        if (!response.ok || !data) {
-          setError('流水不存在或加载失败');
-          return;
-        }
-        if (!data.editable) {
-          setError('源单派生的流水只读，请回销售单修改');
-          return;
-        }
-        setInitial({
+  const initial: MobileCashEntryFormInitial | undefined =
+    data && data.editable
+      ? {
           id: data.id,
-          direction: data.direction as FinanceCashDirection,
+          direction: data.direction,
           occurredDate: data.occurredDate,
           amount: data.amount,
           accountId: data.accountId,
           toAccountId: data.toAccountId ?? null,
           customerId: data.customerId ?? null,
           customerName: data.customerName,
-          category: (data.category as FinanceCashCategoryValue | null) ?? null,
+          supplierId: data.supplierId ?? null,
+          supplierName: data.supplierName,
+          category: data.category ?? null,
           note: data.note,
-        });
-      } catch {
-        if (!cancelled) {
-          setError('流水不存在或加载失败');
         }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [params.id]);
+      : undefined;
+
+  const error = isError && !data
+    ? '流水不存在或加载失败'
+    : data && !data.editable
+      ? '源单派生的流水只读，请回销售单修改'
+      : null;
 
   if (error) {
     return (

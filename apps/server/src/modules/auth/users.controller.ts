@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Headers, HttpCode, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
 import { ApiBody, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import {
   userCreateSchema,
@@ -15,6 +15,8 @@ import {
 import { AuditAction } from '../../common/decorators/audit-action.decorator.js';
 import { CurrentUser, type AuthUser } from '../../common/decorators/current-user.decorator.js';
 import { RequireScopes } from '../../common/decorators/require-scopes.decorator.js';
+import { withIdempotency } from '../../common/idempotency.js';
+import { RedisService } from '../../common/redis.service.js';
 import { ZodValidationPipe } from '../../common/zod-validation.pipe.js';
 import {
   UserCreateBodyDto,
@@ -31,7 +33,10 @@ import { UsersService } from './users.service.js';
 @Controller('users')
 @RequireScopes('account:manage')
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly redis: RedisService,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: '账号列表（不含密码）' })
@@ -49,10 +54,15 @@ export class UsersController {
   @ApiOperation({ summary: '新建账号（租户内账号唯一；初始密码至少 8 位）' })
   @ApiBody({ type: UserCreateBodyDto })
   @ApiCreatedResponse({ type: UserDto })
-  create(
+  async create(
+    @CurrentUser() user: AuthUser,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Body(new ZodValidationPipe(userCreateSchema)) body: UserCreateInput,
   ): Promise<UserDto> {
-    return this.usersService.create(body);
+    // 幂等（技术方案 §6.3）：重复提交返回首请求结果，处理中返回 409
+    return withIdempotency(this.redis, user.userId, 'users', idempotencyKey, () =>
+      this.usersService.create(body),
+    );
   }
 
   @Patch(':id/status')

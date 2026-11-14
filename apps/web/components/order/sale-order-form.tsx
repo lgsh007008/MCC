@@ -1,8 +1,10 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { CopyIcon, Trash2Icon } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import type { ApiSchemas } from '@mcc/shared';
 import {
   calcLineAmount,
   calcOrderTotals,
@@ -82,12 +84,7 @@ const decimalOk = (value: string, scale: number): boolean =>
   new RegExp(`^\\d+(\\.\\d{1,${scale}})?$`).test(value);
 const intOk = (value: string): boolean => /^[1-9]\d*$/.test(value);
 
-interface CustomerOption {
-  id: string;
-  code: string;
-  name: string;
-  status: string;
-}
+type CustomerOption = Pick<ApiSchemas['CustomerDto'], 'id' | 'code' | 'name' | 'status'>;
 
 const emptyRow = (): FormRow => ({
   lengthMm: '',
@@ -131,14 +128,12 @@ export function SaleOrderForm({
   const router = useRouter();
   const [saleDate, setSaleDate] = useState(initial?.saleDate ?? localToday());
   const [customerId, setCustomerId] = useState(initial?.customerId ?? '');
-  const [customerOptions, setCustomerOptions] = useState<CustomerOption[]>([]);
   const [settlementMode, setSettlementMode] = useState<'credit' | 'settled'>(
     initial?.settlementMode ?? 'credit',
   );
   const [settleAccountId, setSettleAccountId] = useState(initial?.settleAccountId ?? '');
   const [receivedAmount, setReceivedAmount] = useState(initial?.receivedAmount ?? '');
   const [receivedTouched, setReceivedTouched] = useState(false);
-  const [accountOptions, setAccountOptions] = useState<Array<{ id: string; name: string }>>([]);
   const [otherAmount, setOtherAmount] = useState(initial?.otherAmount ?? '0');
   const [note, setNote] = useState(initial?.note ?? '');
   const [items, setItems] = useState<FormRow[]>(() =>
@@ -162,71 +157,60 @@ export function SaleOrderForm({
 
   // 客户下拉（design/order.md §7）：只列启用客户；编辑历史单且其客户已停用时补入该客户，
   // 否则单据无法保存。
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const { data, response } = await api.GET('/api/v1/customers', {
-          params: { query: { page: 1, pageSize: 100, status: 'active' } },
+  const currentCustomerId = initial?.customerId ?? '';
+  const customersQuery = useQuery({
+    queryKey: ['customers', 'options', 'sale-order', currentCustomerId],
+    queryFn: async (): Promise<CustomerOption[]> => {
+      const { data: res, response } = await api.GET('/api/v1/customers', {
+        params: { query: { page: 1, pageSize: 100, status: 'active' } },
+      });
+      if (!response.ok || !res) {
+        throw new Error('加载失败，请稍后重试');
+      }
+      let options: CustomerOption[] = res.items.map((item) => ({
+        id: item.id,
+        code: item.code,
+        name: item.name,
+        status: item.status,
+      }));
+      if (currentCustomerId && !options.some((option) => option.id === currentCustomerId)) {
+        const detail = await api.GET('/api/v1/customers/{id}', {
+          params: { path: { id: currentCustomerId } },
         });
-        let options: CustomerOption[] = response.ok && data ? data.items : [];
-        const currentId = initial?.customerId;
-        if (currentId && !options.some((option) => option.id === currentId)) {
-          const detail = await api.GET('/api/v1/customers/{id}', {
-            params: { path: { id: currentId } },
-          });
-          if (detail.response.ok && detail.data) {
-            options = [detail.data, ...options];
-          } else {
-            // 客户档案已删除：用单据快照补选项，保证历史单仍可保存（design/order.md §7）
-            options = [
-              {
-                id: currentId,
-                code: '',
-                name: initial?.customerName ?? '',
-                status: 'deleted',
-              },
-              ...options,
-            ];
-          }
-        }
-        if (!cancelled) {
-          setCustomerOptions(options);
-        }
-      } catch {
-        if (!cancelled) {
-          setCustomerOptions([]);
+        if (detail.response.ok && detail.data) {
+          options = [detail.data, ...options];
+        } else {
+          // 客户档案已删除：用单据快照补选项，保证历史单仍可保存（design/order.md §7）
+          options = [
+            {
+              id: currentCustomerId,
+              code: '',
+              name: initial?.customerName ?? '',
+              status: 'deleted',
+            },
+            ...options,
+          ];
         }
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [initial?.customerId]);
+      return options;
+    },
+  });
+  const customerOptions = customersQuery.data ?? [];
 
   // 现结收款账户：只列启用账户
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const { data, response } = await api.GET('/api/v1/finance/accounts');
-        if (!cancelled && response.ok && data) {
-          setAccountOptions(
-            data.items
-              .filter((item) => item.active)
-              .map((item) => ({ id: item.id, name: item.name })),
-          );
-        }
-      } catch {
-        if (!cancelled) {
-          setAccountOptions([]);
-        }
+  const accountsQuery = useQuery({
+    queryKey: ['finance-accounts', 'options'],
+    queryFn: async (): Promise<ApiSchemas['FinanceAccountDto'][]> => {
+      const { data: res, response } = await api.GET('/api/v1/finance/accounts');
+      if (!response.ok || !res) {
+        throw new Error('加载失败，请稍后重试');
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+      return res.items;
+    },
+  });
+  const accountOptions = (accountsQuery.data ?? [])
+    .filter((account) => account.active)
+    .map((account) => ({ id: account.id, name: account.name }));
 
   const scrollDetailToEnd = (): void => {
     requestAnimationFrame(() => {

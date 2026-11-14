@@ -1,7 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
+import { useQueries } from '@tanstack/react-query';
+import type { ApiSchemas } from '@mcc/shared';
 import { buttonVariants } from '@/components/ui/button';
 import {
   MobileListCard,
@@ -15,70 +17,49 @@ import { cn } from '@/lib/utils';
 
 // 销售单移动列表（product/order.md 移动页）：搜索（客户名称模糊）+ 卡片列表 + 加载更多；
 // 样式统一走 components/mobile/list.tsx（与客户档案等移动列表一致）。
-interface OrderListItem {
-  id: string;
-  saleDate: string;
-  customerName: string;
-  totalVolume: string;
-  totalAmount: string;
-}
+type OrderListItem = ApiSchemas['SaleOrderListItemDto'];
+type OrderListPage = ApiSchemas['SaleOrderListDto'];
 
 const PAGE_SIZE = 20;
 
+async function fetchSaleOrders(page: number, customerName: string): Promise<OrderListPage> {
+  const { data: res, response } = await api.GET('/api/v1/sale-orders', {
+    params: {
+      query: {
+        page,
+        pageSize: PAGE_SIZE,
+        customerName: customerName || undefined,
+        sortBy: 'saleDate',
+        sortOrder: 'desc',
+      },
+    },
+  });
+  if (!response.ok || !res) {
+    throw new Error('加载失败，请稍后重试');
+  }
+  return res;
+}
+
 export default function MobileSaleOrdersPage(): React.ReactElement {
   const [keyword, setKeyword] = useState('');
-  const [query, setQuery] = useState({ keyword: '', page: 1 });
-  const [items, setItems] = useState<OrderListItem[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [applied, setApplied] = useState('');
+  const [page, setPage] = useState(1);
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    void (async () => {
-      try {
-        const { data, response } = await api.GET('/api/v1/sale-orders', {
-          params: {
-            query: {
-              page: query.page,
-              pageSize: PAGE_SIZE,
-              customerName: query.keyword || undefined,
-              sortBy: 'saleDate',
-              sortOrder: 'desc',
-            },
-          },
-        });
-        if (cancelled) {
-          return;
-        }
-        if (!response.ok || !data) {
-          setError('加载失败，请稍后重试');
-          return;
-        }
-        setItems((prev) => (query.page === 1 ? data.items : [...prev, ...data.items]));
-        setTotal(data.total);
-        setError(null);
-      } catch {
-        if (!cancelled) {
-          setError('加载失败，请稍后重试');
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [query]);
+  const listQueries = useQueries({
+    queries: Array.from({ length: page }, (_, index) => ({
+      queryKey: ['sale-orders', index + 1, applied],
+      queryFn: () => fetchSaleOrders(index + 1, applied),
+    })),
+  });
+  const items: OrderListItem[] = listQueries.flatMap((query) => query.data?.items ?? []);
+  const lastQuery = listQueries[listQueries.length - 1];
+  const total = listQueries.reduce((acc, query) => query.data?.total ?? acc, 0);
+  const loading = listQueries.some((query) => query.isFetching);
+  const error = lastQuery?.isError ? '加载失败，请稍后重试' : null;
 
   const handleSearch = (value?: string): void => {
-    const next = (value ?? keyword).trim();
-    setItems([]);
-    setTotal(0);
-    setQuery({ keyword: next, page: 1 });
+    setApplied((value ?? keyword).trim());
+    setPage(1);
   };
 
   const hasMore = items.length < total;
@@ -126,10 +107,7 @@ export default function MobileSaleOrdersPage(): React.ReactElement {
       ))}
 
       {hasMore ? (
-        <MobileListLoadMore
-          loading={loading}
-          onClick={() => setQuery((prev) => ({ ...prev, page: prev.page + 1 }))}
-        />
+        <MobileListLoadMore loading={loading} onClick={() => setPage((prev) => prev + 1)} />
       ) : null}
     </MobileListPage>
   );

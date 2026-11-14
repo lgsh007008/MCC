@@ -3,6 +3,7 @@ import { Prisma } from '@mcc/db';
 import {
   calcAccountBalance,
   calcBusinessSummary,
+  calcPayable,
   calcReceivable,
   sumMoney,
   type CashBalanceLine,
@@ -15,12 +16,14 @@ import {
   type FinanceCashEntryListQuery,
   type FinanceCashMethod,
   type FinanceCashSummaryQuery,
+  type FinancePayablesQuery,
   type FinanceReceivablesQuery,
   type FinanceSummaryQuery,
 } from '@mcc/shared';
 import { problem } from '../../common/http-problem.js';
 import { PrismaService } from '../../common/prisma.service.js';
 import { CustomerService } from '../customer/index.js';
+import { SupplierService } from '../supplier/index.js';
 import type { FinanceSummaryDto } from './dto/finance.dto.js';
 import type {
   FinanceAccountDto,
@@ -28,6 +31,7 @@ import type {
   FinanceCashEntryDto,
   FinanceCashEntryListDto,
   FinanceCashSummaryDto,
+  FinancePayableListDto,
   FinanceReceivableListDto,
 } from './dto/cash.dto.js';
 
@@ -125,6 +129,7 @@ const CHANNEL_TO_METHOD: Record<DbAccountChannel, DbCashMethod> = {
 
 const SOURCE_TYPE_LABELS = {
   sale_order: '销售单',
+  purchase_order: '采购单',
 } as const;
 type SourceType = keyof typeof SOURCE_TYPE_LABELS;
 
@@ -161,6 +166,8 @@ interface CashEntryRow {
   toAccount: { name: string } | null;
   customerId: string | null;
   customerName: string;
+  supplierId: string | null;
+  supplierName: string;
   method: DbCashMethod;
   category: DbCashCategory | null;
   note: string;
@@ -181,6 +188,8 @@ const CASH_ENTRY_SELECT = {
   toAccount: { select: { name: true } },
   customerId: true,
   customerName: true,
+  supplierId: true,
+  supplierName: true,
   method: true,
   category: true,
   note: true,
@@ -205,13 +214,15 @@ export interface SourceCashEntryInput {
   sourceType: SourceType;
   sourceId: string;
   sourceCode: string;
-  direction: 'in';
+  direction: 'in' | 'out';
   category: FinanceCashCategoryValue;
   occurredDate: string;
   amount: string;
   accountId: string;
   customerId?: string | null;
   customerName?: string;
+  supplierId?: string | null;
+  supplierName?: string;
   note?: string;
 }
 
@@ -220,34 +231,43 @@ export class FinanceService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly customerService: CustomerService,
+    private readonly supplierService: SupplierService,
   ) {}
 
-  // 经营收支汇总：销售单按应计（现结取实收、赊销取合计）+ 流水分类按实际收付；不落库
+  // 经营收支汇总：销售与采购均按应计（现结取实收 / 实付、赊销 / 赊购取合计）+ 流水分类按实际收付；不落库
   async summary(query: FinanceSummaryQuery): Promise<FinanceSummaryDto> {
     const orderWhere: Prisma.SaleOrderWhereInput = { deletedAt: null };
+    const purchaseWhere: Prisma.PurchaseOrderWhereInput = { deletedAt: null };
     const entryWhere: Prisma.FinanceCashEntryWhereInput = {
       deletedAt: null,
       direction: { in: ['IN', 'OUT'] },
-      category: { in: ['OTHER_REVENUE', 'PURCHASE_PAYMENT', 'LABOR_COST', 'OPERATING_EXPENSE'] },
+      category: { in: ['OTHER_REVENUE', 'LABOR_COST', 'OPERATING_EXPENSE'] },
     };
     if (query.dateFrom || query.dateTo) {
       orderWhere.saleDate = {};
+      purchaseWhere.purchaseDate = {};
       entryWhere.occurredDate = {};
       if (query.dateFrom) {
         const from = toDate(query.dateFrom);
         orderWhere.saleDate.gte = from;
+        purchaseWhere.purchaseDate.gte = from;
         entryWhere.occurredDate.gte = from;
       }
       if (query.dateTo) {
         const to = toDate(query.dateTo);
         orderWhere.saleDate.lte = to;
+        purchaseWhere.purchaseDate.lte = to;
         entryWhere.occurredDate.lte = to;
       }
     }
-    const [orders, entries] = await Promise.all([
+    const [orders, purchases, entries] = await Promise.all([
       this.prisma.client.saleOrder.findMany({
         where: orderWhere,
         select: { settlementMode: true, receivedAmount: true, totalAmount: true },
+      }),
+      this.prisma.client.purchaseOrder.findMany({
+        where: purchaseWhere,
+        select: { settlementMode: true, paidAmount: true, totalAmount: true },
       }),
       this.prisma.client.financeCashEntry.findMany({
         where: entryWhere,
@@ -257,18 +277,26 @@ export class FinanceService {
     const salesAmounts = orders.map((order) =>
       money(order.settlementMode === 'SETTLED' ? order.receivedAmount : order.totalAmount),
     );
+    const purchaseAmounts = purchases.map((purchase) =>
+      money(
+        purchase.settlementMode === 'SETTLED'
+          ? purchase.paidAmount ?? '0'
+          : purchase.totalAmount,
+      ),
+    );
     const cashLines = entries
       .filter((entry) => entry.category !== null)
       .map((entry) => ({
         category: CASH_CATEGORY_FROM_DB[entry.category as DbCashCategory],
         amount: money(entry.amount),
       }));
-    const summary = calcBusinessSummary(salesAmounts, cashLines);
+    const summary = calcBusinessSummary(salesAmounts, purchaseAmounts, cashLines);
     return {
       totalIncome: summary.totalIncome,
       totalExpense: summary.totalExpense,
       netAmount: summary.netAmount,
       orderCount: orders.length,
+      purchaseCount: purchases.length,
       cashEntryCount: entries.length,
       categories: summary.byCategory,
     };
@@ -302,6 +330,8 @@ export class FinanceService {
       toAccountId: null,
       customerId: input.customerId ?? null,
       customerName: input.customerName ?? '',
+      supplierId: input.supplierId ?? null,
+      supplierName: input.supplierName ?? '',
       method: CHANNEL_TO_METHOD[account.channel],
       category: CASH_CATEGORY_TO_DB[input.category],
       note: input.note ?? '',
@@ -507,6 +537,8 @@ export class FinanceService {
       toAccountName: row.toAccount?.name ?? null,
       customerId: row.customerId,
       customerName: row.customerName,
+      supplierId: row.supplierId,
+      supplierName: row.supplierName,
       method: CASH_METHOD_FROM_DB[row.method],
       category: row.category ? CASH_CATEGORY_FROM_DB[row.category] : null,
       note: row.note,
@@ -535,6 +567,10 @@ export class FinanceService {
     if (query.customerId) {
       // 客户只挂在收款流水上，选中客户后自然只剩该客户的收款
       where.customerId = query.customerId;
+    }
+    if (query.supplierId) {
+      // 供应商只挂在采购付款流水上，选中供应商后自然只剩该供应商的付款
+      where.supplierId = query.supplierId;
     }
     if (query.dateFrom || query.dateTo) {
       where.occurredDate = {};
@@ -583,25 +619,44 @@ export class FinanceService {
     return account.channel;
   }
 
-  // 仅销售回款挂客户并快照客户名；方式由资金账户渠道推导
-  private async resolveCashParties(
-    input: FinanceCashEntryInput,
-  ): Promise<{ customerId: string | null; customerName: string; method: DbCashMethod }> {
+  // 仅销售回款挂客户、仅采购付款挂供应商，并快照名称；方式由资金账户渠道推导
+  private async resolveCashParties(input: FinanceCashEntryInput): Promise<{
+    customerId: string | null;
+    customerName: string;
+    supplierId: string | null;
+    supplierName: string;
+    method: DbCashMethod;
+  }> {
     const channel = await this.accountChannel(input.accountId);
     if (input.direction === 'transfer' && input.toAccountId) {
       await this.accountChannel(input.toAccountId);
     }
     const method = CHANNEL_TO_METHOD[channel];
-    if (input.direction !== 'in' || input.category !== 'sales_receipt') {
-      return { customerId: null, customerName: '', method };
+    let customerId: string | null = null;
+    let customerName = '';
+    let supplierId: string | null = null;
+    let supplierName = '';
+    if (input.direction === 'in' && input.category === 'sales_receipt') {
+      const customer = input.customerId
+        ? await this.customerService.findById(input.customerId)
+        : null;
+      if (!customer || customer.deleted) {
+        throw problem(400, 'CUSTOMER_NOT_FOUND', '客户不存在');
+      }
+      customerId = customer.id;
+      customerName = customer.name;
     }
-    const customer = input.customerId
-      ? await this.customerService.findById(input.customerId)
-      : null;
-    if (!customer || customer.deleted) {
-      throw problem(400, 'CUSTOMER_NOT_FOUND', '客户不存在');
+    if (input.direction === 'out' && input.category === 'purchase_payment') {
+      const supplier = input.supplierId
+        ? await this.supplierService.findById(input.supplierId)
+        : null;
+      if (!supplier || supplier.deleted) {
+        throw problem(400, 'SUPPLIER_NOT_FOUND', '供应商不存在');
+      }
+      supplierId = supplier.id;
+      supplierName = supplier.name;
     }
-    return { customerId: customer.id, customerName: customer.name, method };
+    return { customerId, customerName, supplierId, supplierName, method };
   }
 
   async cashEntryDetail(id: string): Promise<FinanceCashEntryDto> {
@@ -631,6 +686,8 @@ export class FinanceService {
               toAccountId: input.direction === 'transfer' ? input.toAccountId ?? null : null,
               customerId: parties.customerId,
               customerName: parties.customerName,
+              supplierId: parties.supplierId,
+              supplierName: parties.supplierName,
               method: parties.method,
               category: input.category ? CASH_CATEGORY_TO_DB[input.category] : null,
               note: input.note,
@@ -675,6 +732,8 @@ export class FinanceService {
         toAccountId: input.direction === 'transfer' ? input.toAccountId ?? null : null,
         customerId: parties.customerId,
         customerName: parties.customerName,
+        supplierId: parties.supplierId,
+        supplierName: parties.supplierName,
         method: parties.method,
         category: input.category ? CASH_CATEGORY_TO_DB[input.category] : null,
         note: input.note,
@@ -797,6 +856,73 @@ export class FinanceService {
           sales: salesAmount,
           receipts: receiptAmount,
           outstanding: calcReceivable([salesAmount], [receiptAmount], openingDebt),
+        };
+      }),
+    };
+  }
+
+  // 应付：应付 = 期初应付 + 累计采购 − 累计付款（负数为预付）。
+  // 采购合计对 purchase 域表只读聚合；累计付款只取挂该供应商的采购付款流水。
+  async payables(query: FinancePayablesQuery): Promise<FinancePayableListDto> {
+    const ids = [
+      ...new Set(
+        query.supplierIds
+          .split(',')
+          .map((value) => value.trim())
+          .filter((value) => UUID_RE.test(value)),
+      ),
+    ];
+    if (ids.length === 0) {
+      return { items: [] };
+    }
+    const [purchases, payments, openingPayables] = await Promise.all([
+      this.prisma.client.purchaseOrder.findMany({
+        where: { supplierId: { in: ids }, deletedAt: null },
+        select: {
+          supplierId: true,
+          totalAmount: true,
+          settlementMode: true,
+          paidAmount: true,
+        },
+      }),
+      this.prisma.client.financeCashEntry.groupBy({
+        by: ['supplierId'],
+        where: {
+          supplierId: { in: ids },
+          direction: 'OUT',
+          category: 'PURCHASE_PAYMENT',
+          deletedAt: null,
+        },
+        _sum: { amount: true },
+      }),
+      this.supplierService.findOpeningPayables(ids),
+    ]);
+    // 现结单按实付计累计采购，赊购单按合计；现结后应付为 0（折让不留下尾差）
+    const purchaseMap = new Map<string, string[]>();
+    for (const purchase of purchases) {
+      const amount = money(
+        purchase.settlementMode === 'SETTLED'
+          ? purchase.paidAmount ?? '0'
+          : purchase.totalAmount,
+      );
+      const list = purchaseMap.get(purchase.supplierId) ?? [];
+      list.push(amount);
+      purchaseMap.set(purchase.supplierId, list);
+    }
+    const paymentMap = new Map(
+      payments.map((row) => [row.supplierId, money(row._sum.amount ?? '0')]),
+    );
+    return {
+      items: ids.map((supplierId) => {
+        const openingPayable = openingPayables.get(supplierId) ?? '0.00';
+        const purchaseAmount = sumMoney(purchaseMap.get(supplierId) ?? []);
+        const paymentAmount = paymentMap.get(supplierId) ?? '0.00';
+        return {
+          supplierId,
+          openingPayable,
+          purchases: purchaseAmount,
+          payments: paymentAmount,
+          outstanding: calcPayable([purchaseAmount], [paymentAmount], openingPayable),
         };
       }),
     };

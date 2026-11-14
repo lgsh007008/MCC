@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { LogOutIcon, ReceiptTextIcon, UsersIcon, WalletIcon } from 'lucide-react';
+import { LogOutIcon, ShoppingCartIcon, TruckIcon, WalletIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCan } from '@/components/auth/permission-context';
 import { MobileEntryCard } from '@/components/mobile/entry-card';
@@ -15,6 +15,7 @@ import { authSession } from '@/lib/auth/session';
 export default function MobileHomePage(): React.ReactElement {
   const canOrder = useCan('order:view');
   const canCustomer = useCan('customer:view');
+  const canPurchase = useCan('purchase:view');
   const canFinance = useCan('finance:view');
   const [loggingOut, setLoggingOut] = useState(false);
 
@@ -49,21 +50,20 @@ export default function MobileHomePage(): React.ReactElement {
         }
       />
       <div className="space-y-4 p-4">
-        <p className="text-mobile-body text-muted-foreground">选择要办理的业务</p>
-        {canOrder ? (
+        {canOrder || canCustomer ? (
           <MobileEntryCard
-            href="/m/sale-orders"
-            icon={ReceiptTextIcon}
-            title="成品销售单"
-            description="开单 / 查单"
+            href="/m/sales"
+            icon={ShoppingCartIcon}
+            title="销售"
+            description="销售单 / 客户档案"
           />
         ) : null}
-        {canCustomer ? (
+        {canPurchase ? (
           <MobileEntryCard
-            href="/m/customers"
-            icon={UsersIcon}
-            title="客户档案"
-            description="查客户 / 维护资料"
+            href="/m/purchase"
+            icon={TruckIcon}
+            title="采购"
+            description="采购单 / 供应商"
           />
         ) : null}
         {canFinance ? (

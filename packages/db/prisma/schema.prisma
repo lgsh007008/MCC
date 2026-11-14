@@ -162,6 +162,93 @@ model Customer {
   @@map("customers")
 }
 
+// ── 供应商领域（supplier，design/supplier.md §2）────────
+// 供应商 = 长期往来实体，与客户域镜像；累计采购 / 付款 / 应付不落本表（finance 实时聚合），
+// 唯一金额列是期初应付（上线前余额的录入源）。
+
+enum SupplierStatus {
+  ACTIVE
+  INACTIVE
+
+  @@map("supplier_status")
+}
+
+model Supplier {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @default("default") @map("tenant_id")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at")
+
+  // 编号 SP + 连字符 + 5 位全局流水（如 SP-00001），系统生成、只读、永不复用（1-产品文档.md 五）
+  code    String         @map("code")
+  name    String         @map("name")
+  contact String         @default("") @map("contact")
+  status  SupplierStatus @default(ACTIVE)
+  note    String         @default("") @map("note")
+
+  // 期初应付：系统上线前已发生的净应付（product/supplier.md R-供应商-001）。
+  // 只作 finance 计算应付的基数，不计入累计采购 / 经营收支；历史付款不补录。
+  openingPayable Decimal @default(0) @map("opening_payable") @db.Decimal(14, 2)
+
+  purchaseOrders PurchaseOrder[]
+
+  @@unique([tenantId, code])
+  @@index([name])
+  @@map("suppliers")
+}
+
+// ── 采购领域（purchase，design/purchase.md §2）────────
+// 采购单是单头单据（无明细）；金额保存时由 shared 纯函数重算落账。
+// 供应商 = 引用 + 名称快照；现结在同事务内派生财务付款流水。
+
+enum PurchaseSettlementMode {
+  // 结算方式：赊购（默认）/ 现结；现结时同事务生成付款流水
+  CREDIT
+  SETTLED
+
+  @@map("purchase_settlement_mode")
+}
+
+model PurchaseOrder {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @default("default") @map("tenant_id")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at")
+
+  // 采购单编号 PO + 连字符 + 5 位全局流水（如 PO-00001），自动生成、只读、永不复用
+  code         String   @map("code")
+  purchaseDate DateTime @map("purchase_date") @db.Date
+
+  // 供应商：外键用于归属与聚合；名称快照保留录单当时名称（design/purchase.md §2）
+  supplierId   String   @map("supplier_id") @db.Uuid
+  supplier     Supplier @relation(fields: [supplierId], references: [id])
+  supplierName String   @map("supplier_name")
+
+  // 吨数：送货为实际过磅，结算为计价；单价按结算吨数计
+  deliveredTons Decimal @map("delivered_tons") @db.Decimal(12, 3)
+  settledTons   Decimal @map("settled_tons") @db.Decimal(12, 3)
+  unitPrice     Decimal @map("unit_price") @db.Decimal(12, 2)
+
+  // 金额：保存时按结算吨数重算，不手填
+  subtotalAmount Decimal @map("subtotal_amount") @db.Decimal(18, 2)
+  otherAmount    Decimal @default(0) @map("other_amount") @db.Decimal(18, 2)
+  totalAmount    Decimal @map("total_amount") @db.Decimal(18, 2)
+  note           String  @default("") @map("note")
+
+  // 结算：赊购时账户与实付为空；现结实付默认等于合计、可改
+  settlementMode  PurchaseSettlementMode @default(CREDIT) @map("settlement_mode")
+  settleAccountId String?                @db.Uuid @map("settle_account_id")
+  paidAmount      Decimal?               @map("paid_amount") @db.Decimal(18, 2)
+
+  @@unique([tenantId, code])
+  @@index([purchaseDate])
+  @@index([supplierId])
+  @@map("purchase_orders")
+}
+
+
 // ── 订单领域（order，design/order.md §2）────────────────
 // sale_order / sale_order_item 均归本领域；客户 = 引用 + 快照（customer_id 归属与聚合，
 // customer_name 为下单当时名称快照，客户改名不回改历史单据）。
@@ -359,9 +446,11 @@ model FinanceCashEntry {
   // 内部转账的转入账户
   toAccountId  String?              @map("to_account_id") @db.Uuid
   toAccount    FinanceAccount?      @relation("CashEntryToAccount", fields: [toAccountId], references: [id])
-  // 收款挂客户（不挂销售单）；付款对象写入备注
+  // 收款挂客户、付款挂供应商（均不挂单据）；对象名称快照保留当时的名称
   customerId   String?              @map("customer_id") @db.Uuid
   customerName String               @default("") @map("customer_name")
+  supplierId   String?              @map("supplier_id") @db.Uuid
+  supplierName String               @default("") @map("supplier_name")
   // 方式由账户渠道推导，不单独录入
   method       FinanceCashMethod    @default(BANK) @map("method")
   // 收支分类：收款 / 付款必填，内部转账为 NULL；决定是否计入经营收支
@@ -378,6 +467,7 @@ model FinanceCashEntry {
   @@index([occurredDate])
   @@index([accountId])
   @@index([customerId])
+  @@index([supplierId])
   @@index([category])
   @@map("finance_cash_entries")
 }

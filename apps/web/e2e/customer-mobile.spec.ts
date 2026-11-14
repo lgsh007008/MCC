@@ -29,6 +29,8 @@ test('手机端客户档案：新建 → 编辑 → 停用/启用 → 删除', a
   await page.getByRole('button', { name: '登录' }).click();
   await expect(page).toHaveURL(/\/m$/);
 
+  await page.getByRole('link', { name: /销售/ }).click();
+  await expect(page).toHaveURL(/\/m\/sales$/);
   await page.getByRole('link', { name: /客户档案/ }).click();
   await expect(page).toHaveURL(/\/m\/customers$/);
 

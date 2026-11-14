@@ -1,9 +1,11 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowDownIcon, ArrowUpIcon, BanIcon, CircleCheckIcon, EyeIcon, PencilIcon, Trash2Icon } from 'lucide-react';
 import { absMoney } from '@mcc/shared';
+import type { ApiSchemas } from '@mcc/shared';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { useCan } from '@/components/auth/permission-context';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -26,20 +28,14 @@ import { api } from '@/lib/api';
 //（受控例外，技术方案 §6.3；策略与退出方案见 design/customer.md §6）；
 // 超过阈值回退服务端分页并禁用该列排序。
 
-interface CustomerRow {
-  id: string;
-  code: string;
-  name: string;
-  contact: string;
-  status: string;
-  note: string;
-  createdAt: string;
+// 表格行 = 契约客户 + 跨域派生列（order 累计方量 / finance 应收），非手写 DTO
+type CustomerRow = ApiSchemas['CustomerDto'] & {
   totalVolume: string;
   orderCount: number;
   sales: string;
   receipts: string;
   outstanding: string;
-}
+};
 
 type SortField = 'createdAt' | 'totalVolume';
 type SortOrder = 'asc' | 'desc';
@@ -96,9 +92,26 @@ async function fetchReceivables(
   return map;
 }
 
+// 客户行补齐 order / finance 派生列（≤阈值时全量组合，超阈值只组合当前页）
+async function mergeDerived(items: ApiSchemas['CustomerDto'][]): Promise<CustomerRow[]> {
+  const [stats, receivables] = await Promise.all([
+    fetchCustomerStats(items.map((item) => item.id)),
+    fetchReceivables(items.map((item) => item.id)),
+  ]);
+  return items.map((item) => ({
+    ...item,
+    totalVolume: stats[item.id]?.totalVolume ?? '0.0000',
+    orderCount: stats[item.id]?.orderCount ?? 0,
+    sales: receivables[item.id]?.sales ?? '0.00',
+    receipts: receivables[item.id]?.receipts ?? '0.00',
+    outstanding: receivables[item.id]?.outstanding ?? '0.00',
+  }));
+}
+
 export default function CustomersPage(): React.ReactElement {
   const canManage = useCan('customer:manage');
   const confirm = useConfirm();
+  const queryClient = useQueryClient();
   const [filters, setFilters] = useState({ name: '', status: '' });
   const [applied, setApplied] = useState({ name: '', status: '' });
   const [sort, setSort] = useState<{ field: SortField; order: SortOrder }>({
@@ -106,154 +119,109 @@ export default function CustomersPage(): React.ReactElement {
     order: 'desc',
   });
   const [page, setPage] = useState(1);
-  const [rows, setRows] = useState<CustomerRow[]>([]);
-  const [total, setTotal] = useState(0);
-  const [volumeSortable, setVolumeSortable] = useState(true);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [reloadToken, setReloadToken] = useState(0);
-  const cacheRef = useRef<{ key: string; rows: CustomerRow[]; total: number } | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    const key = JSON.stringify({ applied, sort, reloadToken });
-    // 翻页 / 改筛选 / 改排序即清空选择（页面模式规范）
-    setSelected(new Set());
+  const baseQuery = {
+    name: applied.name || undefined,
+    status:
+      applied.status === 'active' || applied.status === 'inactive'
+        ? (applied.status as 'active' | 'inactive')
+        : undefined,
+  };
 
-    // 全量模式且缓存命中：翻页只切片，不再请求
-    const cached = cacheRef.current;
-    if (cached && cached.key === key) {
-      setRows(cached.rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE));
-      setTotal(cached.total);
-      setLoading(false);
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    setLoading(true);
-    void (async () => {
-      try {
-        const baseQuery: { name?: string; status?: 'active' | 'inactive' } = {
-          name: applied.name || undefined,
-          status:
-            applied.status === 'active' || applied.status === 'inactive' ? applied.status : undefined,
-        };
-        // 先探总数，决定全量组合还是回退服务端分页
-        const probe = await api.GET('/api/v1/customers', {
-          params: { query: { page: 1, pageSize: 1, ...baseQuery } },
-        });
-        if (!probe.response.ok || !probe.data) {
-          if (!cancelled) {
-            setError('加载失败，请稍后重试');
-          }
-          return;
-        }
-        const totalCount = probe.data.total;
-        const canSortVolume = totalCount <= MAX_FULL_FETCH;
-
-        if (canSortVolume) {
-          const pageCount = Math.max(1, Math.ceil(totalCount / FULL_FETCH_PAGE_SIZE));
-          const pageResults = await Promise.all(
-            Array.from({ length: pageCount }, (_, index) =>
-              api.GET('/api/v1/customers', {
-                params: {
-                  query: { page: index + 1, pageSize: FULL_FETCH_PAGE_SIZE, ...baseQuery },
-                },
-              }),
-            ),
-          );
-          const items = pageResults.flatMap((result) => result.data?.items ?? []);
-          const [stats, receivables] = await Promise.all([
-            fetchCustomerStats(items.map((item) => item.id)),
-            fetchReceivables(items.map((item) => item.id)),
-          ]);
-          const merged: CustomerRow[] = items.map((item) => ({
-            ...item,
-            totalVolume: stats[item.id]?.totalVolume ?? '0.0000',
-            orderCount: stats[item.id]?.orderCount ?? 0,
-            sales: receivables[item.id]?.sales ?? '0.00',
-            receipts: receivables[item.id]?.receipts ?? '0.00',
-            outstanding: receivables[item.id]?.outstanding ?? '0.00',
-          }));
-          const direction = sort.order === 'asc' ? 1 : -1;
-          merged.sort((a, b) => {
-            const primary =
-              sort.field === 'totalVolume'
-                ? volumeKey(a.totalVolume) === volumeKey(b.totalVolume)
-                  ? 0
-                  : volumeKey(a.totalVolume) > volumeKey(b.totalVolume)
-                    ? 1
-                    : -1
-                : a.createdAt.localeCompare(b.createdAt);
-            if (primary !== 0) {
-              return primary * direction;
-            }
-            // 并列时按创建日期倒序、编号升序兜底，保证翻页顺序稳定
-            const dateCmp = b.createdAt.localeCompare(a.createdAt);
-            return dateCmp !== 0 ? dateCmp : a.code.localeCompare(b.code);
-          });
-          if (cancelled) {
-            return;
-          }
-          cacheRef.current = { key, rows: merged, total: totalCount };
-          setVolumeSortable(true);
-          setRows(merged.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE));
-          setTotal(totalCount);
-          setError(null);
-        } else {
-          // 超过阈值：回退服务端分页，方量列不可排序
-          cacheRef.current = null;
-          setVolumeSortable(false);
-          const result = await api.GET('/api/v1/customers', {
-            params: { query: { page, pageSize: PAGE_SIZE, sortOrder: 'desc', ...baseQuery } },
-          });
-          if (cancelled) {
-            return;
-          }
-          if (!result.response.ok || !result.data) {
-            setError('加载失败，请稍后重试');
-            return;
-          }
-          const items = result.data.items;
-          const [stats, receivables] = await Promise.all([
-            fetchCustomerStats(items.map((item) => item.id)),
-            fetchReceivables(items.map((item) => item.id)),
-          ]);
-          if (cancelled) {
-            return;
-          }
-          setRows(
-            items.map((item) => ({
-              ...item,
-              totalVolume: stats[item.id]?.totalVolume ?? '0.0000',
-              orderCount: stats[item.id]?.orderCount ?? 0,
-              sales: receivables[item.id]?.sales ?? '0.00',
-              receipts: receivables[item.id]?.receipts ?? '0.00',
-              outstanding: receivables[item.id]?.outstanding ?? '0.00',
-            })),
-          );
-          setTotal(result.data.total);
-          setError(null);
-        }
-      } catch {
-        if (!cancelled) {
-          setError('加载失败，请稍后重试');
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
+  // 先探总数，决定全量组合还是回退服务端分页
+  const probeQuery = useQuery({
+    queryKey: ['customers', 'probe', applied],
+    queryFn: async (): Promise<number> => {
+      const { data, response } = await api.GET('/api/v1/customers', {
+        params: { query: { page: 1, pageSize: 1, ...baseQuery } },
+      });
+      if (!response.ok || !data) {
+        throw new Error('加载失败，请稍后重试');
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [page, applied, sort, reloadToken]);
+      return data.total;
+    },
+  });
+
+  const mode: 'loading' | 'full' | 'paged' =
+    probeQuery.data === undefined
+      ? 'loading'
+      : probeQuery.data <= MAX_FULL_FETCH
+        ? 'full'
+        : 'paged';
+
+  // 全量模式：筛选维度取一次，翻页与排序纯客户端；超阈值回退服务端分页
+  const listQuery = useQuery({
+    queryKey:
+      mode === 'paged' ? ['customers', 'paged', page, applied] : ['customers', 'full', applied],
+    enabled: mode !== 'loading',
+    queryFn: async (): Promise<{ total: number; items: CustomerRow[] }> => {
+      if (mode === 'full') {
+        const totalCount = probeQuery.data ?? 0;
+        const pageCount = Math.max(1, Math.ceil(totalCount / FULL_FETCH_PAGE_SIZE));
+        const pageResults = await Promise.all(
+          Array.from({ length: pageCount }, (_, index) =>
+            api.GET('/api/v1/customers', {
+              params: {
+                query: { page: index + 1, pageSize: FULL_FETCH_PAGE_SIZE, ...baseQuery },
+              },
+            }),
+          ),
+        );
+        const items = pageResults.flatMap((result) => result.data?.items ?? []);
+        return { total: totalCount, items: await mergeDerived(items) };
+      }
+      const { data, response } = await api.GET('/api/v1/customers', {
+        params: { query: { page, pageSize: PAGE_SIZE, sortOrder: 'desc', ...baseQuery } },
+      });
+      if (!response.ok || !data) {
+        throw new Error('加载失败，请稍后重试');
+      }
+      return { total: data.total, items: await mergeDerived(data.items) };
+    },
+  });
+
+  const volumeSortable = mode !== 'paged';
+
+  const sortedRows = useMemo(() => {
+    const items = listQuery.data?.items ?? [];
+    if (mode !== 'full') {
+      return items;
+    }
+    const direction = sort.order === 'asc' ? 1 : -1;
+    return [...items].sort((a, b) => {
+      const primary =
+        sort.field === 'totalVolume'
+          ? volumeKey(a.totalVolume) === volumeKey(b.totalVolume)
+            ? 0
+            : volumeKey(a.totalVolume) > volumeKey(b.totalVolume)
+              ? 1
+              : -1
+          : a.createdAt.localeCompare(b.createdAt);
+      if (primary !== 0) {
+        return primary * direction;
+      }
+      // 并列时按创建日期倒序、编号升序兜底，保证翻页顺序稳定
+      const dateCmp = b.createdAt.localeCompare(a.createdAt);
+      return dateCmp !== 0 ? dateCmp : a.code.localeCompare(b.code);
+    });
+  }, [listQuery.data, mode, sort]);
+
+  const rows =
+    mode === 'full' ? sortedRows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE) : sortedRows;
+  const total = listQuery.data?.total ?? probeQuery.data ?? 0;
+  const loading = probeQuery.isPending || (mode !== 'loading' && listQuery.isPending);
+  const error =
+    actionError ?? (probeQuery.isError || listQuery.isError ? '加载失败，请稍后重试' : null);
+
+  // 翻页 / 改筛选 / 改排序即清空选择（页面模式规范）
+  useEffect(() => {
+    setSelected(new Set());
+  }, [page, applied, sort]);
 
   async function reload(): Promise<void> {
-    setReloadToken((token) => token + 1);
+    await queryClient.invalidateQueries({ queryKey: ['customers'] });
   }
 
   async function patchStatus(id: string, status: 'active' | 'inactive'): Promise<void> {
@@ -285,7 +253,7 @@ export default function CustomersPage(): React.ReactElement {
       await patchStatus(customer.id, 'active');
       await reload();
     } catch {
-      setError('状态切换失败，请稍后重试');
+      setActionError('状态切换失败，请稍后重试');
     }
   }
 
@@ -322,7 +290,7 @@ export default function CustomersPage(): React.ReactElement {
         await reload();
       }
     } catch {
-      setError('批量状态切换失败，请稍后重试');
+      setActionError('批量状态切换失败，请稍后重试');
     }
   }
 
@@ -346,7 +314,7 @@ export default function CustomersPage(): React.ReactElement {
         await reload();
       }
     } catch {
-      setError('删除失败，请稍后重试');
+      setActionError('删除失败，请稍后重试');
     }
   }
 
@@ -375,7 +343,7 @@ export default function CustomersPage(): React.ReactElement {
         await reload();
       }
     } catch {
-      setError('批量删除失败，请稍后重试');
+      setActionError('批量删除失败，请稍后重试');
     }
   }
 
@@ -456,7 +424,6 @@ export default function CustomersPage(): React.ReactElement {
     setApplied(empty);
     setPage(1);
     setSelected(new Set());
-    setReloadToken((token) => token + 1);
   };
 
   return (
@@ -467,7 +434,6 @@ export default function CustomersPage(): React.ReactElement {
           e.preventDefault();
           setApplied({ ...filters });
           setPage(1);
-          setReloadToken((token) => token + 1);
         }}
       >
         <div className="flex items-center gap-2">

@@ -1,0 +1,205 @@
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { supplierInputSchema } from '@mcc/shared';
+import { PageFrame } from '@/components/admin/page-frame';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { api } from '@/lib/api';
+import { randomUuid } from '@/lib/uuid';
+
+// 供应商表单（product/supplier.md R-供应商-001）：新建与编辑共用；
+// 编号不可编辑；重名只提示不阻断保存。
+
+export interface SupplierFormInitial {
+  code: string;
+  name: string;
+  contact: string;
+  openingPayable: string;
+  note: string;
+}
+
+function Field({
+  label,
+  htmlFor,
+  children,
+}: {
+  label: string;
+  htmlFor?: string;
+  children: React.ReactNode;
+}): React.ReactElement {
+  return (
+    <div className="flex items-center gap-2">
+      <Label htmlFor={htmlFor} className="w-24 shrink-0 justify-end text-right text-muted-foreground">
+        {label}
+      </Label>
+      {children}
+    </div>
+  );
+}
+
+export function SupplierForm({
+  title,
+  supplierId,
+  initial,
+}: {
+  title: React.ReactNode;
+  supplierId?: string;
+  initial?: SupplierFormInitial;
+}): React.ReactElement {
+  const router = useRouter();
+  const [name, setName] = useState(initial?.name ?? '');
+  const [contact, setContact] = useState(initial?.contact ?? '');
+  const [openingPayable, setOpeningPayable] = useState(initial?.openingPayable ?? '0.00');
+  const [note, setNote] = useState(initial?.note ?? '');
+  const [duplicateName, setDuplicateName] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function checkDuplicate(value: string): Promise<void> {
+    if (!value.trim()) {
+      setDuplicateName(false);
+      return;
+    }
+    try {
+      const { data, response } = await api.GET('/api/v1/suppliers/name-check', {
+        params: { query: { name: value.trim(), excludeId: supplierId } },
+      });
+      setDuplicateName(response.ok && Boolean(data?.duplicate));
+    } catch {
+      setDuplicateName(false);
+    }
+  }
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
+    setError(null);
+    const parsed = supplierInputSchema.safeParse({ name, contact, openingPayable, note });
+    if (!parsed.success) {
+      setError(parsed.error.issues[0]?.message ?? '输入不合法');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      if (supplierId) {
+        const { response } = await api.PUT('/api/v1/suppliers/{id}', {
+          params: { path: { id: supplierId } },
+          body: parsed.data,
+        });
+        if (!response.ok) {
+          const body = (await response.json().catch(() => null)) as { message?: string } | null;
+          setError(body?.message ?? '保存失败，请稍后重试');
+          return;
+        }
+        router.push(`/admin/suppliers/${supplierId}`);
+        return;
+      }
+      const { data, response } = await api.POST('/api/v1/suppliers', {
+        body: parsed.data,
+        headers: { 'Idempotency-Key': randomUuid() },
+      });
+      if (!response.ok || !data) {
+        const body = (await response.json().catch(() => null)) as { message?: string } | null;
+        setError(body?.message ?? '保存失败，请稍后重试');
+        return;
+      }
+      router.push(`/admin/suppliers/${data.id}`);
+    } catch {
+      setError('提交失败，请稍后重试');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <form className="h-full min-h-0" onSubmit={handleSubmit}>
+      <PageFrame
+        title={title}
+        actions={
+          <div className="w-full">
+            {error ? <p className="mb-2 text-sm text-destructive">{error}</p> : null}
+            <div className="flex gap-2">
+              <Button type="submit" disabled={submitting}>
+                {submitting ? '保存中…' : '保存'}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() =>
+                  router.push(supplierId ? `/admin/suppliers/${supplierId}` : '/admin/suppliers')
+                }
+              >
+                取消
+              </Button>
+            </div>
+          </div>
+        }
+      >
+        <section className="rounded-lg border border-border bg-card p-4">
+          <h2 className="text-sm font-semibold">供应商</h2>
+          <div className="mt-3 grid gap-3 xl:grid-cols-2">
+            <Field label="供应商编号" htmlFor="supplierCode">
+              <Input
+                id="supplierCode"
+                value={initial?.code ?? '系统生成'}
+                readOnly
+                disabled
+                className="h-8 w-40"
+              />
+            </Field>
+            <Field label="供应商名称" htmlFor="supplierName">
+              <div className="w-full max-w-72">
+                <Input
+                  id="supplierName"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  onBlur={(e) => void checkDuplicate(e.target.value)}
+                  placeholder="供应商名称"
+                  className="h-8 w-full"
+                />
+                {duplicateName ? (
+                  <p className="mt-1 text-xs text-muted-foreground">已存在同名供应商，可继续保存</p>
+                ) : null}
+              </div>
+            </Field>
+            <Field label="联系信息" htmlFor="supplierContact">
+              <Textarea
+                id="supplierContact"
+                value={contact}
+                onChange={(e) => setContact(e.target.value)}
+                placeholder="电话等"
+                className="min-h-8 w-full max-w-72"
+              />
+            </Field>
+            <Field label="期初应付" htmlFor="supplierOpeningPayable">
+              <div className="w-full max-w-72">
+                <Input
+                  id="supplierOpeningPayable"
+                  value={openingPayable}
+                  onChange={(e) => setOpeningPayable(e.target.value)}
+                  inputMode="decimal"
+                  placeholder="0.00"
+                  className="h-8 w-full"
+                />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  系统上线前已发生的净应付；上线后的付款照常登记采购付款
+                </p>
+              </div>
+            </Field>
+            <Field label="备注" htmlFor="supplierNote">
+              <Textarea
+                id="supplierNote"
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                className="min-h-8 w-full max-w-72"
+              />
+            </Field>
+          </div>
+        </section>
+      </PageFrame>
+    </form>
+  );
+}

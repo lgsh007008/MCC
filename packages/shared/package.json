@@ -9,6 +9,7 @@
   },
   "scripts": {
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "gen:client": "openapi-typescript ./openapi.json -o ./src/gen/api.d.ts",
     "lint": "eslint ."
@@ -19,6 +20,7 @@
     "zod": "^4.0.0"
   },
   "devDependencies": {
+    "@vitest/coverage-v8": "^3.2.7",
     "openapi-typescript": "^7.13.0",
     "typescript": "^5.0.0",
     "vitest": "^3.2.7"

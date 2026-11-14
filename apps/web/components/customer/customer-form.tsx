@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { api } from '@/lib/api';
+import { randomUuid } from '@/lib/uuid';
 
 // 客户表单（product/customer.md R-客户-001；页面模式规范见 product/平台布局.md）：
 // 新建与编辑共用。Label 与控件左右并排；编号不可编辑；重名只提示不阻断保存。
@@ -97,7 +98,10 @@ export function CustomerForm({
         router.push(`/admin/customers/${customerId}`);
         return;
       }
-      const { data, response } = await api.POST('/api/v1/customers', { body: parsed.data });
+      const { data, response } = await api.POST('/api/v1/customers', {
+        body: parsed.data,
+        headers: { 'Idempotency-Key': randomUuid() },
+      });
       if (!response.ok || !data) {
         const body = (await response.json().catch(() => null)) as { message?: string } | null;
         setError(body?.message ?? '保存失败，请稍后重试');

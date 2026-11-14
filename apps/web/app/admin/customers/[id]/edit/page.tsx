@@ -1,16 +1,30 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
+import type { ApiSchemas } from '@mcc/shared';
 import { usePageCrumb } from '@/components/admin/page-breadcrumb';
-import { CustomerForm, type CustomerFormInitial } from '@/components/customer/customer-form';
+import { CustomerForm } from '@/components/customer/customer-form';
 import { api } from '@/lib/api';
 
 // 客户编辑页（product/customer.md R-客户-001 页面设计）：加载现有客户后进入共用表单。
 export default function CustomerEditPage(): React.ReactElement {
   const params = useParams<{ id: string }>();
-  const [initial, setInitial] = useState<CustomerFormInitial | null>(null);
-  const [error, setError] = useState<string | null>(null);
+
+  const customerQuery = useQuery({
+    queryKey: ['customers', params.id],
+    queryFn: async (): Promise<ApiSchemas['CustomerDto']> => {
+      const { data: res, response } = await api.GET('/api/v1/customers/{id}', {
+        params: { path: { id: params.id } },
+      });
+      if (!response.ok || !res) {
+        throw new Error('客户不存在或加载失败');
+      }
+      return res;
+    },
+  });
+  const initial = customerQuery.data;
+  const error = customerQuery.isError ? '客户不存在或加载失败' : null;
 
   // 面包屑页面标识：编号（链接回详情）/ 编辑
   usePageCrumb(
@@ -18,31 +32,6 @@ export default function CustomerEditPage(): React.ReactElement {
       ? [{ title: initial.code, href: `/admin/customers/${params.id}` }, { title: '编辑' }]
       : [],
   );
-
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const { data, response } = await api.GET('/api/v1/customers/{id}', {
-          params: { path: { id: params.id } },
-        });
-        if (!cancelled) {
-          if (response.ok && data) {
-            setInitial(data);
-          } else {
-            setError('客户不存在或加载失败');
-          }
-        }
-      } catch {
-        if (!cancelled) {
-          setError('加载失败，请稍后重试');
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [params.id]);
 
   if (error) {
     return <p className="text-sm text-destructive">{error}</p>;

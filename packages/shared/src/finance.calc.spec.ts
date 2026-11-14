@@ -3,6 +3,7 @@ import {
   absMoney,
   calcAccountBalance,
   calcBusinessSummary,
+  calcPayable,
   calcReceivable,
   calcSettlementDifference,
   sumMoney,
@@ -35,22 +36,30 @@ describe('经营收支汇总（R-财务-001）', () => {
     { category: 'loan_repay' as const, amount: '200.00' },
   ];
 
-  it('销售按应计、其余按分类收付，非经营分类全部排除', () => {
-    const summary = calcBusinessSummary(['1000.00', '500.00'], cashLines);
+  it('销售与采购按应计、其余按分类收付，非经营分类全部排除', () => {
+    const summary = calcBusinessSummary(['1000.00', '500.00'], ['800.00'], cashLines);
     expect(summary.totalIncome).toBe('1700.50');
-    expect(summary.totalExpense).toBe('850.25');
-    expect(summary.netAmount).toBe('850.25');
+    expect(summary.totalExpense).toBe('1350.25');
+    expect(summary.netAmount).toBe('350.25');
     expect(summary.byCategory).toEqual([
       { category: 'sales_revenue', amount: '1500.00' },
       { category: 'other_revenue', amount: '200.50' },
-      { category: 'purchase_payment', amount: '300.00' },
+      { category: 'purchase_expense', amount: '800.00' },
       { category: 'labor_cost', amount: '400.00' },
       { category: 'operating_expense', amount: '150.25' },
     ]);
   });
 
+  it('采购付款流水不再重复计入支出', () => {
+    const summary = calcBusinessSummary([], [], cashLines);
+    expect(summary.totalExpense).toBe('550.25');
+    expect(summary.byCategory.find((row) => row.category === 'purchase_expense')?.amount).toBe(
+      '0.00',
+    );
+  });
+
   it('空数据输出五项全零', () => {
-    const summary = calcBusinessSummary([], []);
+    const summary = calcBusinessSummary([], [], []);
     expect(summary).toMatchObject({
       totalIncome: '0.00',
       totalExpense: '0.00',
@@ -94,6 +103,18 @@ describe('应收（R-财务-002）', () => {
   it('负数为预收，不截断', () => {
     expect(calcReceivable(['0.00'], ['200.00'])).toBe('-200.00');
     expect(calcReceivable(['0.00'], ['30000.00'], '0.00')).toBe('-30000.00');
+  });
+});
+
+describe('应付（R-财务-004）', () => {
+  it('应付 = 期初应付 + 累计采购 − 累计付款', () => {
+    expect(calcPayable(['1000.00'], ['400.00'])).toBe('600.00');
+    expect(calcPayable(['1000.00', '500.50'], ['400.00'])).toBe('1100.50');
+    expect(calcPayable(['0.00'], ['0.00'], '80000.00')).toBe('80000.00');
+  });
+
+  it('负数为预付，不截断', () => {
+    expect(calcPayable(['0.00'], ['200.00'])).toBe('-200.00');
   });
 });
 

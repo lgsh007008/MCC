@@ -6,8 +6,10 @@ import {
   SCOPES,
   USER_ROLES,
   hasScope,
+  scopeSatisfied,
   scopesOf,
 } from './auth.permissions';
+import type { Scope } from './auth.permissions';
 
 // 角色矩阵完整性（product/账号与权限.md R-账号与权限-003）：
 // 新增角色时必须同时补标签、说明与 scope，否则账号管理与权限说明会出现空缺。
@@ -38,6 +40,21 @@ describe('角色与权限矩阵', () => {
     expect(hasScope('FINANCE', 'audit:view')).toBe(false);
     expect(hasScope('WORKER', 'audit:view')).toBe(false);
     expect(SCOPES).not.toContain('audit:manage');
+  });
+
+  // 技术方案 §8.2：manage 默认包含同域 view；角色矩阵只列 manage 时也能查看
+  it('manage 包含同域 view，反之不成立', () => {
+    expect(scopeSatisfied(['order:manage'], 'order:view')).toBe(true);
+    expect(scopeSatisfied(['finance:manage'], 'finance:view')).toBe(true);
+    expect(scopeSatisfied(['order:view'], 'order:manage')).toBe(false);
+    // 无 view/manage 配对的 scope 不受包含规则影响
+    expect(scopeSatisfied(['account:manage'], 'account:view' as Scope)).toBe(false);
+    expect(scopeSatisfied(['audit:view'], 'audit:manage' as Scope)).toBe(false);
+  });
+
+  it('未知角色无任何 scope', () => {
+    expect(scopesOf(null)).toEqual([]);
+    expect(scopesOf('GUEST')).toEqual([]);
   });
 
   it('销售含财务维护；财务可看订单与客户但不能维护', () => {

@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Input } from '@/components/ui/input';
@@ -14,26 +15,15 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { ROLE_LABELS, type UserRole } from '@mcc/shared';
+import type { ApiSchemas } from '@mcc/shared';
 import { api } from '@/lib/api';
 
 // 审计日志列表页（product/审计日志.md R-审计-001；页面模式见 product/平台布局.md）：
 // 只读查询：时间范围 / 操作人 / 领域 / 动作 / 结果 + 分页；无多选、无批量、无删除。
 
-interface AuditRow {
-  id: string;
-  createdAt: string;
-  actorUsername?: string | null;
-  actorRole?: string | null;
-  domain: string;
-  action: string;
-  actionLabel?: string | null;
-  objectType?: string | null;
-  objectCode?: string | null;
-  result: string;
-  statusCode?: number | null;
-  errorCode?: string | null;
-  ip?: string | null;
-}
+// 表格行 = 契约审计日志，非手写 DTO
+type AuditRow = ApiSchemas['AuditLogItemDto'];
+type AuditLogList = ApiSchemas['AuditLogListDto'];
 
 interface Filters {
   dateFrom: string;
@@ -43,6 +33,8 @@ interface Filters {
   action: string;
   result: '' | 'ok' | 'failed';
 }
+
+const EMPTY_LIST: AuditLogList = { total: 0, items: [] };
 
 const PAGE_SIZE = 20;
 
@@ -79,53 +71,36 @@ export default function AuditLogsPage(): React.ReactElement {
   const [filters, setFilters] = useState<Filters>(initial);
   const [applied, setApplied] = useState<Filters>(initial);
   const [page, setPage] = useState(1);
-  const [rows, setRows] = useState<AuditRow[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      setLoading(true);
-      try {
-        const { data, response } = await api.GET('/api/v1/audit-logs', {
-          params: {
-            query: {
-              page,
-              pageSize: PAGE_SIZE,
-              dateFrom: applied.dateFrom || undefined,
-              dateTo: applied.dateTo || undefined,
-              actor: applied.actor || undefined,
-              domain: applied.domain || undefined,
-              action: applied.action || undefined,
-              result: applied.result || undefined,
-            },
+  const logsQuery = useQuery({
+    queryKey: ['audit-logs', page, applied],
+    queryFn: async (): Promise<AuditLogList> => {
+      const { data: res, response } = await api.GET('/api/v1/audit-logs', {
+        params: {
+          query: {
+            page,
+            pageSize: PAGE_SIZE,
+            dateFrom: applied.dateFrom || undefined,
+            dateTo: applied.dateTo || undefined,
+            actor: applied.actor || undefined,
+            domain: applied.domain || undefined,
+            action: applied.action || undefined,
+            result: applied.result || undefined,
           },
-        });
-        if (!cancelled) {
-          if (response.ok && data) {
-            setRows(data.items);
-            setTotal(data.total);
-            setError(null);
-          } else {
-            setError('加载失败，请稍后重试');
-          }
-        }
-      } catch {
-        if (!cancelled) {
-          setError('加载失败，请稍后重试');
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
+        },
+      });
+      if (!response.ok || !res) {
+        throw new Error('加载失败，请稍后重试');
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [applied, page]);
+      return res;
+    },
+  });
+
+  const data = logsQuery.data ?? EMPTY_LIST;
+  const rows: AuditRow[] = data.items;
+  const total = data.total;
+  const loading = logsQuery.isPending;
+  const error = logsQuery.isError ? '加载失败，请稍后重试' : null;
 
   const submit = (event: React.FormEvent<HTMLFormElement>): void => {
     event.preventDefault();

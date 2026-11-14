@@ -12,7 +12,6 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiBody, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
-import { createHash } from 'node:crypto';
 import {
   customerVolumeSummaryQuerySchema,
   saleOrderBatchDeleteSchema,
@@ -28,7 +27,7 @@ import {
 import { AuditAction } from '../../common/decorators/audit-action.decorator.js';
 import { CurrentUser, type AuthUser } from '../../common/decorators/current-user.decorator.js';
 import { RequireScopes } from '../../common/decorators/require-scopes.decorator.js';
-import { problem } from '../../common/http-problem.js';
+import { withIdempotency } from '../../common/idempotency.js';
 import { RedisService } from '../../common/redis.service.js';
 import { ZodValidationPipe } from '../../common/zod-validation.pipe.js';
 import {
@@ -42,8 +41,6 @@ import {
   SaleOrderUpdateBodyDto,
 } from './dto/order.dto.js';
 import { OrderService } from './order.service.js';
-
-const IDEMPOTENCY_TTL_SECONDS = 86_400;
 
 // 接口清单与路径（design/order.md §5）；契约由装饰器代码生成（ADR-006）。
 @ApiTags('sale-orders')
@@ -106,28 +103,9 @@ export class OrderController {
     @Body(new ZodValidationPipe(saleOrderInputSchema)) body: SaleOrderInput,
   ): Promise<SaleOrderDto> {
     // 幂等（技术方案 §6.3）：同键并发/重复提交返回首请求结果，处理中返回 409
-    if (idempotencyKey) {
-      const key = `idem:sale-orders:${user.userId}:${createHash('sha256')
-        .update(idempotencyKey)
-        .digest('hex')}`;
-      const locked = await this.redis.set(key, 'pending', 'EX', IDEMPOTENCY_TTL_SECONDS, 'NX');
-      if (locked === null) {
-        const previous = await this.redis.get(key);
-        if (previous && previous !== 'pending') {
-          return JSON.parse(previous) as SaleOrderDto;
-        }
-        throw problem(409, 'IN_PROGRESS', '同一请求正在处理中，请勿重复提交');
-      }
-      try {
-        const result = await this.orderService.create(body);
-        await this.redis.set(key, JSON.stringify(result), 'EX', IDEMPOTENCY_TTL_SECONDS);
-        return result;
-      } catch (error) {
-        await this.redis.del(key).catch(() => undefined);
-        throw error;
-      }
-    }
-    return this.orderService.create(body);
+    return withIdempotency(this.redis, user.userId, 'sale-orders', idempotencyKey, () =>
+      this.orderService.create(body),
+    );
   }
 
   @Put(':id')

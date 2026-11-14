@@ -1,7 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
+import { useQueries } from '@tanstack/react-query';
+import type { ApiSchemas } from '@mcc/shared';
 import { buttonVariants } from '@/components/ui/button';
 import { useCan } from '@/components/auth/permission-context';
 import {
@@ -16,69 +18,49 @@ import { cn } from '@/lib/utils';
 
 // 客户移动列表（product/customer.md 移动页）：名称搜索 + 卡片 + 加载更多；
 // 页面骨架与销售单共用 MobileListPage，主操作「新建客户」固定在底部（customer:manage 才显示）。
-interface CustomerListItem {
-  id: string;
-  name: string;
-  contact: string;
-  status: string;
-}
+type CustomerListItem = ApiSchemas['CustomerDto'];
+type CustomerListPage = ApiSchemas['CustomerListDto'];
 
 const PAGE_SIZE = 20;
+
+async function fetchCustomers(page: number, name: string): Promise<CustomerListPage> {
+  const { data: res, response } = await api.GET('/api/v1/customers', {
+    params: {
+      query: {
+        page,
+        pageSize: PAGE_SIZE,
+        name: name || undefined,
+        sortOrder: 'desc',
+      },
+    },
+  });
+  if (!response.ok || !res) {
+    throw new Error('加载失败，请稍后重试');
+  }
+  return res;
+}
 
 export default function MobileCustomersPage(): React.ReactElement {
   const canManage = useCan('customer:manage');
   const [keyword, setKeyword] = useState('');
-  const [query, setQuery] = useState({ keyword: '', page: 1 });
-  const [items, setItems] = useState<CustomerListItem[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [applied, setApplied] = useState('');
+  const [page, setPage] = useState(1);
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    void (async () => {
-      try {
-        const { data, response } = await api.GET('/api/v1/customers', {
-          params: {
-            query: {
-              page: query.page,
-              pageSize: PAGE_SIZE,
-              name: query.keyword || undefined,
-              sortOrder: 'desc',
-            },
-          },
-        });
-        if (cancelled) {
-          return;
-        }
-        if (!response.ok || !data) {
-          setError('加载失败，请稍后重试');
-          return;
-        }
-        setItems((prev) => (query.page === 1 ? data.items : [...prev, ...data.items]));
-        setTotal(data.total);
-        setError(null);
-      } catch {
-        if (!cancelled) {
-          setError('加载失败，请稍后重试');
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [query]);
+  const listQueries = useQueries({
+    queries: Array.from({ length: page }, (_, index) => ({
+      queryKey: ['customers', index + 1, applied],
+      queryFn: () => fetchCustomers(index + 1, applied),
+    })),
+  });
+  const items: CustomerListItem[] = listQueries.flatMap((query) => query.data?.items ?? []);
+  const lastQuery = listQueries[listQueries.length - 1];
+  const total = listQueries.reduce((acc, query) => query.data?.total ?? acc, 0);
+  const loading = listQueries.some((query) => query.isFetching);
+  const error = lastQuery?.isError ? '加载失败，请稍后重试' : null;
 
   const handleSearch = (value?: string): void => {
-    const next = (value ?? keyword).trim();
-    setItems([]);
-    setTotal(0);
-    setQuery({ keyword: next, page: 1 });
+    setApplied((value ?? keyword).trim());
+    setPage(1);
   };
 
   const hasMore = items.length < total;
@@ -127,10 +109,7 @@ export default function MobileCustomersPage(): React.ReactElement {
       ))}
 
       {hasMore ? (
-        <MobileListLoadMore
-          loading={loading}
-          onClick={() => setQuery((prev) => ({ ...prev, page: prev.page + 1 }))}
-        />
+        <MobileListLoadMore loading={loading} onClick={() => setPage((prev) => prev + 1)} />
       ) : null}
     </MobileListPage>
   );
