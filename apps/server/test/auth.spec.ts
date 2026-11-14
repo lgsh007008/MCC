@@ -169,9 +169,9 @@ describe('账号与权限接口（契约/集成）', () => {
       orderBy: { createdAt: 'asc' },
     });
     // 登录成功即留痕（登录为公开接口，无守卫注入主体，actor 为空属预期）；
-    // 凭证失败同样留痕（result=401）
+    // 凭证失败同样留痕：result=failed，具体状态码落 status_code（旧记录才是状态码字符串）
     expect(logs.some((log) => log.result === 'ok')).toBe(true);
-    expect(logs.some((log) => log.result === '401')).toBe(true);
+    expect(logs.some((log) => log.result === 'failed' && log.statusCode === 401)).toBe(true);
   });
 
   it('无 Cookie 端：刷新令牌经请求体传递同样换新访问令牌', async () => {
