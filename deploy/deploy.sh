@@ -51,7 +51,9 @@ if ! ./deploy/renumber-codes.sh; then
 fi
 mark "编号重排完成"
 
-compose pull
+# 只拉应用镜像：postgres / redis 用固定 tag 且已在本机，每次 pull 都会请求 docker.io，
+# 服务器镜像加速器不可用时（TLS 超时）会让整次发布卡在拉取阶段。
+compose pull server web
 mark "镜像拉取完成"
 # 迁移只向前（技术方案 §9.4）；失败即中止，不进入 rebuild
 compose run --rm --no-deps server pnpm --filter @mcc/db exec prisma migrate deploy
