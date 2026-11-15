@@ -15,9 +15,12 @@ import { FinanceCashCard } from '@/components/mobile/finance-cash-card';
 import { MobileListState } from '@/components/mobile/list';
 import { MobileActionBar, MobileHeader } from '@/components/mobile/mobile-shell';
 import { Button, buttonVariants } from '@/components/ui/button';
-import { DatePicker } from '@/components/ui/date-picker';
 import { Segmented } from '@/components/ui/segmented';
 import { Select } from '@/components/ui/select';
+import {
+  MobileDateRangeFields,
+  defaultMobileDateRange,
+} from '@/components/mobile/date-range-fields';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
@@ -36,20 +39,6 @@ interface CashFilters {
 }
 
 const PAGE_SIZE = 20;
-
-const pad = (n: number): string => String(n).padStart(2, '0');
-const localToday = (): string => {
-  const now = new Date();
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-};
-const monthStart = (): string => {
-  const now = new Date();
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`;
-};
-const defaultRange = (): { dateFrom: string; dateTo: string } => ({
-  dateFrom: monthStart(),
-  dateTo: localToday(),
-});
 
 async function fetchCashEntries(
   page: number,
@@ -79,7 +68,7 @@ export default function MobileFinanceCashPage(): React.ReactElement {
   const canManage = useCan('finance:manage');
   const [accountId, setAccountId] = useState('');
   const [filters, setFilters] = useState<CashFilters>({
-    ...defaultRange(),
+    ...defaultMobileDateRange(),
     direction: '',
     category: '',
   });
@@ -146,25 +135,11 @@ export default function MobileFinanceCashPage(): React.ReactElement {
             />
           </div>
 
-          <div className="space-y-1.5">
-            <span className="text-mobile-label text-muted-foreground">日期从</span>
-            <DatePicker
-              value={filters.dateFrom}
-              onChange={(value) => setFilters({ ...filters, dateFrom: value })}
-              size="touch"
-              className="w-full"
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <span className="text-mobile-label text-muted-foreground">日期至</span>
-            <DatePicker
-              value={filters.dateTo}
-              onChange={(value) => setFilters({ ...filters, dateTo: value })}
-              size="touch"
-              className="w-full"
-            />
-          </div>
+          <MobileDateRangeFields
+            dateFrom={filters.dateFrom}
+            dateTo={filters.dateTo}
+            onChange={(next) => setFilters({ ...filters, ...next })}
+          />
 
           <div className="space-y-1.5">
             <span className="text-mobile-label text-muted-foreground">方向</span>
@@ -236,7 +211,7 @@ export default function MobileFinanceCashPage(): React.ReactElement {
               className="h-12 flex-1 text-mobile-body"
               onClick={() => {
                 const defaults: CashFilters = {
-                  ...defaultRange(),
+                  ...defaultMobileDateRange(),
                   direction: '',
                   category: '',
                 };

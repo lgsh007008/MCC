@@ -11,6 +11,7 @@ import { API_PREFIX } from '../src/common/api-prefix.js';
 import { loginFailKey } from '../src/modules/auth/auth.constants.js';
 import { PrismaService } from '../src/common/prisma.service.js';
 import { RedisService } from '../src/common/redis.service.js';
+import { scopedClient, TEST_TENANT_CODE, TEST_TENANT_ID } from './helpers.js';
 
 // auth 接口关键路径（契约/集成层，技术方案 §10）：
 // 登录成功 / 凭证错误 / 参数校验 / 连续失败锁定 / 刷新与撤销 / 修改密码 / 守卫 401。
@@ -20,6 +21,7 @@ describe('账号与权限接口（契约/集成）', () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let redis: RedisService;
+  let db: PrismaService['client'];
   const username = `it-${Date.now()}`;
   const password = 'Secret#12345';
 
@@ -31,25 +33,26 @@ describe('账号与权限接口（契约/集成）', () => {
     app.use(cookieParser());
     await app.init();
     prisma = app.get(PrismaService);
+    db = scopedClient(prisma.client);
     redis = app.get(RedisService);
     // 清掉历史限流计数，避免测试间窗口叠加导致误报 429
     const rateKeys = await redis.keys('rate:*');
     if (rateKeys.length > 0) {
       await redis.del(...rateKeys);
     }
-    await prisma.client.user.create({
-      data: { username, passwordHash: await hash(password), role: 'SALES' },
+    await db.user.create({
+      data: { tenantId: TEST_TENANT_ID, username, passwordHash: await hash(password), role: 'SALES' },
     });
   });
 
   afterAll(async () => {
-    await prisma.client.user.deleteMany({ where: { username: { startsWith: 'it-' } } });
-    await prisma.client.eventLog.deleteMany({ where: { actorUsername: username } });
+    await db.user.deleteMany({ where: { username: { startsWith: 'it-' } } });
+    await db.eventLog.deleteMany({ where: { actorUsername: username } });
     await app.close();
   });
 
   const login = (agent: request.Agent, body: Record<string, unknown>) =>
-    agent.post(`/${API_PREFIX}/auth/login`).send(body);
+    agent.post(`/${API_PREFIX}/auth/login`).send({ tenantCode: TEST_TENANT_CODE, ...body });
 
   it('登录成功：签发访问令牌并种下刷新令牌 Cookie', async () => {
     const res = await login(request.agent(app.getHttpServer()), {
@@ -95,7 +98,7 @@ describe('账号与权限接口（契约/集成）', () => {
     expect(locked.body.code).toBe('AUTH_LOCKED');
 
     // 清理计数（模拟锁定期满）后恢复
-    await redis.del(loginFailKey(username));
+    await redis.del(loginFailKey(TEST_TENANT_CODE, username));
     const recovered = await login(agent, { username, password });
     expect(recovered.status).toBe(200);
   });
@@ -137,7 +140,7 @@ describe('账号与权限接口（契约/集成）', () => {
     const agent = request.agent(app.getHttpServer());
     const loginRes = await agent
       .post(`/${API_PREFIX}/auth/login`)
-      .send({ username, password });
+      .send({ tenantCode: TEST_TENANT_CODE, username, password });
     const accessToken = String(loginRes.body.accessToken);
 
     const change = await agent
@@ -164,7 +167,7 @@ describe('账号与权限接口（契约/集成）', () => {
     await login(agent, { username, password });
     await login(agent, { username, password: 'definitely-wrong' });
 
-    const logs = await prisma.client.eventLog.findMany({
+    const logs = await db.eventLog.findMany({
       where: { domain: 'auth', action: 'login' },
       orderBy: { createdAt: 'asc' },
     });
@@ -175,11 +178,13 @@ describe('账号与权限接口（契约/集成）', () => {
   });
 
   it('无 Cookie 端：刷新令牌经请求体传递同样换新访问令牌', async () => {
-    const user = await prisma.client.user.findFirst({ where: { username } });
+    const user = await db.user.findFirst({ where: { username } });
     expect(user).not.toBeNull();
-    const rawToken = 'body-refresh-token-test';
-    await prisma.client.refreshToken.create({
+    // 刷新令牌格式为 `${tenantId}.${random}`，刷新时先按前缀定位租户
+    const rawToken = `${TEST_TENANT_ID}.body-refresh-token-test`;
+    await db.refreshToken.create({
       data: {
+        tenantId: TEST_TENANT_ID,
         tokenHash: createHash('sha256').update(rawToken).digest('hex'),
         userId: String(user?.id),
         expiresAt: new Date(Date.now() + 60_000),

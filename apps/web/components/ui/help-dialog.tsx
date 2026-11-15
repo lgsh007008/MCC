@@ -3,8 +3,9 @@
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
-// 收支汇总口径说明弹窗的共用展示原子（经营收支 / 资金收付两个弹窗）：
-// 弹窗外壳（固定标题与底部操作、中部滚动）+ 分组标题 + 两列信息条；沿用平台弹窗覆盖层，不单独构成新形态。
+// 口径说明弹窗的共用展示原子（product/平台布局.md「弹窗说明（只读）」）：
+// 弹窗外壳（固定标题与底部操作、中部滚动）+ 分组标题 + 两列信息条；
+// 财务两个口径弹窗与生产三个口径弹窗共用，不按域各建一份。
 
 export function HelpDialogShell({
   open,

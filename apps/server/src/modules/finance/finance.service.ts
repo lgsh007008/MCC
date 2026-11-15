@@ -22,6 +22,7 @@ import {
 } from '@mcc/shared';
 import { problem } from '../../common/http-problem.js';
 import { PrismaService } from '../../common/prisma.service.js';
+import { currentTenantId } from '../../common/prisma-tenant.extension.js';
 import { CustomerService } from '../customer/index.js';
 import { SupplierService } from '../supplier/index.js';
 import type { FinanceSummaryDto } from './dto/finance.dto.js';
@@ -349,7 +350,7 @@ export class FinanceService {
       return;
     }
     const code = await this.nextCashCode(tx);
-    await tx.financeCashEntry.create({ data: { code, ...data } });
+    await tx.financeCashEntry.create({ data: { tenantId: currentTenantId(), code, ...data } });
   }
 
   async removeSourceCashEntries(
@@ -455,6 +456,7 @@ export class FinanceService {
           const code = await this.nextAccountCode(tx);
           return tx.financeAccount.create({
             data: {
+              tenantId: currentTenantId(),
               code,
               name: input.name,
               kind: ACCOUNT_KIND_TO_DB[input.kind],
@@ -678,6 +680,7 @@ export class FinanceService {
           const code = await this.nextCashCode(tx);
           return tx.financeCashEntry.create({
             data: {
+              tenantId: currentTenantId(),
               code,
               direction: CASH_DIRECTION_TO_DB[input.direction],
               occurredDate: toDate(input.occurredDate),

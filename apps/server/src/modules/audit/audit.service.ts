@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@mcc/db';
 import type { AuditLogQuery } from '@mcc/shared';
 import { PrismaService } from '../../common/prisma.service.js';
+import { currentTenantId } from '../../common/prisma-tenant.extension.js';
 import type { AuditLogItemDto, AuditLogListDto } from './dto/audit.dto.js';
 
 export interface AuditWriteInput {
@@ -37,6 +38,7 @@ export class AuditService {
     try {
       await this.prisma.client.eventLog.create({
         data: {
+          tenantId: currentTenantId(),
           actorId: input.actorId ?? null,
           actorUsername: input.actorUsername ?? null,
           actorRole: input.actorRole ?? null,

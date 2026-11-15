@@ -25,6 +25,7 @@ test('销售单现结：实收与差额、自动收款流水、改赊销回退',
   const customerName = `e2e 现结客户-${stamp}`;
 
   await page.goto('/login');
+  await page.getByPlaceholder('如 TN-00001').fill('TN-00001');
   await page.getByPlaceholder('请输入账号').fill('admin');
   await page.getByPlaceholder('请输入密码').fill('Mcc@2026');
   await page.getByRole('button', { name: '登录' }).click();
@@ -78,7 +79,11 @@ test('销售单现结：实收与差额、自动收款流水、改赊销回退',
     await page.getByLabel('实收金额').fill('580.00');
     await expect(page.getByText('差额 20.00')).toBeVisible();
     await page.getByRole('button', { name: '保存' }).click();
-
+    await page
+      .getByRole('button', { name: '仍然保存' })
+      .waitFor({ state: 'visible', timeout: 1500 })
+      .then(() => page.getByRole('button', { name: '仍然保存' }).click())
+      .catch(() => {});
     await expect(page).toHaveURL(/\/admin\/sale-orders\/[0-9a-f-]{36}$/);
     orderId = page.url().split('/').pop() ?? '';
     await expect(page.getByText('现结', { exact: true })).toBeVisible();
@@ -98,6 +103,11 @@ test('销售单现结：实收与差额、自动收款流水、改赊销回退',
     await page.getByLabel('结算方式').click();
     await page.getByRole('option', { name: '赊销' }).click();
     await page.getByRole('button', { name: '保存' }).click();
+    await page
+      .getByRole('button', { name: '仍然保存' })
+      .waitFor({ state: 'visible', timeout: 1500 })
+      .then(() => page.getByRole('button', { name: '仍然保存' }).click())
+      .catch(() => {});
     await expect(page).toHaveURL(/\/admin\/sale-orders\/[0-9a-f-]{36}$/);
     await page.goto('/admin/finance/cash');
     await expect(page.getByRole('row').filter({ hasText: '销售单 SO-' })).toHaveCount(0);

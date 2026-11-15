@@ -4,6 +4,26 @@
  */
 
 export interface paths {
+    "/api/v1/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 健康检查
+         * @description 外部探活使用，不校验登录态
+         */
+        get: operations["HealthController_check"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/audit-logs": {
         parameters: {
             query?: never;
@@ -21,6 +41,162 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ops/audit-logs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 平台审计列表：时间范围、操作人、动作、目标租户、结果 + 分页 */
+        get: operations["PlatformAuditController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ops/tenants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 租户列表：编号/名称模糊、状态、套餐 + 分页（账号数由 auth 批量接口前端组合） */
+        get: operations["TenantController_list"];
+        put?: never;
+        /** 开通租户：编号自动生成；只建租户，管理员由前端第二步补建 */
+        post: operations["TenantController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ops/tenants/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 租户详情：套餐、覆盖项、有效功能（不含账号数） */
+        get: operations["TenantController_detail"];
+        /** 更新租户名称与备注 */
+        put: operations["TenantController_update"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ops/tenants/{id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** 停用 / 启用租户；停用使 session_epoch + 1，旧令牌立即失效 */
+        patch: operations["TenantController_setStatus"];
+        trace?: never;
+    };
+    "/api/v1/ops/tenants/{id}/plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** 改套餐：校验目标套餐启用态，返回功能差异与额度变化 */
+        put: operations["TenantController_changePlan"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ops/tenants/{id}/features": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** 全量提交功能覆盖项（只含与套餐不同的项），返回有效功能 */
+        put: operations["TenantController_setFeatures"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ops/plans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 套餐列表（含使用该套餐的租户数） */
+        get: operations["PlanController_list"];
+        put?: never;
+        /** 新建套餐（名称唯一；功能只含可售功能；账号额度） */
+        post: operations["PlanController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ops/plans/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** 更新套餐名称、功能集合、账号额度与备注 */
+        put: operations["PlanController_update"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ops/plans/{id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** 停用 / 启用套餐；停用后不可被新租户选择，存量租户不受影响 */
+        patch: operations["PlanController_setStatus"];
+        trace?: never;
+    };
     "/api/v1/auth/login": {
         parameters: {
             query?: never;
@@ -30,7 +206,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** 登录：校验账号密码，签发访问令牌 + 刷新令牌 */
+        /** 登录：租户编号 + 账号 + 密码，签发访问令牌 + 刷新令牌 */
         post: operations["AuthController_login"];
         delete?: never;
         options?: never;
@@ -152,6 +328,178 @@ export interface paths {
         put?: never;
         /** 重置账号密码并撤销该账号全部刷新会话 */
         post: operations["UsersController_resetPassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ops/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 平台运营登录：签发平台访问令牌 + 平台刷新令牌 */
+        post: operations["PlatformAuthController_login"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ops/auth/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 凭 ops_refresh_token Cookie（或请求体）换新平台访问令牌 */
+        post: operations["PlatformAuthController_refresh"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ops/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 撤销平台刷新令牌，登出 */
+        post: operations["PlatformAuthController_logout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ops/auth/change-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 平台账号改密；成功后撤销该账号全部平台刷新会话 */
+        post: operations["PlatformAuthController_changePassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ops/accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 平台运营账号列表（不含密码） */
+        get: operations["PlatformUsersController_listPlatformUsers"];
+        put?: never;
+        /** 新建平台运营账号（全局唯一；初始密码至少 8 位） */
+        post: operations["PlatformUsersController_createPlatformUser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ops/accounts/{id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** 启用 / 停用平台账号（不能停用自己或最后一个启用平台管理员） */
+        patch: operations["PlatformUsersController_setPlatformUserStatus"];
+        trace?: never;
+    };
+    "/api/v1/ops/accounts/{id}/reset-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 重置平台账号密码并撤销其全部平台刷新会话 */
+        post: operations["PlatformUsersController_resetPlatformUserPassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ops/tenant-account-counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 批量租户账号数（未删除、含停用；平台账号不计入） */
+        get: operations["PlatformUsersController_tenantAccountCounts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ops/tenants/{tenantId}/admins": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 租户 ADMIN 账号列表（跨租户受控作用域） */
+        get: operations["PlatformUsersController_tenantAdmins"];
+        put?: never;
+        /** 补建 / 新增租户管理员（校验套餐额度） */
+        post: operations["PlatformUsersController_createTenantAdmin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ops/tenants/{tenantId}/admins/{userId}/reset-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 重置租户管理员密码并撤销该账号刷新会话 */
+        post: operations["PlatformUsersController_resetTenantAdminPassword"];
         delete?: never;
         options?: never;
         head?: never;
@@ -509,6 +857,200 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/material-issues": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 原木领用列表：领用日期区间 + 分页；含领用吨数合计 */
+        get: operations["ProductionController_listIssues"];
+        put?: never;
+        /** 新建原木领用；重复提交防抖：请求头 Idempotency-Key */
+        post: operations["ProductionController_createIssue"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/material-issues/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 原木领用详情 */
+        get: operations["ProductionController_issueDetail"];
+        /** 更新原木领用 */
+        put: operations["ProductionController_updateIssue"];
+        post?: never;
+        /** 删除原木领用（软删除，编号不回收） */
+        delete: operations["ProductionController_removeIssue"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/material-issues/batch-delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 批量删除原木领用（软删除；不存在/已删行静默跳过） */
+        post: operations["ProductionController_batchDeleteIssues"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/production-outputs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 方木产出列表：产出日期区间 + 分页；含产出总方数合计 */
+        get: operations["ProductionController_listOutputs"];
+        put?: never;
+        /** 新建方木产出；重复提交防抖：请求头 Idempotency-Key */
+        post: operations["ProductionController_createOutput"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/production-outputs/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 方木产出详情（含产出明细） */
+        get: operations["ProductionController_outputDetail"];
+        /** 更新方木产出（整单提交，产出明细同步） */
+        put: operations["ProductionController_updateOutput"];
+        post?: never;
+        /** 删除方木产出（软删除，编号不回收） */
+        delete: operations["ProductionController_removeOutput"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/production-outputs/batch-delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 批量删除方木产出（软删除；不存在/已删行静默跳过） */
+        post: operations["ProductionController_batchDeleteOutputs"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inventory/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 当前库存汇总：原木 / 方木库存、成本、总值、负库存与期初状态 */
+        get: operations["ProductionController_inventorySummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inventory/openings/current": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 当前期初库存只读详情（头 + 原木 / 方木明细） */
+        get: operations["ProductionController_openingCurrent"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inventory/counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 盘点记录列表：类型 + 日期区间 + 分页；含操作人、盘盈 / 盘亏项数与差异金额 */
+        get: operations["ProductionController_countList"];
+        put?: never;
+        /** 库存盘点（IC 编号；单类型、实盘可空、原因可选；Idempotency-Key） */
+        post: operations["ProductionController_createCount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inventory/counts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 盘点记录详情（头含盘点类型 + 明细） */
+        get: operations["ProductionController_countDetail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inventory/openings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 设置库存期初（IC 编号；仅允许一次；Idempotency-Key） */
+        post: operations["ProductionController_createOpening"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/sale-orders": {
         parameters: {
             query?: never;
@@ -538,6 +1080,40 @@ export interface paths {
         get: operations["OrderController_customerVolumeSummary"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sale-orders/{id}/profit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 销售单材料毛利快照（成本待补时毛利为 null） */
+        get: operations["OrderController_profit"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sale-orders/{id}/recalculate-cost": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 重算成本待补订单的材料成本；仅 PENDING 可重算，成功后锁定 */
+        post: operations["OrderController_recalculateCost"];
         delete?: never;
         options?: never;
         head?: never;
@@ -702,7 +1278,182 @@ export interface components {
             total: number;
             items: components["schemas"]["AuditLogItemDto"][];
         };
+        PlatformAuditLogItemDto: {
+            id: string;
+            /** @description ISO 时间 */
+            createdAt: string;
+            actorId?: string | null;
+            actorUsername?: string | null;
+            /** @description 领域 */
+            domain: string;
+            /** @description 动作标识 */
+            action: string;
+            /** @description 中文动作名 */
+            actionLabel?: string | null;
+            /** @description 目标租户 id 快照 */
+            targetTenantId?: string | null;
+            /** @description 目标租户编号快照 */
+            targetTenantCode?: string | null;
+            /** @description 目标租户名称快照 */
+            targetTenantName?: string | null;
+            objectType?: string | null;
+            objectId?: string | null;
+            objectCode?: string | null;
+            /** @description ok / failed */
+            result: string;
+            statusCode?: number | null;
+            errorCode?: string | null;
+            ip?: string | null;
+            userAgent?: string | null;
+            requestId?: string | null;
+        };
+        PlatformAuditLogListDto: {
+            /** @description 筛选后总数 */
+            total: number;
+            items: components["schemas"]["PlatformAuditLogItemDto"][];
+        };
+        TenantListItemDto: {
+            id: string;
+            /** @description 租户编号（登录标识） */
+            code: string;
+            name: string;
+            planId: string;
+            planName: string;
+            /** @enum {string} */
+            status: "active" | "suspended";
+            /** @description 套餐账号额度（账号数由 auth 批量接口前端组合） */
+            maxAccounts: number;
+            note: string;
+            /** @description 创建时间（ISO） */
+            createdAt: string;
+        };
+        TenantListDto: {
+            /** @description 筛选后总数 */
+            total: number;
+            items: components["schemas"]["TenantListItemDto"][];
+        };
+        TenantFeatureOverrideDto: {
+            /** @description 可售功能标识 */
+            featureCode: string;
+            /** @description true = 加购启用；false = 关闭 */
+            enabled: boolean;
+        };
+        TenantDetailDto: {
+            id: string;
+            code: string;
+            name: string;
+            planId: string;
+            planName: string;
+            /** @enum {string} */
+            status: "active" | "suspended";
+            maxAccounts: number;
+            note: string;
+            createdAt: string;
+            /** @description 有效功能（基础功能 ∪ 套餐功能 + 覆盖） */
+            effectiveFeatures: string[];
+            /** @description 只含与套餐不同的覆盖项 */
+            overrides: components["schemas"]["TenantFeatureOverrideDto"][];
+        };
+        TenantCreateBodyDto: {
+            /**
+             * @description 租户名称
+             * @example 梅好木业
+             */
+            name: string;
+            /** @description 套餐 id */
+            planId: string;
+            /**
+             * @description 备注
+             * @default
+             */
+            note: string;
+        };
+        TenantUpdateBodyDto: {
+            /** @description 租户名称 */
+            name: string;
+            /**
+             * @description 备注
+             * @default
+             */
+            note: string;
+        };
+        TenantStatusBodyDto: {
+            /**
+             * @description 启用 / 停用
+             * @enum {string}
+             */
+            status: "active" | "suspended";
+        };
+        TenantPlanBodyDto: {
+            /** @description 目标套餐 id（须为启用态） */
+            planId: string;
+        };
+        TenantPlanChangeDto: {
+            planId: string;
+            planName: string;
+            /** @description 新套餐账号额度 */
+            maxAccounts: number;
+            effectiveFeatures: string[];
+            /** @description 改套餐后新增的功能 */
+            added: string[];
+            /** @description 改套餐后失去的功能 */
+            removed: string[];
+        };
+        TenantFeaturesBodyDto: {
+            /** @description 全量提交覆盖项（只含与套餐不同的项） */
+            overrides: components["schemas"]["TenantFeatureOverrideDto"][];
+        };
+        PlanDto: {
+            id: string;
+            name: string;
+            /** @description 账号额度 */
+            maxAccounts: number;
+            /** @enum {string} */
+            status: "active" | "inactive";
+            /** @description 套餐包含的可售功能 */
+            featureCodes: string[];
+            note: string;
+            /** @description 使用该套餐的租户数 */
+            tenantCount: number;
+            createdAt: string;
+        };
+        PlanListDto: {
+            /** @description 总数 */
+            total: number;
+            items: components["schemas"]["PlanDto"][];
+        };
+        PlanCreateBodyDto: {
+            /**
+             * @description 套餐名称（唯一）
+             * @example 标准版
+             */
+            name: string;
+            /**
+             * @description 账号额度（0 表示不可新建账号）
+             * @example 20
+             */
+            maxAccounts: number;
+            /** @description 可售功能标识集合 */
+            featureCodes: string[];
+            /**
+             * @description 备注
+             * @default
+             */
+            note: string;
+        };
+        PlanStatusBodyDto: {
+            /**
+             * @description 启用 / 停用
+             * @enum {string}
+             */
+            status: "active" | "inactive";
+        };
         LoginBodyDto: {
+            /**
+             * @description 租户编号（登录标识）
+             * @example TN-00001
+             */
+            tenantCode: string;
             /**
              * @description 账号，一人一号
              * @example admin
@@ -726,6 +1477,8 @@ export interface components {
             username: string;
             /** @description 角色：ADMIN / SALES / FINANCE / WORKER */
             role: string;
+            /** @description 租户有效功能（菜单按 feature ∩ scope 裁剪） */
+            features: string[];
         };
         RefreshRequestDto: {
             /** @description 无 Cookie 客户端经请求体传递刷新令牌；web 走 Cookie 时无需此字段 */
@@ -734,6 +1487,8 @@ export interface components {
         RefreshResponseDto: {
             /** @description 新签发的访问令牌 */
             accessToken: string;
+            /** @description 租户有效功能（刷新后重新下发，菜单据此裁剪） */
+            features: string[];
         };
         ChangePasswordBodyDto: {
             /** @description 旧密码 */
@@ -761,10 +1516,18 @@ export interface components {
             /** @description 创建时间（ISO） */
             createdAt: string;
         };
+        UserQuotaDto: {
+            /** @description 未删除账号数（含停用） */
+            used: number;
+            /** @description 套餐账号额度 */
+            maxAccounts: number;
+        };
         UserListDto: {
-            /** @description 总数 */
+            /** @description 筛选后总数 */
             total: number;
             items: components["schemas"]["UserDto"][];
+            /** @description 账号额度（账号管理页显示与新建校验） */
+            quota: components["schemas"]["UserQuotaDto"];
         };
         UserCreateBodyDto: {
             /**
@@ -802,6 +1565,103 @@ export interface components {
              * @description 新密码（至少 8 位）
              * @example Mcc@2026
              */
+            password: string;
+        };
+        PlatformLoginBodyDto: {
+            /**
+             * @description 平台账号
+             * @example opsadmin
+             */
+            username: string;
+            /**
+             * @description 密码
+             * @example Mcc@2026
+             */
+            password: string;
+            /**
+             * @description 记住登录：勾选 → 刷新令牌 30 天；不勾选 → 会话级
+             * @default false
+             */
+            rememberMe: boolean;
+        };
+        PlatformLoginResponseDto: {
+            /** @description 平台访问令牌，存内存并以 Bearer 请求头携带 */
+            accessToken: string;
+            /** @description 平台账号名 */
+            username: string;
+            /** @description 平台角色（当前仅 PLATFORM_ADMIN） */
+            role: string;
+        };
+        PlatformRefreshRequestDto: {
+            /** @description 无 Cookie 客户端经请求体传递刷新令牌；web 走 Cookie 时无需此字段 */
+            refreshToken?: string;
+        };
+        PlatformRefreshResponseDto: {
+            /** @description 新签发的平台访问令牌 */
+            accessToken: string;
+        };
+        PlatformUserDto: {
+            id: string;
+            username: string;
+            role: string;
+            roleLabel: string;
+            /** @enum {string} */
+            status: "active" | "inactive";
+            createdAt: string;
+        };
+        PlatformUserListDto: {
+            total: number;
+            items: components["schemas"]["PlatformUserDto"][];
+        };
+        PlatformUserCreateBodyDto: {
+            /** @description 平台账号（全局唯一） */
+            username: string;
+            /** @description 初始密码（至少 8 位） */
+            password: string;
+            /**
+             * @description 平台角色
+             * @enum {string}
+             */
+            role: "PLATFORM_ADMIN";
+        };
+        PlatformUserStatusBodyDto: {
+            /**
+             * @description 启用 / 停用
+             * @enum {string}
+             */
+            status: "active" | "inactive";
+        };
+        PlatformUserResetPasswordBodyDto: {
+            /** @description 新密码（至少 8 位） */
+            password: string;
+        };
+        TenantAccountCountDto: {
+            tenantId: string;
+            /** @description 未删除账号数（含停用；平台账号不计入） */
+            accountCount: number;
+        };
+        TenantAccountCountsDto: {
+            items: components["schemas"]["TenantAccountCountDto"][];
+        };
+        TenantAdminDto: {
+            id: string;
+            username: string;
+            /** @enum {string} */
+            status: "active" | "inactive";
+            createdAt: string;
+        };
+        TenantAdminListDto: {
+            total: number;
+            items: components["schemas"]["TenantAdminDto"][];
+        };
+        TenantAdminCreateBodyDto: {
+            /** @description 账号（租户内唯一） */
+            username: string;
+            /** @description 初始密码（至少 8 位） */
+            password: string;
+        };
+        TenantAdminResetPasswordBodyDto: {
+            /** @description 新密码（至少 8 位） */
             password: string;
         };
         CustomerDto: {
@@ -1157,6 +2017,389 @@ export interface components {
              */
             note: string;
         };
+        MaterialIssueSummaryDto: {
+            /** @description 领用吨数合计（3 位小数） */
+            tons: string;
+        };
+        MaterialIssueDto: {
+            id: string;
+            /** @description 编号 MI-##### */
+            code: string;
+            /** @description 领用日期 */
+            issueDate: string;
+            /** @description 领用原木吨数（3 位小数） */
+            tons: string;
+            note: string;
+            /** @description 结转状态：pending 待结转 / settled 已结转 */
+            settlementStatus: string;
+            /** @description 已结转金额（2 位小数） */
+            settledAmount: string;
+            /** @description 待结转金额（2 位小数） */
+            pendingAmount: string;
+            /** @description 结转过本单的产出单编号（按事件顺序） */
+            settledByCodes: string[];
+            createdAt: string;
+        };
+        MaterialIssueListDto: {
+            total: number;
+            summary: components["schemas"]["MaterialIssueSummaryDto"];
+            items: components["schemas"]["MaterialIssueDto"][];
+        };
+        MaterialIssueBodyDto: {
+            /**
+             * @description 领用日期
+             * @example 2026-11-15
+             */
+            issueDate: string;
+            /**
+             * @description 领用原木吨数（3 位小数）
+             * @example 5.000
+             */
+            tons: string;
+            /**
+             * @description 备注
+             * @default
+             */
+            note: string;
+        };
+        MaterialIssueBatchDeleteBodyDto: {
+            /** @description 原木领用单 id 列表（1~200） */
+            ids: string[];
+        };
+        MaterialIssueBatchDeleteResponseDto: {
+            /** @description 实际删除条数 */
+            deleted: number;
+        };
+        ProductionOutputSummaryDto: {
+            /** @description 产出总方数（4 位小数） */
+            totalVolume: string;
+        };
+        ProductionOutputListItemDto: {
+            id: string;
+            /** @description 编号 PR-##### */
+            code: string;
+            /** @description 产出日期 */
+            outputDate: string;
+            /** @description 产出明细行数 */
+            lineCount: number;
+            /** @description 产出总方数（4 位小数） */
+            totalVolume: string;
+            /** @description 本次结转金额（2 位小数） */
+            settledAmount: string;
+            note: string;
+            createdAt: string;
+        };
+        ProductionOutputListDto: {
+            total: number;
+            summary: components["schemas"]["ProductionOutputSummaryDto"];
+            items: components["schemas"]["ProductionOutputListItemDto"][];
+        };
+        ProductionOutputLineDto: {
+            id: string;
+            seq: number;
+            lengthMm: number;
+            widthMm: number;
+            heightMm: number;
+            pieces: number;
+            /** @description 方量（m³，4 位小数） */
+            volumeM3: string;
+            note: string;
+        };
+        ProductionOutputDto: {
+            id: string;
+            /** @description 编号 PR-##### */
+            code: string;
+            /** @description 产出日期 */
+            outputDate: string;
+            /** @description 产出明细行数 */
+            lineCount: number;
+            /** @description 产出总方数（4 位小数） */
+            totalVolume: string;
+            /** @description 本次结转金额（2 位小数） */
+            settledAmount: string;
+            note: string;
+            createdAt: string;
+            /** @description 来源领用单编号（按最早未结转先结转推导） */
+            sourceIssueCodes: string[];
+            outputs: components["schemas"]["ProductionOutputLineDto"][];
+        };
+        ProductionOutputLineBodyDto: {
+            /**
+             * @description 长度（净尺寸，整数毫米）
+             * @example 3000
+             */
+            lengthMm: number;
+            /**
+             * @description 宽度（净尺寸，整数毫米）
+             * @example 100
+             */
+            widthMm: number;
+            /**
+             * @description 高度（净尺寸，整数毫米）
+             * @example 20
+             */
+            heightMm: number;
+            /**
+             * @description 根数（正整数）
+             * @example 10
+             */
+            pieces: number;
+            /**
+             * @description 行备注
+             * @default
+             */
+            note: string;
+        };
+        ProductionOutputBodyDto: {
+            /**
+             * @description 产出日期
+             * @example 2026-11-15
+             */
+            outputDate: string;
+            /**
+             * @description 备注
+             * @default
+             */
+            note: string;
+            /** @description 产出明细（至少一行） */
+            outputs: components["schemas"]["ProductionOutputLineBodyDto"][];
+        };
+        ProductionOutputLineUpdateBodyDto: {
+            /**
+             * @description 长度（净尺寸，整数毫米）
+             * @example 3000
+             */
+            lengthMm: number;
+            /**
+             * @description 宽度（净尺寸，整数毫米）
+             * @example 100
+             */
+            widthMm: number;
+            /**
+             * @description 高度（净尺寸，整数毫米）
+             * @example 20
+             */
+            heightMm: number;
+            /**
+             * @description 根数（正整数）
+             * @example 10
+             */
+            pieces: number;
+            /**
+             * @description 行备注
+             * @default
+             */
+            note: string;
+            /** @description 已有产出行 id（编辑时携带） */
+            id?: string;
+        };
+        ProductionOutputUpdateBodyDto: {
+            /**
+             * @description 产出日期
+             * @example 2026-11-15
+             */
+            outputDate: string;
+            /**
+             * @description 备注
+             * @default
+             */
+            note: string;
+            /** @description 产出明细（至少一行；已有行带 id） */
+            outputs: components["schemas"]["ProductionOutputLineUpdateBodyDto"][];
+        };
+        ProductionOutputBatchDeleteBodyDto: {
+            /** @description 方木产出单 id 列表（1~200） */
+            ids: string[];
+        };
+        ProductionOutputBatchDeleteResponseDto: {
+            /** @description 实际删除条数 */
+            deleted: number;
+        };
+        InventoryPoolDto: {
+            /** @description 数量：原木吨数 / 方木方数 */
+            quantity: string;
+            /** @description 平均成本：元/吨 或 元/m³（6 位） */
+            unitCost: string;
+            /** @description 库存金额 */
+            amount: string;
+            /** @description 是否为负库存 */
+            negative: boolean;
+        };
+        InventoryTimberLineDto: {
+            productType: string;
+            lengthMm: number;
+            widthMm: number;
+            heightMm: number;
+            quantity: string;
+            unitCost: string;
+            amount: string;
+            negative: boolean;
+        };
+        InventorySummaryDto: {
+            /** @description 是否尚未设置期初库存 */
+            needsOpening: boolean;
+            /** @description 期初日期 */
+            openingDate: string | null;
+            raw: components["schemas"]["InventoryPoolDto"];
+            timber: components["schemas"]["InventoryPoolDto"];
+            timberLines: components["schemas"]["InventoryTimberLineDto"][];
+            totalAmount: string;
+            /** @description 待结转成本（不计入库存总值） */
+            pendingAmount: string;
+            /** @description 待结转的领用单笔数 */
+            pendingIssueCount: number;
+            /** @description 最早一笔待结转领用单编号 */
+            earliestPendingIssueCode: string | null;
+            /** @description 最早一笔待结转领用单日期 */
+            earliestPendingIssueDate: string | null;
+            negativeLineCount: number;
+        };
+        InventoryAdjustmentItemDto: {
+            /** @enum {string} */
+            targetType: "raw_log" | "timber";
+            lengthMm: number | null;
+            widthMm: number | null;
+            heightMm: number | null;
+            bookQuantity: string;
+            actualQuantity: string;
+            differenceQuantity: string;
+            unitCost: string;
+            amount: string;
+            /**
+             * @description 差异原因；盘点未填时按 other 落库
+             * @enum {string}
+             */
+            reason: "opening" | "measurement" | "missing" | "damage" | "other";
+            note: string;
+        };
+        InventoryOpeningDetailDto: {
+            id: string;
+            code: string;
+            openingDate: string;
+            /** @description 操作人；存量数据为空时显示「—」 */
+            operatorName: string;
+            note: string;
+            createdAt: string;
+            totalAmount: string;
+            items: components["schemas"]["InventoryAdjustmentItemDto"][];
+        };
+        InventoryCountListItemDto: {
+            id: string;
+            code: string;
+            /**
+             * @description 盘点类型
+             * @enum {string}
+             */
+            targetType: "raw_log" | "timber";
+            adjustmentDate: string;
+            operatorName: string;
+            gainCount: number;
+            lossCount: number;
+            /** @description 原木差异吨数 */
+            rawDifferenceTons: string;
+            /** @description 方木差异方数 */
+            timberDifferenceVolume: string;
+            /** @description 差异金额合计（盘盈为正、盘亏为负） */
+            differenceAmount: string;
+            note: string;
+            createdAt: string;
+        };
+        InventoryCountListDto: {
+            total: number;
+            items: components["schemas"]["InventoryCountListItemDto"][];
+        };
+        InventoryCountDetailDto: {
+            id: string;
+            code: string;
+            /**
+             * @description 盘点类型
+             * @enum {string}
+             */
+            targetType: "raw_log" | "timber";
+            adjustmentDate: string;
+            operatorName: string;
+            note: string;
+            createdAt: string;
+            items: components["schemas"]["InventoryAdjustmentItemDto"][];
+        };
+        InventoryOpeningRawBodyDto: {
+            /** @description 期初原木吨数（4 位以内小数） */
+            quantity: string;
+            /** @description 单位成本（元/吨，6 位以内小数）；与金额二选一 */
+            unitCost?: string;
+            /** @description 期初金额（元，2 位小数）；与单位成本二选一 */
+            amount?: string;
+        };
+        InventoryOpeningTimberBodyDto: {
+            lengthMm: number;
+            widthMm: number;
+            heightMm: number;
+            /** @description 期初方木方数 */
+            quantity: string;
+            /** @description 单位成本（元/m³） */
+            unitCost?: string;
+            /** @description 期初金额（元） */
+            amount?: string;
+        };
+        InventoryOpeningBodyDto: {
+            /** @description 期初日期 */
+            openingDate: string;
+            /**
+             * @description 备注
+             * @default
+             */
+            note: string;
+            rawLog: components["schemas"]["InventoryOpeningRawBodyDto"];
+            timber: components["schemas"]["InventoryOpeningTimberBodyDto"][];
+        };
+        InventoryAdjustmentResultDto: {
+            id: string;
+            /** @description IC 编号 */
+            code: string;
+            /** @enum {string} */
+            type: "opening" | "count";
+            /** @description 调整日期 */
+            adjustmentDate: string;
+        };
+        InventoryCountRawBodyDto: {
+            /** @description 原木实盘吨数；留空表示本行不参与本次盘点 */
+            actualQuantity?: string;
+            /**
+             * @description 差异原因；选填，留空按 other 落库
+             * @enum {string}
+             */
+            reason?: "measurement" | "missing" | "damage" | "other";
+        };
+        InventoryCountTimberBodyDto: {
+            lengthMm: number;
+            widthMm: number;
+            heightMm: number;
+            /** @description 方木实盘方数；留空表示本行不参与本次盘点 */
+            actualQuantity?: string;
+            /**
+             * @description 差异原因；选填，留空按 other 落库
+             * @enum {string}
+             */
+            reason?: "measurement" | "missing" | "damage" | "other";
+        };
+        InventoryCountBodyDto: {
+            /**
+             * @description 盘点类型：一张单只盘一类库存
+             * @enum {string}
+             */
+            targetType: "raw_log" | "timber";
+            /** @description 盘点日期；不早于期初日期、不晚于今天 */
+            countDate: string;
+            /**
+             * @description 备注
+             * @default
+             */
+            note: string;
+            /** @description 原木盘点行（targetType = raw_log 时必填） */
+            rawLog?: components["schemas"]["InventoryCountRawBodyDto"];
+            /** @description 方木盘点行（targetType = timber 时使用） */
+            timber?: components["schemas"]["InventoryCountTimberBodyDto"][];
+        };
         SaleOrderSummaryDto: {
             /** @description 合计方量（筛选全量） */
             totalVolume: string;
@@ -1209,6 +2452,27 @@ export interface components {
         CustomerVolumeSummaryDto: {
             /** @description 按请求的客户 id 顺序返回 */
             items: components["schemas"]["CustomerVolumeSummaryItemDto"][];
+        };
+        SaleOrderProfitDto: {
+            orderId: string;
+            code: string;
+            /** @description 确认收入：现结取实收、赊销取合计 */
+            revenue: string;
+            /** @description 下单时方木平均成本（元/m³） */
+            materialUnitCost: string | null;
+            /** @description 材料成本快照金额 */
+            materialCostAmount: string;
+            /**
+             * @description 成本状态：待补 / 已锁定
+             * @enum {string}
+             */
+            materialCostStatus: "pending" | "final";
+            /** @description 材料毛利；待补时为 null */
+            materialProfit: string | null;
+            /** @description 材料毛利率（百分比，2 位）；待补时为 null */
+            materialMargin: string | null;
+            /** @description 快照时间 */
+            snapshottedAt: string | null;
         };
         SaleOrderItemResponseDto: {
             /** @description 明细行 id */
@@ -1537,6 +2801,24 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    HealthController_check: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 服务存活 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     AuditController_list: {
         parameters: {
             query?: {
@@ -1569,6 +2851,310 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AuditLogListDto"];
+                };
+            };
+        };
+    };
+    PlatformAuditController_list: {
+        parameters: {
+            query?: {
+                /** @description 每页条数，默认 20（最大 100） */
+                pageSize?: number;
+                /** @description 页码，默认 1 */
+                page?: number;
+                /** @description 结果 */
+                result?: "ok" | "failed";
+                /** @description 目标租户编号/名称模糊 */
+                targetTenant?: string;
+                /** @description 动作标识 */
+                action?: string;
+                /** @description 操作人账号模糊 */
+                actor?: string;
+                /** @description 结束日期 YYYY-MM-DD */
+                dateTo?: string;
+                /** @description 开始日期 YYYY-MM-DD */
+                dateFrom?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformAuditLogListDto"];
+                };
+            };
+        };
+    };
+    TenantController_list: {
+        parameters: {
+            query?: {
+                /** @description 每页条数，默认 20（最大 100） */
+                pageSize?: number;
+                /** @description 页码，默认 1 */
+                page?: number;
+                /** @description 套餐 id */
+                planId?: string;
+                /** @description 状态 */
+                status?: "active" | "suspended";
+                /** @description 租户名称模糊 */
+                name?: string;
+                /** @description 租户编号模糊 */
+                code?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TenantListDto"];
+                };
+            };
+        };
+    };
+    TenantController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TenantCreateBodyDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TenantDetailDto"];
+                };
+            };
+        };
+    };
+    TenantController_detail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TenantDetailDto"];
+                };
+            };
+        };
+    };
+    TenantController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TenantUpdateBodyDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TenantDetailDto"];
+                };
+            };
+        };
+    };
+    TenantController_setStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TenantStatusBodyDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TenantDetailDto"];
+                };
+            };
+        };
+    };
+    TenantController_changePlan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TenantPlanBodyDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TenantPlanChangeDto"];
+                };
+            };
+        };
+    };
+    TenantController_setFeatures: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TenantFeaturesBodyDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TenantDetailDto"];
+                };
+            };
+        };
+    };
+    PlanController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanListDto"];
+                };
+            };
+        };
+    };
+    PlanController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlanCreateBodyDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanDto"];
+                };
+            };
+        };
+    };
+    PlanController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlanCreateBodyDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanDto"];
+                };
+            };
+        };
+    };
+    PlanController_setStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlanStatusBodyDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanDto"];
                 };
             };
         };
@@ -1768,6 +3354,279 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["UserResetPasswordBodyDto"];
+            };
+        };
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PlatformAuthController_login: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlatformLoginBodyDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformLoginResponseDto"];
+                };
+            };
+        };
+    };
+    PlatformAuthController_refresh: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlatformRefreshRequestDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformRefreshResponseDto"];
+                };
+            };
+        };
+    };
+    PlatformAuthController_logout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PlatformAuthController_changePassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangePasswordBodyDto"];
+            };
+        };
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PlatformUsersController_listPlatformUsers: {
+        parameters: {
+            query?: {
+                /** @description 每页条数，默认 20（最大 100） */
+                pageSize?: number;
+                /** @description 页码，默认 1 */
+                page?: number;
+                /** @description 账号名模糊 */
+                keyword?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformUserListDto"];
+                };
+            };
+        };
+    };
+    PlatformUsersController_createPlatformUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlatformUserCreateBodyDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformUserDto"];
+                };
+            };
+        };
+    };
+    PlatformUsersController_setPlatformUserStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlatformUserStatusBodyDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformUserDto"];
+                };
+            };
+        };
+    };
+    PlatformUsersController_resetPlatformUserPassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlatformUserResetPasswordBodyDto"];
+            };
+        };
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PlatformUsersController_tenantAccountCounts: {
+        parameters: {
+            query: {
+                /** @description 租户 id，逗号分隔（最多 200） */
+                tenantIds: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TenantAccountCountsDto"];
+                };
+            };
+        };
+    };
+    PlatformUsersController_tenantAdmins: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenantId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TenantAdminListDto"];
+                };
+            };
+        };
+    };
+    PlatformUsersController_createTenantAdmin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenantId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TenantAdminCreateBodyDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TenantAdminDto"];
+                };
+            };
+        };
+    };
+    PlatformUsersController_resetTenantAdminPassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenantId: string;
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TenantAdminResetPasswordBodyDto"];
             };
         };
         responses: {
@@ -2504,6 +4363,419 @@ export interface operations {
             };
         };
     };
+    ProductionController_listIssues: {
+        parameters: {
+            query?: {
+                /** @description 每页条数，默认 20（最大 100） */
+                pageSize?: number;
+                /** @description 页码，默认 1 */
+                page?: number;
+                /** @description 领用日期止（YYYY-MM-DD） */
+                dateTo?: string;
+                /** @description 领用日期起（YYYY-MM-DD） */
+                dateFrom?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MaterialIssueListDto"];
+                };
+            };
+        };
+    };
+    ProductionController_createIssue: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MaterialIssueBodyDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MaterialIssueDto"];
+                };
+            };
+        };
+    };
+    ProductionController_issueDetail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MaterialIssueDto"];
+                };
+            };
+        };
+    };
+    ProductionController_updateIssue: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MaterialIssueBodyDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MaterialIssueDto"];
+                };
+            };
+        };
+    };
+    ProductionController_removeIssue: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ProductionController_batchDeleteIssues: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MaterialIssueBatchDeleteBodyDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MaterialIssueBatchDeleteResponseDto"];
+                };
+            };
+        };
+    };
+    ProductionController_listOutputs: {
+        parameters: {
+            query?: {
+                /** @description 每页条数，默认 20（最大 100） */
+                pageSize?: number;
+                /** @description 页码，默认 1 */
+                page?: number;
+                /** @description 产出日期止（YYYY-MM-DD） */
+                dateTo?: string;
+                /** @description 产出日期起（YYYY-MM-DD） */
+                dateFrom?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductionOutputListDto"];
+                };
+            };
+        };
+    };
+    ProductionController_createOutput: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProductionOutputBodyDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductionOutputDto"];
+                };
+            };
+        };
+    };
+    ProductionController_outputDetail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductionOutputDto"];
+                };
+            };
+        };
+    };
+    ProductionController_updateOutput: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProductionOutputUpdateBodyDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductionOutputDto"];
+                };
+            };
+        };
+    };
+    ProductionController_removeOutput: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ProductionController_batchDeleteOutputs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProductionOutputBatchDeleteBodyDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductionOutputBatchDeleteResponseDto"];
+                };
+            };
+        };
+    };
+    ProductionController_inventorySummary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InventorySummaryDto"];
+                };
+            };
+        };
+    };
+    ProductionController_openingCurrent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InventoryOpeningDetailDto"];
+                };
+            };
+        };
+    };
+    ProductionController_countList: {
+        parameters: {
+            query?: {
+                /** @description 每页条数，默认 20（最大 100） */
+                pageSize?: number;
+                /** @description 页码，默认 1 */
+                page?: number;
+                /** @description 盘点日期止（YYYY-MM-DD） */
+                dateTo?: string;
+                /** @description 盘点日期起（YYYY-MM-DD） */
+                dateFrom?: string;
+                /** @description 盘点类型筛选 */
+                targetType?: "raw_log" | "timber";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InventoryCountListDto"];
+                };
+            };
+        };
+    };
+    ProductionController_createCount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InventoryCountBodyDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InventoryAdjustmentResultDto"];
+                };
+            };
+        };
+    };
+    ProductionController_countDetail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InventoryCountDetailDto"];
+                };
+            };
+        };
+    };
+    ProductionController_createOpening: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InventoryOpeningBodyDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InventoryAdjustmentResultDto"];
+                };
+            };
+        };
+    };
     OrderController_list: {
         parameters: {
             query?: {
@@ -2581,6 +4853,48 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CustomerVolumeSummaryDto"];
+                };
+            };
+        };
+    };
+    OrderController_profit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SaleOrderProfitDto"];
+                };
+            };
+        };
+    };
+    OrderController_recalculateCost: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SaleOrderProfitDto"];
                 };
             };
         };

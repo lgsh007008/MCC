@@ -10,24 +10,27 @@ import { cn } from '@/lib/utils';
 // 移动列表共用件（design/平台布局.md §1.5 / §1.8）：销售单、客户档案等所有移动列表
 // 强制复用同一套页面骨架、搜索框、卡片、加载更多与空态，避免各页复制导致样式漂移。
 
-// 列表页骨架：顶部栏 + 可选搜索区 + 列表区 + 可选底部主操作条。
-// 主操作（新建）固定在底部；顶部栏右侧只放非主操作（如入口页退出）。
+// 列表页骨架：顶部栏 + 可选页头动作 + 可选搜索区 + 列表区 + 可选底部主操作条。
+// 页头右侧只放非主操作（如口径说明、入口页退出）；主操作（新建）固定在底部。
 export function MobileListPage({
   title,
   backHref,
   search,
+  headerAction,
   action,
   children,
 }: {
   title: string;
   backHref?: string;
   search?: React.ReactNode;
+  /** 顶部栏右侧的非主操作（如口径说明） */
+  headerAction?: React.ReactNode;
   action?: React.ReactNode;
   children: React.ReactNode;
 }): React.ReactElement {
   return (
     <div className={action ? 'pb-24' : undefined}>
-      <MobileHeader title={title} backHref={backHref} />
+      <MobileHeader title={title} backHref={backHref} action={headerAction} />
       <div className="space-y-3 p-4">
         {search}
         {children}

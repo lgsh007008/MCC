@@ -1,15 +1,22 @@
 import { describe, expect, it } from 'vitest';
 import {
+  PLATFORM_ROLE_LABELS,
+  PLATFORM_ROLE_SCOPES,
+  PLATFORM_ROLES,
+  PLATFORM_SCOPES,
   ROLE_DESCRIPTIONS,
   ROLE_LABELS,
   ROLE_SCOPES,
   SCOPES,
   USER_ROLES,
+  hasPlatformScope,
   hasScope,
+  isPlatformRole,
+  platformScopeSatisfied,
   scopeSatisfied,
   scopesOf,
 } from './auth.permissions';
-import type { Scope } from './auth.permissions';
+import type { PlatformScope, Scope } from './auth.permissions';
 
 // 角色矩阵完整性（product/账号与权限.md R-账号与权限-003）：
 // 新增角色时必须同时补标签、说明与 scope，否则账号管理与权限说明会出现空缺。
@@ -64,5 +71,43 @@ describe('角色与权限矩阵', () => {
     expect(hasScope('FINANCE', 'order:manage')).toBe(false);
     expect(hasScope('FINANCE', 'customer:view')).toBe(true);
     expect(hasScope('FINANCE', 'customer:manage')).toBe(false);
+  });
+});
+
+// 平台运营身份与租户身份是两套命名空间（design/账号与权限.md R-账号与权限-004）：
+describe('平台运营权限', () => {
+  it('每个平台角色都有标签与 scope', () => {
+    for (const role of PLATFORM_ROLES) {
+      expect(PLATFORM_ROLE_LABELS[role]).toBeTruthy();
+      expect(PLATFORM_ROLE_SCOPES[role].length).toBeGreaterThan(0);
+    }
+  });
+
+  it('平台管理员拥有全部平台 scope', () => {
+    expect(PLATFORM_ROLE_SCOPES.PLATFORM_ADMIN).toEqual(PLATFORM_SCOPES);
+    expect(hasPlatformScope('PLATFORM_ADMIN', 'platform:tenant:manage')).toBe(true);
+    expect(hasPlatformScope('PLATFORM_ADMIN', 'platform:account:manage')).toBe(true);
+    expect(hasPlatformScope('PLATFORM_ADMIN', 'platform:audit:view')).toBe(true);
+  });
+
+  it('平台 manage 包含 tenant view，反之不成立', () => {
+    expect(platformScopeSatisfied(['platform:tenant:manage'], 'platform:tenant:view')).toBe(true);
+    expect(platformScopeSatisfied(['platform:tenant:view'], 'platform:tenant:manage')).toBe(false);
+    expect(platformScopeSatisfied(['platform:account:manage'], 'platform:tenant:view')).toBe(false);
+    expect(
+      platformScopeSatisfied(['platform:audit:view'], 'platform:audit:manage' as PlatformScope),
+    ).toBe(false);
+  });
+
+  it('租户角色不能获得平台 scope，平台角色不能获得租户 scope', () => {
+    expect(isPlatformRole('ADMIN')).toBe(false);
+    expect(hasPlatformScope('ADMIN', 'platform:tenant:view')).toBe(false);
+    expect(hasScope('PLATFORM_ADMIN', 'order:view')).toBe(false);
+  });
+
+  it('未知平台角色无任何 scope', () => {
+    expect(isPlatformRole('GUEST')).toBe(false);
+    expect(hasPlatformScope(null, 'platform:tenant:view')).toBe(false);
+    expect(hasPlatformScope('GUEST', 'platform:tenant:view')).toBe(false);
   });
 });

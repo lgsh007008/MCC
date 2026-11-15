@@ -59,7 +59,7 @@ modules/finance/
 - 账户余额 `calcAccountBalance`：期初 + 收款 − 付款 + 转入 − 转出；转账按 `accountId` 减、`toAccountId` 加，**同一笔转账不重复计入同一账户**
 - 应收 `calcReceivable`：期初欠款 + 累计销售 − 累计收款；期初欠款取客户档案录入值（默认 0），累计销售现结取实收、赊销取合计，累计收款只取挂该客户的 `SALES_RECEIPT` 流水，两者都只统计系统内数据；历史回款不补录（补录会流入资金账户、虚增账户余额与资金总额）；负数为预收，不截断
 - 应付 `calcPayable`：期初应付 + 累计采购 − 累计付款；期初应付取供应商档案录入值（默认 0），累计采购现结取实付、赊购取合计，累计付款只取挂该供应商的 `PURCHASE_PAYMENT` 流水，两者都只统计系统内数据；历史付款不补录（补录会流出资金账户、虚减账户余额与资金总额）；负数为预付，不截断
-- 资金汇总：期间收款 = Σ`IN`；期间付款 = Σ`OUT`；净流入 = 收款 − 付款；期末资金总额 = Σ各账户当前余额；`TRANSFER` 三项均不计
+- 资金汇总：期间收款 = Σ`IN`；期间付款 = Σ`OUT`；净流入 = 收款 − 付款；当前资金总额 = Σ各账户当前余额；`TRANSFER` 三项均不计
 - 金额运算以字符串 + BigInt 实现（含负数），禁浮点；纯函数单测为最高优先级（技术方案 §10）
 
 ## 4. 编号生成
@@ -73,7 +73,7 @@ modules/finance/
 
 | 接口 | 路径 | 用途 |
 | --- | --- | --- |
-| summary | `GET /api/v1/finance/summary?dateFrom&dateTo` | 经营收支汇总：销售收入 / 其他收入 / 采购付款 / 工资 / 费用 / 总收入 / 总支出 / 净额 / 条数 / 分类小计（实时聚合，销售单只读聚合 + 流水分类） |
+| summary | `GET /api/v1/finance/summary?dateFrom&dateTo` | 经营收支汇总：销售收入 / 其他收入 / 采购支出 / 工资 / 费用 / 总收入 / 总支出 / 净额 / 条数 / 分类小计（实时聚合，销售单与采购单只读聚合 + 流水分类） |
 | accounts | `GET /api/v1/finance/accounts` | 资金账户列表（不分页，含每个账户实时余额与流水条数 `entryCount`） |
 | account-create | `POST /api/v1/finance/accounts` | 新建账户（类型 / 渠道级联 / 期初余额 / 启用状态） |
 | account-update | `PUT /api/v1/finance/accounts/:id` | 更新账户（名称 / 类型 / 渠道 / 期初 / 启用；状态切换由列表行操作提交整行字段） |
@@ -99,13 +99,13 @@ modules/finance/
 
 ## 7. 前端实现节（web）
 
-- 汇总页（`/admin/finance/summary`，聚合页 + 页内 Tab）：顶部两个 Tab「经营收支 / 资金收付」，状态写入 `?tab=funds`，默认经营收支；日期为两个 Tab **共用的一份 state**（`filters` 输入 + `applied` 已查询），切 Tab 保留已查询区间、未提交输入丢弃；Tab 1 展示总收入 / 总支出 / 净额三卡 + 分类小计表（销售收入、其他收入、采购支出、工资、费用），说明区为同一段小字——定位句后接「N 张销售单 / M 张采购单 / K 条收支流水」，右侧只放「分类口径说明」按钮（打开 `components/finance/business-summary-help-dialog.tsx`：`sm:max-w-[520px]`，三组信息条——怎么算 / 五个分类 / 为什么不含其余分类 + 收尾句，底部只有关闭；标题与底部操作固定、仅中部内容滚动）；Tab 2 展示四卡同排（期间收款 / 期间付款 / 净流入 + 「当前资金总额 · 此刻」，`grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4`；第四卡 `border-l-2 border-l-primary/40 bg-muted/40`，金额 `text-xl xl:text-2xl`，下方小字「不随日期筛选变化」，取 `cash.totalFunds`）+ 各账户余额列表（账户编号、名称、类型 / 渠道、当前余额、状态，不含期初余额），说明区右为「资金口径说明」按钮（打开 `components/finance/cash-summary-help-dialog.tsx`：三组信息条——怎么算 / 净流入为什么不等于资金总额 / 哪些钱进哪些不进 + 收尾句；同样固定标题与底部操作、仅中部内容滚动）；两个口径弹窗共用 `components/finance/summary-help-parts.tsx`（`HelpDialogShell` / `HelpSection` / `HelpRow`）：`HelpDialogShell` 的 `DialogContent` 为 `flex max-h-[85vh] flex-col gap-0 overflow-hidden p-0`，标题 `shrink-0 border-b`（`pr-12` 让开右上角关闭按钮），内容区 `scroll-area min-h-0 flex-1 overflow-y-auto`（平台滚动条样式），底部 `shrink-0 border-t`，头尾固定、仅中部滚动；查询 / 重置作用于共用筛选；根容器 `flex h-full min-h-0 flex-col`，内容铺满
+- 汇总页（`/admin/finance/summary`，聚合页 + 页内 Tab）：顶部两个 Tab「经营收支 / 资金收付」，状态写入 `?tab=funds`，默认经营收支；日期为两个 Tab **共用的一份 state**（`filters` 输入 + `applied` 已查询），切 Tab 保留已查询区间、未提交输入丢弃；Tab 1 展示总收入 / 总支出 / 净额三卡 + 分类小计表（销售收入、其他收入、采购支出、工资、费用），说明区为同一段小字——定位句后接「N 张销售单 / M 张采购单 / K 条收支流水」，右侧只放「分类口径说明」按钮（打开 `components/finance/business-summary-help-dialog.tsx`：`sm:max-w-[520px]`，三组信息条——怎么算 / 五个分类 / 为什么不含其余分类 + 收尾句，底部只有关闭；标题与底部操作固定、仅中部内容滚动）；Tab 2 展示四卡同排（期间收款 / 期间付款 / 净流入 + 「当前资金总额 · 此刻」，`grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4`；第四卡 `border-l-2 border-l-primary/40 bg-muted/40`，金额 `text-xl xl:text-2xl`，下方小字「不随日期筛选变化」，取 `cash.totalFunds`）+ 各账户余额列表（账户编号、名称、类型 / 渠道、当前余额、状态，不含期初余额），说明区右为「资金口径说明」按钮（打开 `components/finance/cash-summary-help-dialog.tsx`：三组信息条——怎么算 / 净流入为什么不等于资金总额 / 哪些钱进哪些不进 + 收尾句；同样固定标题与底部操作、仅中部内容滚动）；两个口径弹窗共用 `components/ui/help-dialog.tsx`（`HelpDialogShell` / `HelpSection` / `HelpRow`，生产域的库存 / 材料毛利 / 盘点口径弹窗同样复用）：`HelpDialogShell` 的 `DialogContent` 为 `flex max-h-[85vh] flex-col gap-0 overflow-hidden p-0`，标题 `shrink-0 border-b`（`pr-12` 让开右上角关闭按钮），内容区 `scroll-area min-h-0 flex-1 overflow-y-auto`（平台滚动条样式），底部 `shrink-0 border-t`，头尾固定、仅中部滚动；查询 / 重置作用于共用筛选；根容器 `flex h-full min-h-0 flex-col`，内容铺满
 - 资金流水页（`/admin/finance/cash`，主从列表页模式）：根容器 `flex h-full min-h-0 overflow-hidden rounded-lg border border-border bg-card`（单一面板）。左栏 `w-60 shrink-0 border-r border-border flex flex-col`：卡片头「资金账户」标题左 + `新增账户`（outline sm）右；列表首项「全部」默认选中，单行左「全部账户」右账户数 / 启用数摘要，不显示金额并加粗；账户行为单行：名称按钮（`flex-1 truncate` + `title`，内含名称与启用 / 停用标签，点名称或状态均筛选）+ 行尾「⋯」`MoreHorizontal` 触发按钮（`icon-sm` ghost，`aria-label="账户操作"`，点击不触发筛选）；不显示金额、编号、渠道、期初；选中态 `bg-muted` + 左侧竖条；「⋯」菜单（`DropdownMenuContent align="end"`）= 查看详情 / 编辑 / 停用（二次确认）或启用（不确认）/ 删除（`destructive`，二次确认）；点击行即设置右栏 `accountId` 条件并回第 1 页；左栏数据来自 `/finance/accounts`，随流水变更同步刷新。右栏 `min-w-0 flex-1` 沿用列表页：筛选按「方向、收支分类、日期区间、客户、供应商」顺序排列（无账户下拉，往来单位居末）；收支分类与方向级联（取 `FINANCE_CASH_CATEGORIES_BY_DIRECTION`，方向为空列全部，收款 / 付款只列各自子集；内部转账无分类——分类值清空且 `Select` 置 `disabled`、只显示「内部转账无分类」，切回收款 / 付款恢复可选）；客户筛选只作用于销售回款、供应商筛选只作用于采购付款（方向不符时结果自然为空）；列 = 编号（主色按钮，点击打开详情）、发生日期、方向、账户（内部转账显示「转出 → 转入」）、收支分类、客户（仅销售回款）、供应商（仅采购付款）、备注、金额（收 +、付 −，右对齐着色）、来源、操作；**源单流水行只读**（显示来源，只有查看），手工流水可查看 / 编辑 / 删除；合计行与表头逐列对齐（`TableFooter` 加 `bg-muted [&_td]:bg-muted`）：`合计` 单元格 `colSpan={8}` 覆盖编号至备注列，金额列放 `收款 / 付款`（右对齐），来源列放 `净额`，操作列补一个空 `TableCell`，保证合计行格数与 11 列表头一致、背景覆盖到表格右缘；分页同列表页；`登记流水` 为主操作，弹窗默认账户 = 左栏选中项（「全部」取第一个启用账户）；重置 = 清空方向、分类、客户、供应商与日期 + 左栏回「全部」+ 回第 1 页。账户与流水弹窗（`components/finance/finance-account-form.tsx`、`finance-cash-entry-form.tsx`）保存后关闭并刷新两栏；账户弹窗同为 `sm:max-w-[720px]`、`p-6`、双列网格（名称整行，类型 / 渠道一行，期初余额整行）；状态字段移出表单，由左栏「⋯」菜单独占，删除经 `DELETE /finance/accounts/:id` 软删；账户类型与渠道级联（类型变更时渠道重置为「银行」）；表格超宽时按列表页在表格容器内滚动
 - 资金流水弹窗：`sm:max-w-[720px]`、`p-6`、双列网格（`gap-x-6 gap-y-5`），标签宽 96px、控件占满所在列；顶部为收款 / 付款 / 内部转账模式切换；收支分类在收款时三选一（销售回款 / 其他收入 / 借款），付款时五选一（采购付款 / 工资 / 费用 / 资产购置 / 还款），内部转账无分类；仅「销售回款」显示客户下拉且必选，仅「采购付款」显示供应商下拉且必选，其他分类不显示往来单位；方式由账户渠道推导，不单独录入
 - 资金流水弹窗的客户 / 供应商下拉：只列启用项；编辑历史流水时若往来单位已停用 / 删除，经对应详情补快照，保证可保存（与销售单 / 采购单表单同法）
 - 详情弹窗：`components/finance/finance-account-detail-dialog.tsx`（编号、名称、类型、渠道、期初余额、当前余额、状态，`sm:max-w-[640px]` + `grid grid-cols-2`；编辑 = 关闭详情后打开账户弹窗）；`components/finance/finance-cash-entry-detail-dialog.tsx`（编号、发生日期、方向、金额、账户 / 转入账户、收支分类、客户、供应商、方式、来源、备注；两列信息条，备注 `col-span-2` 且 `whitespace-pre-wrap break-words`，容器与值 `min-w-0` 防长串溢出；编辑 = 关闭详情后打开流水弹窗，仅手工流水）；左栏「⋯」菜单的查看详情、右栏编号点击与行内查看均打开对应详情，详情与编辑不嵌套
 - 路由与菜单：菜单「财务」分组两项（资金流水 / 收支汇总）随 `design/平台布局.md` §1.3 静态配置登记；`scopeForPath` 对 `/admin/finance/*` 返回 `finance:view`（写操作按钮按 `finance:manage` 裁剪）；财务另建移动页（见下条）。
-- 移动页（`/m/finance`、`/m/finance/cash`、`/m/finance/cash/new`、`/m/finance/cash/[id]`、`/m/finance/cash/[id]/edit`、`/m/finance/summary`）：`/m` 入口卡片按 `useCan('finance:view')` 裁剪（与客户 / 销售单移动页同法，不走 `scopeForPath`）；`/m/finance` 为二级入口（两个 48px 大按钮）；资金流水页顶部账户下拉取 `/finance/accounts`（「全部账户」+ 启用项），列表取 `/finance/cash-entries`（`pageSize: 20` + 加载更多，筛选含账户、日期、方向、分类；移动端不设客户 / 供应商筛选），卡片组件 `components/mobile/finance-cash-card.tsx`（采购付款卡片显示供应商）；登记 / 编辑表单 `components/mobile/finance-cash-entry-form.tsx`（单列、控件 `h-12`、方向用 `Segmented`、分类按 `FINANCE_CASH_CATEGORIES_BY_DIRECTION` 级联、内部转账禁用分类、销售回款显示客户下拉、采购付款显示供应商下拉、金额 `inputMode="decimal"`、日期 `size="touch"`），写 `POST` / `PUT /finance/cash-entries`，源单流水不提供编辑删除；详情 `app/m/finance/cash/[id]/page.tsx` 只读 + 手工流水编辑 / 删除（`useConfirm`）；收支汇总页 `app/m/finance/summary/page.tsx` 复用 `/finance/summary` 与 `/finance/cash-summary`，Tab 用 `Segmented` 写 `?tab=funds`，口径弹窗复用 `business-summary-help-dialog` / `cash-summary-help-dialog`；移动页均不新增后端接口。
+- 移动页（`/m/finance`、`/m/finance/cash`、`/m/finance/cash/new`、`/m/finance/cash/[id]`、`/m/finance/cash/[id]/edit`、`/m/finance/summary`）：`/m` 入口卡片按 `useCan('finance:view')` 裁剪（与客户 / 销售单移动页同法，不走 `scopeForPath`）；`/m/finance` 为二级入口（两个 48px 大按钮）；资金流水页顶部账户下拉取 `/finance/accounts`（「全部账户」+ 启用项），列表取 `/finance/cash-entries`（`pageSize: 20` + 加载更多，筛选含账户、日期、方向、分类；移动端不设客户 / 供应商筛选），卡片组件 `components/mobile/finance-cash-card.tsx`（采购付款卡片显示供应商）；登记 / 编辑表单 `components/mobile/finance-cash-entry-form.tsx`（单列、控件 `h-12`、方向用 `Segmented`、分类按 `FINANCE_CASH_CATEGORIES_BY_DIRECTION` 级联、内部转账禁用分类、销售回款显示客户下拉、采购付款显示供应商下拉、金额 `inputMode="decimal"`、日期 `size="touch"`），写 `POST` / `PUT /finance/cash-entries`，源单流水不提供编辑删除；详情 `app/m/finance/cash/[id]/page.tsx` 只读 + 手工流水编辑 / 删除（`useConfirm`）；收支汇总页 `app/m/finance/summary/page.tsx` 复用 `/finance/summary` 与 `/finance/cash-summary`，Tab 用 `Segmented` 写 `?tab=funds`，口径弹窗复用 `business-summary-help-dialog` / `cash-summary-help-dialog`；经营收支说明区与 PC 同口径——定位句整段（含采购按采购单确认、工资费用按实付）在上，「口径说明」按钮在下；分类小计卡顶部「本期计入 N 张销售单、M 张采购单、K 条收支流水」；移动页均不新增后端接口。
 
 ## 8. 后置边界（本轮不建）
 
@@ -184,6 +184,7 @@ modules/finance/
 | 7 前端实现节 · 汇总页定位句 | 修改 | 定位句 70 余字，含两组「按…确认（…也计入）」并列 | 精简为「看这段时间生意赚了多少：收入按销售单、采购按采购单确认（赊销赊购都计入），工资费用按实付计入，所以净额不等于手里的现金。」 | 原句过长，页面定位句需一眼读完 |
 | 7 前端实现节 · 汇总页说明区 | 修改 | 说明区 `flex flex-wrap items-start justify-between`：左段定位句、右段条数小字 + 按钮，右块易整块折到下一行 | 定位句与条数并入同一 `<p>`，去掉 `flex-wrap` 与右侧包裹层，按钮 `shrink-0` 独占右侧 | 条数与定位句被排成两行，视觉上像两段话 |
 | 7 前端实现节 · 资金流水合计行 | 修改 | 合计行 4 格、列跨度为 6 + 1 + 1 + 2 = 10，表头 11 列；`[&_td]:bg-muted` 覆盖不到不存在的操作列，统计值整体左移一列 | 合计行改 8 + 1 + 1 + 1 = 11 格：`合计` 跨编号至备注列、金额列放收款 / 付款、来源列放净额、操作列空单元格；e2e 断言合计行末格右边界与表头末列对齐 | 合计行与表头列数一致、背景铺满整行，避免再加列时漏格 |
+| 7 前端实现节 · 移动汇总页说明区 | 修改 | 移动经营收支沿用旧定位句「收入按销售单确认（赊销也计入），支出按实际付款计入」，本期条数缺采购单数 | 定位句与 PC 同口径（采购按采购单确认、工资费用按实付计入），文案整段 + 按钮下置；本期条数补 `purchaseCount` | 移动端与 PC 口径文案漂移，采购支出被误读为按付款计入 |
 
 ### v20261112
 
@@ -213,6 +214,14 @@ modules/finance/
 | 7 前端实现节 | 修改 | 详情为独立路由页面（`/[id]`），列表「查看」跳转 | 详情改为列表页弹窗：`finance-event-detail-dialog.tsx`（数据取自列表项、`dl` 信息条、编辑仅手工并切换为编辑弹窗）；移除 `/[id]` 路由 | 财务事件为流水记录，详情与编辑同构、无需 URL 直达；平台弹窗规范同步扩展至弹窗详情 |
 | 7 前端实现节 · 汇总页 | 修改 | 内容 `max-w-3xl`、页面不撑满高度、条数说明在筛选行 | 去最大宽度、整页弹性布局（分类表 `flex-1` + 表体内滚）、条数说明移卡片区下方右侧 | 与产品文档聚合页「铺满宽度 + 弹性高度」同步；修复宽屏空白 |
 | 4 编号生成 | 修改 | 事件编号 `YYYYMM-####`：取发生日期年月 + 当月流水 | 改为 `FN-#####`：取 `FN-` 前缀最大流水 +1，不含日期；手工与自动事件共用同一序列 | 全局编号规范统一弃用日期前缀；`nextCode` 不再读取 `occurredDate` / `saleDate` |
+
+### v20261115
+
+| 位置 | 类型 | 原本 | 现在 | 原因 |
+| --- | --- | --- | --- | --- |
+| 3 计算规则 · 资金汇总 | 修改 | 期末资金总额 = Σ各账户当前余额 | 当前资金总额 = Σ各账户当前余额 | 产品口径已统一为「当前资金总额」，实现与页面均用该名 |
+| 5 接口清单 · summary | 修改 | 销售收入 / 其他收入 / 采购付款 / 工资 / 费用；销售单只读聚合 | 销售收入 / 其他收入 / 采购支出 / 工资 / 费用；销售单与采购单只读聚合 | v20261114 已改为采购按应计，接口描述未同步 |
+| 7 前端实现节 · 口径弹窗原子 | 修改 | `components/finance/summary-help-parts.tsx` 承载 `HelpDialogShell` / `HelpSection` / `HelpRow` | 原子移到 `components/ui/help-dialog.tsx`，财务与生产域口径弹窗共用；原文件删除 | 「弹窗说明」已登记为平台覆盖层形态，展示原子不应留在财务目录 |
 
 ---
 

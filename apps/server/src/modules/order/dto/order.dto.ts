@@ -181,6 +181,35 @@ export class SaleOrderPrintEventDto {
   code!: string;
 }
 
+export class SaleOrderProfitDto {
+  @ApiProperty({ type: String })
+  orderId!: string;
+
+  @ApiProperty({ type: String })
+  code!: string;
+
+  @ApiProperty({ type: String, description: '确认收入：现结取实收、赊销取合计' })
+  revenue!: string;
+
+  @ApiProperty({ type: String, nullable: true, description: '下单时方木平均成本（元/m³）' })
+  materialUnitCost!: string | null;
+
+  @ApiProperty({ type: String, description: '材料成本快照金额' })
+  materialCostAmount!: string;
+
+  @ApiProperty({ type: String, enum: ['pending', 'final'], description: '成本状态：待补 / 已锁定' })
+  materialCostStatus!: 'pending' | 'final';
+
+  @ApiProperty({ type: String, nullable: true, description: '材料毛利；待补时为 null' })
+  materialProfit!: string | null;
+
+  @ApiProperty({ type: String, nullable: true, description: '材料毛利率（百分比，2 位）；待补时为 null' })
+  materialMargin!: string | null;
+
+  @ApiProperty({ type: String, nullable: true, description: '快照时间' })
+  snapshottedAt!: string | null;
+}
+
 export class SaleOrderSummaryDto {
   @ApiProperty({ type: String, description: '合计方量（筛选全量）' })
   totalVolume!: string;

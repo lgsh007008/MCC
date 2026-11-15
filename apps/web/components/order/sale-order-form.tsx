@@ -13,6 +13,7 @@ import {
   saleOrderUpdateSchema,
 } from '@mcc/shared';
 import { Button } from '@/components/ui/button';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 import { PageFrame } from '@/components/admin/page-frame';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Input } from '@/components/ui/input';
@@ -28,6 +29,7 @@ import {
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { api } from '@/lib/api';
+import { hasNoValidTimberCost, isMaterialCostPending } from '@/lib/timber-cost';
 import { randomUuid } from '@/lib/uuid';
 import { cn } from '@/lib/utils';
 
@@ -126,6 +128,7 @@ export function SaleOrderForm({
   initial?: SaleOrderFormInitial;
 }): React.ReactElement {
   const router = useRouter();
+  const confirm = useConfirm();
   const [saleDate, setSaleDate] = useState(initial?.saleDate ?? localToday());
   const [customerId, setCustomerId] = useState(initial?.customerId ?? '');
   const [settlementMode, setSettlementMode] = useState<'credit' | 'settled'>(
@@ -316,6 +319,19 @@ export function SaleOrderForm({
     }
     setSubmitting(true);
     try {
+      // 无有效方木成本时提示先录产出；确认后仍保存为「成本待补」（product/生产与库存.md R-生产-004）
+      const needsCostWarning = orderId ? await isMaterialCostPending(orderId) : true;
+      if (needsCostWarning && (await hasNoValidTimberCost())) {
+        const proceed = await confirm({
+          title: '当前无有效方木成本',
+          description:
+            '保存后材料成本将记为「成本待补」，库存估值也会受影响；建议先在「方木产出」录入产出，并把产出日期填在销售日期之前。仍要保存吗？',
+          confirmText: '仍然保存',
+        });
+        if (!proceed) {
+          return;
+        }
+      }
       if (orderId) {
         const { response } = await api.PUT('/api/v1/sale-orders/{id}', {
           params: { path: { id: orderId } },

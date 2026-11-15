@@ -4,7 +4,7 @@ import { Fragment, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { ChevronDownIcon, PanelLeftCloseIcon, PanelLeftOpenIcon } from 'lucide-react';
-import { ROLE_LABELS, changePasswordSchema, hasScope, type UserRole } from '@mcc/shared';
+import { ROLE_LABELS, changePasswordSchema, hasScope, type FeatureCode, type UserRole } from '@mcc/shared';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -50,8 +50,14 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 import { api, refreshSession } from '@/lib/api';
-import { authSession, currentRole, currentUsername } from '@/lib/auth/session';
-import { findNavByPath, homeItem, scopeForPath, visibleNavGroups } from '@/lib/nav';
+import { authSession, currentFeatures, currentRole, currentUsername } from '@/lib/auth/session';
+import {
+  featureForPath,
+  findNavByPath,
+  homeItem,
+  scopeForPath,
+  visibleNavGroups,
+} from '@/lib/nav';
 import { RoleProvider } from '@/components/auth/permission-context';
 import { ConfirmProvider } from '@/components/ui/confirm-dialog';
 import { PageBreadcrumbProvider, usePageBreadcrumb } from './page-breadcrumb';
@@ -123,6 +129,7 @@ function AdminShellInner({
   const { reset: resetTabs } = useTabs();
   const mainRef = useRef<HTMLElement>(null);
   const [role, setRole] = useState<UserRole | null>(currentRole());
+  const [features, setFeatures] = useState<FeatureCode[] | null>(currentFeatures());
   // 每个标签记住主内容区滚动位置，切回时恢复（design/平台布局.md §1.6）
   const scrollPositions = useRef(new Map<string, number>());
   const [pwdOpen, setPwdOpen] = useState(false);
@@ -141,6 +148,7 @@ function AdminShellInner({
         return;
       }
       setRole(currentRole());
+      setFeatures(currentFeatures());
       if (!ok && window.location.pathname.startsWith('/admin')) {
         window.location.assign('/login');
       }
@@ -185,11 +193,14 @@ function AdminShellInner({
 
   const current = findNavByPath(pathname);
   const pageCrumbs = usePageBreadcrumb()?.crumbs ?? [];
-  const groups = visibleNavGroups(role);
+  const groups = visibleNavGroups(role, features);
   const username = currentUsername();
-  // 路由裁剪：无权限页面显示统一提示，不渲染页面内容（服务端守卫仍是最终边界）
+  // 路由裁剪：无权限 / 未开通功能时显示统一提示，不渲染页面内容（服务端守卫仍是最终边界）
   const requiredScope = scopeForPath(pathname);
-  const allowed = requiredScope === null || role === null || hasScope(role, requiredScope);
+  const requiredFeature = featureForPath(pathname);
+  const allowed =
+    (requiredScope === null || role === null || hasScope(role, requiredScope)) &&
+    (requiredFeature === null || features === null || features.includes(requiredFeature));
 
   // 滚动位置：路径变化后恢复该标签上次的位置；滚动时持续记录当前路径的位置
   useEffect(() => {
@@ -301,32 +312,14 @@ function AdminShellInner({
                           aria-hidden
                           className="pointer-events-none absolute left-0 top-1/2 hidden h-px w-2 bg-sidebar-foreground/30 group-data-[collapsible=icon]:block"
                         />
-                        {item.pending ? (
-                          <span className="flex items-center justify-between rounded-md px-2 py-1.5 text-sm text-muted-foreground/60">
-                            <span className="flex items-center gap-2">
-                              <item.icon className="size-4" />
-                              <span className="group-data-[collapsible=icon]:hidden">{item.title}</span>
-                            </span>
-                            {item.pendingBadge === false ? null : (
-                              <span className="ml-2 shrink-0 rounded border border-border px-1 text-xs group-data-[collapsible=icon]:hidden">
-                                待建
-                              </span>
-                            )}
-                          </span>
-                        ) : (
-                          <SidebarMenuButton
-                            isActive={
-                              item.href
-                                ? pathname === item.href || pathname.startsWith(`${item.href}/`)
-                                : false
-                            }
-                            title={item.title}
-                            render={<Link href={item.href ?? '#'} aria-label={item.title} />}
-                          >
-                            <item.icon />
-                            <span className="group-data-[collapsible=icon]:hidden">{item.title}</span>
-                          </SidebarMenuButton>
-                        )}
+                        <SidebarMenuButton
+                          isActive={Boolean(item.href) && current?.itemHref === item.href}
+                          title={item.title}
+                          render={<Link href={item.href ?? '#'} aria-label={item.title} />}
+                        >
+                          <item.icon />
+                          <span className="group-data-[collapsible=icon]:hidden">{item.title}</span>
+                        </SidebarMenuButton>
                       </SidebarMenuItem>
                     ))}
                   </SidebarMenu>
@@ -365,7 +358,8 @@ function AdminShellInner({
                       账号管理
                     </DropdownMenuItem>
                   ) : null}
-                  {hasScope(role, 'audit:view') ? (
+                  {hasScope(role, 'audit:view') &&
+                  (features === null || features.includes('audit')) ? (
                     <DropdownMenuItem onClick={() => router.push('/admin/audit-logs')}>
                       审计日志
                     </DropdownMenuItem>

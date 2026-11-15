@@ -13,6 +13,7 @@ import {
 import { AppModule } from '../src/app.module.js';
 import { API_PREFIX } from '../src/common/api-prefix.js';
 import { PrismaService } from '../src/common/prisma.service.js';
+import { scopedClient, TEST_TENANT_CODE, TEST_TENANT_ID } from './helpers.js';
 
 // 订单接口关键路径（契约/集成层，技术方案 §10）：
 // 守卫 401 / 新建（两种计价、计算落账、编号、幂等）/ 详情 / 列表筛选 / 更新重算 / 参数校验 / 软删除。
@@ -21,6 +22,7 @@ import { PrismaService } from '../src/common/prisma.service.js';
 describe('订单接口（契约/集成）', () => {
   let app: INestApplication;
   let prisma: PrismaService;
+  let db: PrismaService['client'];
   let accessToken: string;
   let customerId: string;
   const username = `it-order-user-${Date.now()}`;
@@ -66,10 +68,12 @@ describe('订单接口（契约/集成）', () => {
     app.setGlobalPrefix(API_PREFIX);
     await app.init();
     prisma = app.get(PrismaService);
-    await prisma.client.user.create({
-      data: { username, passwordHash: await hash(password), role: 'SALES' },
+    db = scopedClient(prisma.client);
+    await db.user.create({
+      data: { tenantId: TEST_TENANT_ID, username, passwordHash: await hash(password), role: 'SALES' },
     });
     const login = await request(app.getHttpServer()).post(`/${API_PREFIX}/auth/login`).send({
+      tenantCode: TEST_TENANT_CODE,
       username,
       password,
       rememberMe: false,
@@ -85,17 +89,17 @@ describe('订单接口（契约/集成）', () => {
 
   afterAll(async () => {
     // 现结订单会联动生成收款流水（design/finance.md §6），先按源单清理再删订单
-    const orders = await prisma.client.saleOrder.findMany({
+    const orders = await db.saleOrder.findMany({
       where: { customerId },
       select: { id: true },
     });
-    await prisma.client.financeCashEntry.deleteMany({
+    await db.financeCashEntry.deleteMany({
       where: { sourceType: 'sale_order', sourceId: { in: orders.map((row) => row.id) } },
     });
-    await prisma.client.saleOrder.deleteMany({ where: { customerId } });
-    await prisma.client.customer.deleteMany({ where: { name: { startsWith: 'it-order-' } } });
-    await prisma.client.user.deleteMany({ where: { username: { startsWith: 'it-order-user-' } } });
-    await prisma.client.eventLog.deleteMany({ where: { actorUsername: username } });
+    await db.saleOrder.deleteMany({ where: { customerId } });
+    await db.customer.deleteMany({ where: { name: { startsWith: 'it-order-' } } });
+    await db.user.deleteMany({ where: { username: { startsWith: 'it-order-user-' } } });
+    await db.eventLog.deleteMany({ where: { actorUsername: username } });
     await app.close();
   });
 

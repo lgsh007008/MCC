@@ -10,15 +10,107 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// 主键算法已锁定（技术方案 §5.1）：不可推测的全局唯一 ID，取 uuid v4。
-// 新增模型一律以这五行为头（字段名、类型、映射均照此，禁止逐表另立写法）：
+// 主键算法已锁定（技术方案 §5.1）：不可推测的全局唯一 ID，取 uuid v4；首个租户 id 为历史例外 default。
+// 租户业务模型一律以这五行为头（字段名、类型、映射均照此，禁止逐表另立写法）：
 //   id        String    @id @default(uuid()) @db.Uuid
-//   tenantId  String    @default("default") @map("tenant_id")
+//   tenantId  String    @map("tenant_id")
 //   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
 //   updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
 //   deletedAt DateTime? @map("deleted_at")
-// tenant_id 全表预留（ADR-005，2026-11-09 复活）：当前单租户恒为 default；
-// 租户条件由 server 数据访问层（common/prisma-tenant.extension.ts）统一附加，禁止业务层手写。
+// tenant_id 全表预留并启用（ADR-005 / ADR-012）：请求必须有租户上下文，缺失即拒绝；
+// 租户条件由 server 数据访问层（common/prisma-tenant.extension.ts）统一附加，禁止业务层手写；
+// 数据库不再提供 default，新插入漏设上下文即失败。
+// 全局表（tenants / plans / plan_features / tenant_features / platform_users /
+// platform_refresh_tokens / platform_event_logs）不含 tenant_id，并排除租户过滤。
+// 索引约定：租户表的列表 / 聚合查询一律带 tenant_id = ?，故复合索引以 tenant_id 打头，
+// 第二列为该表列表的排序 / 过滤字段（日期或 created_at），避免多租户后退化为全表扫。
+
+// ── 租户领域（tenant，design/租户.md §2）────────────────
+// 全局表：租户注册表、套餐、套餐功能、租户功能覆盖；不含 tenant_id，排除租户过滤。
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+
+  @@map("tenant_status")
+}
+
+enum PlanStatus {
+  ACTIVE
+  INACTIVE
+
+  @@map("plan_status")
+}
+
+model Tenant {
+  // 首个租户保留历史主键 default；新租户取 uuid 字符串。
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  // 编号 TN-#####，同时作为登录标识；创建后不可改、永不复用
+  code String @unique @map("code")
+  name String @map("name")
+
+  planId String @map("plan_id") @db.Uuid
+  plan   Plan   @relation(fields: [planId], references: [id])
+
+  status       TenantStatus @default(ACTIVE)
+  // 停用时 +1，使旧访问 / 刷新令牌立即失效（design/租户.md §2）
+  sessionEpoch Int          @default(0) @map("session_epoch")
+  note         String       @default("") @map("note")
+
+  featureOverrides TenantFeature[]
+
+  @@index([status])
+  @@map("tenants")
+}
+
+model Plan {
+  id        String   @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  name        String     @unique @map("name")
+  maxAccounts Int        @map("max_accounts")
+  status      PlanStatus @default(ACTIVE)
+  note        String     @default("") @map("note")
+
+  features PlanFeature[]
+  tenants  Tenant[]
+
+  @@map("plans")
+}
+
+model PlanFeature {
+  id        String   @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  planId      String @map("plan_id") @db.Uuid
+  plan        Plan   @relation(fields: [planId], references: [id], onDelete: Cascade)
+  featureCode String @map("feature_code")
+
+  @@unique([planId, featureCode])
+  @@index([planId])
+  @@map("plan_features")
+}
+
+model TenantFeature {
+  id        String   @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  // 只存与套餐不同的覆盖项；租户 id 为首个租户 default 时不是 uuid，故不加 @db.Uuid
+  tenantId    String  @map("tenant_id")
+  tenant      Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  featureCode String  @map("feature_code")
+  enabled     Boolean @default(true)
+
+  @@unique([tenantId, featureCode])
+  @@index([tenantId])
+  @@map("tenant_features")
+}
 
 // ── 账号与权限领域（auth，design/账号与权限.md §2）────────────────
 // user / refresh_token 均归本领域，细节以本文件为准。
@@ -41,17 +133,17 @@ enum UserStatus {
 }
 
 model User {
-  id        String   @id @default(uuid()) @db.Uuid
-  tenantId  String   @default("default") @map("tenant_id")
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @map("tenant_id")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
   deletedAt DateTime? @map("deleted_at")
 
   // 账号：按使用人一人一号，无自助注册（MVP 由初始化直接提供，见 design/账号与权限.md）。
   // 唯一性按租户隔离（ADR-005）：不同租户可重名/重令牌，故用复合唯一而非全局唯一。
-  username     String   @map("username")
-  passwordHash String   @map("password_hash")
-  role         UserRole @default(SALES)
+  username     String     @map("username")
+  passwordHash String     @map("password_hash")
+  role         UserRole   @default(SALES)
   status       UserStatus @default(ACTIVE) @map("status")
 
   refreshTokens RefreshToken[]
@@ -61,24 +153,70 @@ model User {
 }
 
 model RefreshToken {
-  id        String   @id @default(uuid()) @db.Uuid
-  tenantId  String   @default("default") @map("tenant_id")
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @map("tenant_id")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
   deletedAt DateTime? @map("deleted_at")
 
   // 服务端只存哈希（sha256），不存令牌原文（design/账号与权限.md §4）。
-  tokenHash String  @map("token_hash")
-  userId    String  @db.Uuid @map("user_id")
-  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash   String    @map("token_hash")
+  userId      String    @map("user_id") @db.Uuid
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   // 过期时间对应「记住登录」口径：勾选 30 天，不勾选会话级。
-  expiresAt DateTime @map("expires_at")
+  expiresAt   DateTime  @map("expires_at")
   // 撤销即置位（登出 / 改密后旧会话撤销），记录保留供审计。
-  revokedAt DateTime? @map("revoked_at")
+  revokedAt   DateTime? @map("revoked_at")
+  // 签发时的租户 epoch；停用租户后 epoch 递增，旧刷新令牌一律拒绝
+  tenantEpoch Int       @default(0) @map("tenant_epoch")
 
   @@unique([tenantId, tokenHash])
   @@index([userId])
   @@map("refresh_tokens")
+}
+
+// 平台运营身份（全局表，无 tenant_id；ADR-012）
+enum PlatformUserRole {
+  PLATFORM_ADMIN
+
+  @@map("platform_user_role")
+}
+
+enum PlatformUserStatus {
+  ACTIVE
+  INACTIVE
+
+  @@map("platform_user_status")
+}
+
+model PlatformUser {
+  id        String   @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  username     String             @unique @map("username")
+  passwordHash String             @map("password_hash")
+  role         PlatformUserRole   @default(PLATFORM_ADMIN)
+  status       PlatformUserStatus @default(ACTIVE)
+
+  refreshTokens PlatformRefreshToken[]
+
+  @@map("platform_users")
+}
+
+model PlatformRefreshToken {
+  id        String   @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  tokenHash      String       @unique @map("token_hash")
+  platformUserId String       @map("platform_user_id") @db.Uuid
+  platformUser   PlatformUser @relation(fields: [platformUserId], references: [id], onDelete: Cascade)
+  expiresAt      DateTime     @map("expires_at")
+  revokedAt      DateTime?    @map("revoked_at")
+
+  @@index([platformUserId])
+  @@map("platform_refresh_tokens")
 }
 
 // ── 审计（server 全局基础设施，技术方案 §8.5 / §5.2 事件日志模式）────
@@ -86,30 +224,70 @@ model RefreshToken {
 // 归属：audit 模块（modules/audit）；采集由 common 审计拦截器与 auth 显式调用写入。
 
 model EventLog {
-  id        String   @id @default(uuid()) @db.Uuid
-  tenantId  String   @default("default") @map("tenant_id")
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @map("tenant_id")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
   deletedAt DateTime? @map("deleted_at")
 
   // 操作主体（登录后写入 user id；匿名操作如登录失败为 null）
   actorId       String? @map("actor_id")
   actorUsername String? @map("actor_username")
   // 操作发生时的角色快照
-  actorRole String? @map("actor_role")
+  actorRole     String? @map("actor_role")
   // 领域 + 动作（动作标识机器可读，动作名为中文展示）
-  domain      String  @map("domain")
-  action      String  @map("action")
-  actionLabel String? @map("action_label")
+  domain        String  @map("domain")
+  action        String  @map("action")
+  actionLabel   String? @map("action_label")
   // 操作对象（如改密对象为账号 id；对象编号为业务编号快照）
+  objectType    String? @map("object_type")
+  objectId      String? @map("object_id")
+  objectCode    String? @map("object_code")
+  // 结果：ok / failed（旧记录可能为状态码或 error）
+  result        String  @map("result")
+  statusCode    Int?    @map("status_code")
+  errorCode     String? @map("error_code")
+  // 请求与终端上下文（不含敏感信息）
+  method        String? @map("method")
+  path          String? @map("path")
+  ip            String? @map("ip")
+  userAgent     String? @map("user_agent")
+  requestId     String? @map("request_id")
+  payload       Json?   @map("payload")
+
+  @@index([createdAt])
+  @@index([actorId])
+  @@index([tenantId, createdAt])
+  @@index([actorId, createdAt])
+  @@index([domain, action])
+  @@map("event_logs")
+}
+
+// 平台运营跨租户操作审计（全局表，无 tenant_id；design/审计日志.md §2）
+// 只增不删：不提供 update / delete 路径。
+model PlatformEventLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  actorId       String? @map("actor_id")
+  actorUsername String? @map("actor_username")
+  domain        String  @map("domain")
+  action        String  @map("action")
+  actionLabel   String? @map("action_label")
+
+  // 目标租户快照；平台账号自身操作时为空
+  targetTenantId   String? @map("target_tenant_id")
+  targetTenantCode String? @map("target_tenant_code")
+  targetTenantName String? @map("target_tenant_name")
+
   objectType String? @map("object_type")
   objectId   String? @map("object_id")
   objectCode String? @map("object_code")
-  // 结果：ok / failed（旧记录可能为状态码或 error）
+
   result     String  @map("result")
   statusCode Int?    @map("status_code")
   errorCode  String? @map("error_code")
-  // 请求与终端上下文（不含敏感信息）
+
   method    String? @map("method")
   path      String? @map("path")
   ip        String? @map("ip")
@@ -119,10 +297,9 @@ model EventLog {
 
   @@index([createdAt])
   @@index([actorId])
-  @@index([tenantId, createdAt])
-  @@index([actorId, createdAt])
+  @@index([targetTenantId])
   @@index([domain, action])
-  @@map("event_logs")
+  @@map("platform_event_logs")
 }
 
 // ── 客户领域（customer，design/customer.md §2）────────────────
@@ -139,7 +316,7 @@ enum CustomerStatus {
 
 model Customer {
   id        String    @id @default(uuid()) @db.Uuid
-  tenantId  String    @default("default") @map("tenant_id")
+  tenantId  String    @map("tenant_id")
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
   deletedAt DateTime? @map("deleted_at")
@@ -158,6 +335,7 @@ model Customer {
   saleOrders SaleOrder[]
 
   @@unique([tenantId, code])
+  @@index([tenantId, createdAt])
   @@index([name])
   @@map("customers")
 }
@@ -175,7 +353,7 @@ enum SupplierStatus {
 
 model Supplier {
   id        String    @id @default(uuid()) @db.Uuid
-  tenantId  String    @default("default") @map("tenant_id")
+  tenantId  String    @map("tenant_id")
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
   deletedAt DateTime? @map("deleted_at")
@@ -194,6 +372,7 @@ model Supplier {
   purchaseOrders PurchaseOrder[]
 
   @@unique([tenantId, code])
+  @@index([tenantId, createdAt])
   @@index([name])
   @@map("suppliers")
 }
@@ -212,7 +391,7 @@ enum PurchaseSettlementMode {
 
 model PurchaseOrder {
   id        String    @id @default(uuid()) @db.Uuid
-  tenantId  String    @default("default") @map("tenant_id")
+  tenantId  String    @map("tenant_id")
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
   deletedAt DateTime? @map("deleted_at")
@@ -239,15 +418,15 @@ model PurchaseOrder {
 
   // 结算：赊购时账户与实付为空；现结实付默认等于合计、可改
   settlementMode  PurchaseSettlementMode @default(CREDIT) @map("settlement_mode")
-  settleAccountId String?                @db.Uuid @map("settle_account_id")
+  settleAccountId String?                @map("settle_account_id") @db.Uuid
   paidAmount      Decimal?               @map("paid_amount") @db.Decimal(18, 2)
 
   @@unique([tenantId, code])
+  @@index([tenantId, purchaseDate])
   @@index([purchaseDate])
   @@index([supplierId])
   @@map("purchase_orders")
 }
-
 
 // ── 订单领域（order，design/order.md §2）────────────────
 // sale_order / sale_order_item 均归本领域；客户 = 引用 + 快照（customer_id 归属与聚合，
@@ -271,69 +450,85 @@ enum SaleOrderPricingMode {
 }
 
 enum SaleOrderSettlementMode {
-  // 结算方式：赊销（默认）/ 现结；现结时同事务生成收入事件 + 收款流水
+  // 结算方式：赊销（默认）/ 现结；现结时同事务生成收款流水
   CREDIT
   SETTLED
 
   @@map("sale_order_settlement_mode")
 }
 
+enum SaleOrderMaterialCostStatus {
+  // 成本待补 / 已锁定（下单快照）
+  PENDING
+  FINAL
+
+  @@map("sale_order_material_cost_status")
+}
+
 model SaleOrder {
-  id        String   @id @default(uuid()) @db.Uuid
-  tenantId  String   @default("default") @map("tenant_id")
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @map("tenant_id")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
   deletedAt DateTime? @map("deleted_at")
 
   // 主单编号：SO + 连字符 + 5 位全局流水（如 SO-00001），自动生成、只读、永不复用（1-产品文档.md 五）
-  code     String   @map("code")
-  saleDate DateTime @map("sale_date") @db.Date
+  code           String   @map("code")
+  saleDate       DateTime @map("sale_date") @db.Date
   // 客户：外键用于归属与聚合；名称快照保留开单当时的名称（design/order.md §2）
-  customerId   String   @map("customer_id") @db.Uuid
-  customer     Customer @relation(fields: [customerId], references: [id])
-  customerName String   @map("customer_name")
+  customerId     String   @map("customer_id") @db.Uuid
+  customer       Customer @relation(fields: [customerId], references: [id])
+  customerName   String   @map("customer_name")
   // 合计/金额均为保存时按明细重算的落账快照，不手填（design/order.md §3）
-  totalVolume    Decimal @map("total_volume") @db.Decimal(18, 4)
-  subtotalAmount Decimal @map("subtotal_amount") @db.Decimal(18, 2)
-  otherAmount    Decimal @default(0) @map("other_amount") @db.Decimal(18, 2)
-  totalAmount    Decimal @map("total_amount") @db.Decimal(18, 2)
-  note           String  @default("") @map("note")
+  totalVolume    Decimal  @map("total_volume") @db.Decimal(18, 4)
+  subtotalAmount Decimal  @map("subtotal_amount") @db.Decimal(18, 2)
+  otherAmount    Decimal  @default(0) @map("other_amount") @db.Decimal(18, 2)
+  totalAmount    Decimal  @map("total_amount") @db.Decimal(18, 2)
+  note           String   @default("") @map("note")
 
   // 结算：合计金额仍为原价；现结实收默认等于合计、可抹零 / 约整
-  settlementMode SaleOrderSettlementMode @default(CREDIT) @map("settlement_mode")
-  receivedAmount Decimal                 @default(0) @map("received_amount") @db.Decimal(18, 2)
-  settleAccountId String?                @db.Uuid @map("settle_account_id")
+  settlementMode  SaleOrderSettlementMode @default(CREDIT) @map("settlement_mode")
+  receivedAmount  Decimal                 @default(0) @map("received_amount") @db.Decimal(18, 2)
+  settleAccountId String?                 @map("settle_account_id") @db.Uuid
+
+  // 材料成本快照（product/生产与库存.md R-生产-004）：下单时记录方木平均成本；
+  // 成本待补订单（PENDING）可由管理员 / 销售重算一次后锁定，之后不随成本变化。
+  materialUnitCost          Decimal?                    @map("material_unit_cost") @db.Decimal(18, 6)
+  materialCostAmount        Decimal                     @default(0) @map("material_cost_amount") @db.Decimal(18, 2)
+  materialCostStatus        SaleOrderMaterialCostStatus @default(PENDING) @map("material_cost_status")
+  materialCostSnapshottedAt DateTime?                   @map("material_cost_snapshotted_at") @db.Timestamptz(3)
 
   items SaleOrderItem[]
 
   @@unique([tenantId, code])
+  @@index([tenantId, saleDate])
   @@index([saleDate])
   @@index([customerId])
   @@map("sale_orders")
 }
 
 model SaleOrderItem {
-  id        String   @id @default(uuid()) @db.Uuid
-  tenantId  String   @default("default") @map("tenant_id")
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @map("tenant_id")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
   deletedAt DateTime? @map("deleted_at")
 
   orderId String    @map("order_id") @db.Uuid
   order   SaleOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
   // 行序：明细编码 = 主单编号-行序；行序在行创建时分配、软删后作废、不回改不重排（design/order.md §4）
-  seq Int @map("seq")
+  seq     Int       @map("seq")
 
-  productType SaleOrderItemType   @default(SQUARE_TIMBER) @map("product_type")
+  productType SaleOrderItemType    @default(SQUARE_TIMBER) @map("product_type")
   pricingMode SaleOrderPricingMode @default(VOLUME) @map("pricing_mode")
 
   // 尺寸：整数毫米，顺序为长、宽、高；方量对所有行非空（每行都计算，工资依据）
-  lengthMm    Int      @map("length_mm")
-  widthMm     Int      @map("width_mm")
-  heightMm    Int      @map("height_mm")
-  pieces      Int      @map("pieces")
-  volumeM3    Decimal  @map("volume_m3") @db.Decimal(18, 4)
-  price       Decimal  @map("price") @db.Decimal(18, 2)
+  lengthMm Int     @map("length_mm")
+  widthMm  Int     @map("width_mm")
+  heightMm Int     @map("height_mm")
+  pieces   Int     @map("pieces")
+  volumeM3 Decimal @map("volume_m3") @db.Decimal(18, 4)
+  price    Decimal @map("price") @db.Decimal(18, 2)
 
   // 行金额：按方量 = 方量×单价；按根数 = 根数×单价；其他金额为行级人工调整
   lineAmount  Decimal @map("line_amount") @db.Decimal(18, 2)
@@ -407,30 +602,31 @@ enum FinanceCashMethod {
 
 model FinanceAccount {
   id        String    @id @default(uuid()) @db.Uuid
-  tenantId  String    @default("default") @map("tenant_id")
+  tenantId  String    @map("tenant_id")
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
   deletedAt DateTime? @map("deleted_at")
 
   // 账户编号：AC + 连字符 + 5 位全局流水（1-产品文档.md 五）
-  code           String               @map("code")
-  name           String               @map("name")
-  kind           FinanceAccountKind   @default(CORPORATE) @map("kind")
+  code           String                @map("code")
+  name           String                @map("name")
+  kind           FinanceAccountKind    @default(CORPORATE) @map("kind")
   channel        FinanceAccountChannel @default(BANK) @map("channel")
-  openingBalance Decimal              @default(0) @map("opening_balance") @db.Decimal(18, 2)
-  active         Boolean              @default(true) @map("active")
+  openingBalance Decimal               @default(0) @map("opening_balance") @db.Decimal(18, 2)
+  active         Boolean               @default(true) @map("active")
 
   entries   FinanceCashEntry[] @relation("CashEntryAccount")
   transfers FinanceCashEntry[] @relation("CashEntryToAccount")
 
   @@unique([tenantId, code])
+  @@index([tenantId, createdAt])
   @@index([name])
   @@map("finance_accounts")
 }
 
 model FinanceCashEntry {
   id        String    @id @default(uuid()) @db.Uuid
-  tenantId  String    @default("default") @map("tenant_id")
+  tenantId  String    @map("tenant_id")
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
   deletedAt DateTime? @map("deleted_at")
@@ -458,16 +654,164 @@ model FinanceCashEntry {
   note         String               @default("") @map("note")
   // 源单：当前仅销售单现结派生；手工流水三列为 NULL
   sourceType   String?              @map("source_type")
-  sourceId     String?              @db.Uuid @map("source_id")
+  sourceId     String?              @map("source_id") @db.Uuid
   sourceCode   String?              @map("source_code")
 
   @@unique([tenantId, code])
   // 同一源单最多派生一条流水（手工流水三列 NULL，唯一索引允许多个 NULL）
   @@unique([tenantId, sourceType, sourceId])
+  @@index([tenantId, occurredDate])
   @@index([occurredDate])
   @@index([accountId])
   @@index([customerId])
   @@index([supplierId])
   @@index([category])
   @@map("finance_cash_entries")
+}
+
+// ── 生产与库存领域（production，design/生产与库存.md §2）────────
+// 生产记录 = 原木领用 + 多行净尺寸产出；库存由采购 / 生产 / 销售 / 调整实时聚合，不落快照。
+// 成本池与库存估值见 packages/shared/src/inventory.calc.ts。
+
+enum InventoryAdjustmentType {
+  OPENING
+  COUNT
+
+  @@map("inventory_adjustment_type")
+}
+
+enum InventoryTargetType {
+  RAW_LOG
+  TIMBER
+
+  @@map("inventory_target_type")
+}
+
+enum InventoryAdjustmentReason {
+  OPENING
+  MEASUREMENT
+  MISSING
+  DAMAGE
+  OTHER
+
+  @@map("inventory_adjustment_reason")
+}
+
+model MaterialIssue {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @map("tenant_id")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at")
+
+  // 原木领用单编号：MI + 连字符 + 5 位全局流水（1-产品文档.md 五）
+  code      String   @map("code")
+  issueDate DateTime @map("issue_date") @db.Date
+  // 领用原木吨数：实际领用，3 位小数
+  tons      Decimal  @map("tons") @db.Decimal(12, 3)
+  note      String   @default("") @map("note")
+
+  @@unique([tenantId, code])
+  @@index([tenantId, issueDate])
+  @@index([issueDate])
+  @@map("material_issues")
+}
+
+model ProductionOutput {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @map("tenant_id")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at")
+
+  // 方木产出单编号：PR + 连字符 + 5 位全局流水（1-产品文档.md 五）
+  code       String   @map("code")
+  outputDate DateTime @map("output_date") @db.Date
+  note       String   @default("") @map("note")
+
+  lines ProductionOutputLine[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, outputDate])
+  @@index([outputDate])
+  @@map("production_outputs")
+}
+
+model ProductionOutputLine {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @map("tenant_id")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at")
+
+  outputId String           @map("output_id") @db.Uuid
+  output   ProductionOutput @relation(fields: [outputId], references: [id], onDelete: Cascade)
+  // 行序：创建时分配，删除后不回改不重排
+  seq      Int              @map("seq")
+
+  // 净尺寸整数毫米；方量由服务端按长 × 宽 × 高 × 根数 ÷ 10^9 重算
+  lengthMm Int     @map("length_mm")
+  widthMm  Int     @map("width_mm")
+  heightMm Int     @map("height_mm")
+  pieces   Int     @map("pieces")
+  volumeM3 Decimal @map("volume_m3") @db.Decimal(18, 4)
+  note     String  @default("") @map("note")
+
+  @@unique([outputId, seq])
+  @@index([outputId])
+  @@map("production_output_lines")
+}
+
+model InventoryAdjustment {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @map("tenant_id")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at")
+
+  // 库存调整编号：IC + 连字符 + 5 位全局流水（期初与盘点共用）
+  code           String                  @map("code")
+  adjustmentDate DateTime                @map("adjustment_date") @db.Date
+  type           InventoryAdjustmentType @map("type")
+  note           String                  @default("") @map("note")
+  // 操作人快照：创建时写入；存量数据为空，展示「—」
+  createdBy      String?                 @map("created_by") @db.Uuid
+  createdByName  String                  @default("") @map("created_by_name")
+
+  items InventoryAdjustmentItem[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, adjustmentDate])
+  @@index([adjustmentDate])
+  @@map("inventory_adjustments")
+}
+
+model InventoryAdjustmentItem {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @map("tenant_id")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at")
+
+  adjustmentId String              @map("adjustment_id") @db.Uuid
+  adjustment   InventoryAdjustment @relation(fields: [adjustmentId], references: [id], onDelete: Cascade)
+
+  targetType InventoryTargetType @map("target_type")
+  // 方木净尺寸；原木为空
+  lengthMm   Int?                @map("length_mm")
+  widthMm    Int?                @map("width_mm")
+  heightMm   Int?                @map("height_mm")
+
+  // 数量：原木吨数 / 方木方数，统一 4 位；原木展示 3 位
+  bookQuantity       Decimal                   @map("book_quantity") @db.Decimal(18, 4)
+  actualQuantity     Decimal                   @map("actual_quantity") @db.Decimal(18, 4)
+  differenceQuantity Decimal                   @map("difference_quantity") @db.Decimal(18, 4)
+  unitCost           Decimal                   @map("unit_cost") @db.Decimal(18, 6)
+  amount             Decimal                   @map("amount") @db.Decimal(18, 2)
+  reason             InventoryAdjustmentReason @map("reason")
+  note               String                    @default("") @map("note")
+
+  @@index([adjustmentId])
+  @@index([targetType])
+  @@map("inventory_adjustment_items")
 }

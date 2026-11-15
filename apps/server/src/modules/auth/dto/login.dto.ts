@@ -4,6 +4,9 @@ import { ApiProperty } from '@nestjs/swagger';
 // 运行时校验以 @mcc/shared 的 zod schema 为准（ZodValidationPipe，技术方案 §8.4）。
 // 注意：属性须显式标注 type——开发运行时（tsx）不产出 design:type 元数据，缺省会触发循环依赖探测。
 export class LoginBodyDto {
+  @ApiProperty({ type: String, description: '租户编号（登录标识）', example: 'TN-00001' })
+  tenantCode!: string;
+
   @ApiProperty({ type: String, description: '账号，一人一号', example: 'admin' })
   username!: string;
 
@@ -27,6 +30,9 @@ export class LoginResponseDto {
 
   @ApiProperty({ type: String, description: '角色：ADMIN / SALES / FINANCE / WORKER' })
   role!: string;
+
+  @ApiProperty({ type: [String], description: '租户有效功能（菜单按 feature ∩ scope 裁剪）' })
+  features!: string[];
 }
 
 export class RefreshRequestDto {
@@ -41,4 +47,7 @@ export class RefreshRequestDto {
 export class RefreshResponseDto {
   @ApiProperty({ type: String, description: '新签发的访问令牌' })
   accessToken!: string;
+
+  @ApiProperty({ type: [String], description: '租户有效功能（刷新后重新下发，菜单据此裁剪）' })
+  features!: string[];
 }

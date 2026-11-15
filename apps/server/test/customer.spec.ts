@@ -8,6 +8,7 @@ import type { CustomerInput } from '@mcc/shared';
 import { AppModule } from '../src/app.module.js';
 import { API_PREFIX } from '../src/common/api-prefix.js';
 import { PrismaService } from '../src/common/prisma.service.js';
+import { scopedClient, TEST_TENANT_CODE, TEST_TENANT_ID } from './helpers.js';
 
 // 客户接口关键路径（契约/集成层，技术方案 §10）：
 // 守卫 401 / 新建（编号格式、默认启用）/ 重名提示不阻断 / 列表筛选 /
@@ -17,6 +18,7 @@ import { PrismaService } from '../src/common/prisma.service.js';
 describe('客户接口（契约/集成）', () => {
   let app: INestApplication;
   let prisma: PrismaService;
+  let db: PrismaService['client'];
   let accessToken: string;
   const username = `it-customer-user-${Date.now()}`;
   const password = 'Secret#12345';
@@ -37,10 +39,12 @@ describe('客户接口（契约/集成）', () => {
     app.setGlobalPrefix(API_PREFIX);
     await app.init();
     prisma = app.get(PrismaService);
-    await prisma.client.user.create({
-      data: { username, passwordHash: await hash(password), role: 'SALES' },
+    db = scopedClient(prisma.client);
+    await db.user.create({
+      data: { tenantId: TEST_TENANT_ID, username, passwordHash: await hash(password), role: 'SALES' },
     });
     const login = await request(app.getHttpServer()).post(`/${API_PREFIX}/auth/login`).send({
+      tenantCode: TEST_TENANT_CODE,
       username,
       password,
       rememberMe: false,
@@ -49,10 +53,10 @@ describe('客户接口（契约/集成）', () => {
   });
 
   afterAll(async () => {
-    await prisma.client.saleOrder.deleteMany({ where: { customerName: { startsWith: 'it-customer-' } } });
-    await prisma.client.customer.deleteMany({ where: { name: { startsWith: 'it-customer-' } } });
-    await prisma.client.user.deleteMany({ where: { username: { startsWith: 'it-customer-user-' } } });
-    await prisma.client.eventLog.deleteMany({ where: { actorUsername: username } });
+    await db.saleOrder.deleteMany({ where: { customerName: { startsWith: 'it-customer-' } } });
+    await db.customer.deleteMany({ where: { name: { startsWith: 'it-customer-' } } });
+    await db.user.deleteMany({ where: { username: { startsWith: 'it-customer-user-' } } });
+    await db.eventLog.deleteMany({ where: { actorUsername: username } });
     await app.close();
   });
 
@@ -85,7 +89,7 @@ describe('客户接口（契约/集成）', () => {
     expect(first.status).toBe(201);
     expect(second.status).toBe(201);
     expect(second.body.id).toBe(first.body.id);
-    expect(await prisma.client.customer.count({ where: { name } })).toBe(1);
+    expect(await db.customer.count({ where: { name } })).toBe(1);
   });
 
   it('重名：允许保存（不唯一），name-check 返回 duplicate', async () => {

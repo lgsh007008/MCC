@@ -7,6 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from '../src/app.module.js';
 import { API_PREFIX } from '../src/common/api-prefix.js';
 import { PrismaService } from '../src/common/prisma.service.js';
+import { scopedClient, TEST_TENANT_CODE, TEST_TENANT_ID } from './helpers.js';
 
 // 资金收付 / 应收关键路径（product/finance.md R-财务-002）：
 // 账户余额、内部转账不计收支、收款减少欠款、编号前缀。
@@ -15,6 +16,7 @@ import { PrismaService } from '../src/common/prisma.service.js';
 describe('资金收付（契约/集成）', () => {
   let app: INestApplication;
   let prisma: PrismaService;
+  let db: PrismaService['client'];
   let accessToken: string;
   const username = `it-cash-user-${Date.now()}`;
   const password = 'Secret#12345';
@@ -31,10 +33,12 @@ describe('资金收付（契约/集成）', () => {
     app.setGlobalPrefix(API_PREFIX);
     await app.init();
     prisma = app.get(PrismaService);
-    await prisma.client.user.create({
-      data: { username, passwordHash: await hash(password), role: 'SALES' },
+    db = scopedClient(prisma.client);
+    await db.user.create({
+      data: { tenantId: TEST_TENANT_ID, username, passwordHash: await hash(password), role: 'SALES' },
     });
     const login = await request(app.getHttpServer()).post(`/${API_PREFIX}/auth/login`).send({
+      tenantCode: TEST_TENANT_CODE,
       username,
       password,
       rememberMe: false,
@@ -48,19 +52,19 @@ describe('资金收付（契约/集成）', () => {
   });
 
   afterAll(async () => {
-    const accounts = await prisma.client.financeAccount.findMany({
+    const accounts = await db.financeAccount.findMany({
       where: { name: { startsWith: 'it-cash-' } },
       select: { id: true },
     });
     const accountIds = accounts.map((row) => row.id);
-    await prisma.client.financeCashEntry.deleteMany({
+    await db.financeCashEntry.deleteMany({
       where: { OR: [{ accountId: { in: accountIds } }, { toAccountId: { in: accountIds } }] },
     });
-    await prisma.client.saleOrder.deleteMany({ where: { customerId } });
-    await prisma.client.financeAccount.deleteMany({ where: { id: { in: accountIds } } });
-    await prisma.client.customer.deleteMany({ where: { name: { startsWith: 'it-cash-' } } });
-    await prisma.client.user.deleteMany({ where: { username: { startsWith: 'it-cash-user-' } } });
-    await prisma.client.eventLog.deleteMany({ where: { actorUsername: username } });
+    await db.saleOrder.deleteMany({ where: { customerId } });
+    await db.financeAccount.deleteMany({ where: { id: { in: accountIds } } });
+    await db.customer.deleteMany({ where: { name: { startsWith: 'it-cash-' } } });
+    await db.user.deleteMany({ where: { username: { startsWith: 'it-cash-user-' } } });
+    await db.eventLog.deleteMany({ where: { actorUsername: username } });
     await app.close();
   });
 

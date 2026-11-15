@@ -43,7 +43,11 @@ import { randomUuid } from '@/lib/uuid';
 type UserRow = ApiSchemas['UserDto'];
 
 const PAGE_SIZE = 20;
-const EMPTY_LIST: ApiSchemas['UserListDto'] = { total: 0, items: [] };
+const EMPTY_LIST: ApiSchemas['UserListDto'] = {
+  total: 0,
+  items: [],
+  quota: { used: 0, maxAccounts: 0 },
+};
 
 const roleOptions = USER_ROLES.map((role) => ({ value: role, label: ROLE_LABELS[role] }));
 
@@ -249,7 +253,17 @@ export default function UsersPage(): React.ReactElement {
       </form>
 
       <div className="flex items-center justify-between gap-2">
-        <Button onClick={() => setCreateOpen(true)}>新建账号</Button>
+        <div className="flex items-center gap-3">
+          <Button
+            onClick={() => setCreateOpen(true)}
+            disabled={data.quota.maxAccounts > 0 && data.quota.used >= data.quota.maxAccounts}
+          >
+            新建账号
+          </Button>
+          <span className="text-xs text-muted-foreground">
+            已用 {data.quota.used} / 上限 {data.quota.maxAccounts}
+          </span>
+        </div>
         <Button variant="outline" onClick={() => setPermissionsOpen(true)}>
           角色权限说明
         </Button>

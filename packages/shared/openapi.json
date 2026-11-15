@@ -1,6 +1,23 @@
 {
   "openapi": "3.0.0",
   "paths": {
+    "/api/v1/health": {
+      "get": {
+        "description": "外部探活使用，不校验登录态",
+        "operationId": "HealthController_check",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "服务存活"
+          }
+        },
+        "security": [],
+        "summary": "健康检查",
+        "tags": [
+          "system"
+        ]
+      }
+    },
     "/api/v1/audit-logs": {
       "get": {
         "operationId": "AuditController_list",
@@ -100,6 +117,543 @@
         ]
       }
     },
+    "/api/v1/ops/audit-logs": {
+      "get": {
+        "operationId": "PlatformAuditController_list",
+        "parameters": [
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "description": "每页条数，默认 20（最大 100）",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "页码，默认 1",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "result",
+            "required": false,
+            "in": "query",
+            "description": "结果",
+            "schema": {
+              "enum": [
+                "ok",
+                "failed"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "targetTenant",
+            "required": false,
+            "in": "query",
+            "description": "目标租户编号/名称模糊",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "action",
+            "required": false,
+            "in": "query",
+            "description": "动作标识",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "actor",
+            "required": false,
+            "in": "query",
+            "description": "操作人账号模糊",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateTo",
+            "required": false,
+            "in": "query",
+            "description": "结束日期 YYYY-MM-DD",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateFrom",
+            "required": false,
+            "in": "query",
+            "description": "开始日期 YYYY-MM-DD",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformAuditLogListDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "平台审计列表：时间范围、操作人、动作、目标租户、结果 + 分页",
+        "tags": [
+          "ops-audit-logs"
+        ]
+      }
+    },
+    "/api/v1/ops/tenants": {
+      "get": {
+        "operationId": "TenantController_list",
+        "parameters": [
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "description": "每页条数，默认 20（最大 100）",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "页码，默认 1",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "planId",
+            "required": false,
+            "in": "query",
+            "description": "套餐 id",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "状态",
+            "schema": {
+              "enum": [
+                "active",
+                "suspended"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "name",
+            "required": false,
+            "in": "query",
+            "description": "租户名称模糊",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "code",
+            "required": false,
+            "in": "query",
+            "description": "租户编号模糊",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantListDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "租户列表：编号/名称模糊、状态、套餐 + 分页（账号数由 auth 批量接口前端组合）",
+        "tags": [
+          "ops-tenants"
+        ]
+      },
+      "post": {
+        "operationId": "TenantController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TenantCreateBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantDetailDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "开通租户：编号自动生成；只建租户，管理员由前端第二步补建",
+        "tags": [
+          "ops-tenants"
+        ]
+      }
+    },
+    "/api/v1/ops/tenants/{id}": {
+      "get": {
+        "operationId": "TenantController_detail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantDetailDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "租户详情：套餐、覆盖项、有效功能（不含账号数）",
+        "tags": [
+          "ops-tenants"
+        ]
+      },
+      "put": {
+        "operationId": "TenantController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TenantUpdateBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantDetailDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "更新租户名称与备注",
+        "tags": [
+          "ops-tenants"
+        ]
+      }
+    },
+    "/api/v1/ops/tenants/{id}/status": {
+      "patch": {
+        "operationId": "TenantController_setStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TenantStatusBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantDetailDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "停用 / 启用租户；停用使 session_epoch + 1，旧令牌立即失效",
+        "tags": [
+          "ops-tenants"
+        ]
+      }
+    },
+    "/api/v1/ops/tenants/{id}/plan": {
+      "put": {
+        "operationId": "TenantController_changePlan",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TenantPlanBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantPlanChangeDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "改套餐：校验目标套餐启用态，返回功能差异与额度变化",
+        "tags": [
+          "ops-tenants"
+        ]
+      }
+    },
+    "/api/v1/ops/tenants/{id}/features": {
+      "put": {
+        "operationId": "TenantController_setFeatures",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TenantFeaturesBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantDetailDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "全量提交功能覆盖项（只含与套餐不同的项），返回有效功能",
+        "tags": [
+          "ops-tenants"
+        ]
+      }
+    },
+    "/api/v1/ops/plans": {
+      "get": {
+        "operationId": "PlanController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanListDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "套餐列表（含使用该套餐的租户数）",
+        "tags": [
+          "ops-plans"
+        ]
+      },
+      "post": {
+        "operationId": "PlanController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanCreateBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "新建套餐（名称唯一；功能只含可售功能；账号额度）",
+        "tags": [
+          "ops-plans"
+        ]
+      }
+    },
+    "/api/v1/ops/plans/{id}": {
+      "put": {
+        "operationId": "PlanController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanCreateBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "更新套餐名称、功能集合、账号额度与备注",
+        "tags": [
+          "ops-plans"
+        ]
+      }
+    },
+    "/api/v1/ops/plans/{id}/status": {
+      "patch": {
+        "operationId": "PlanController_setStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanStatusBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "停用 / 启用套餐；停用后不可被新租户选择，存量租户不受影响",
+        "tags": [
+          "ops-plans"
+        ]
+      }
+    },
     "/api/v1/auth/login": {
       "post": {
         "operationId": "AuthController_login",
@@ -127,7 +681,7 @@
           }
         },
         "security": [],
-        "summary": "登录：校验账号密码，签发访问令牌 + 刷新令牌",
+        "summary": "登录：租户编号 + 账号 + 密码，签发访问令牌 + 刷新令牌",
         "tags": [
           "auth"
         ]
@@ -400,6 +954,412 @@
         "summary": "重置账号密码并撤销该账号全部刷新会话",
         "tags": [
           "users"
+        ]
+      }
+    },
+    "/api/v1/ops/auth/login": {
+      "post": {
+        "operationId": "PlatformAuthController_login",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlatformLoginBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformLoginResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "summary": "平台运营登录：签发平台访问令牌 + 平台刷新令牌",
+        "tags": [
+          "ops-auth"
+        ]
+      }
+    },
+    "/api/v1/ops/auth/refresh": {
+      "post": {
+        "operationId": "PlatformAuthController_refresh",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlatformRefreshRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformRefreshResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "summary": "凭 ops_refresh_token Cookie（或请求体）换新平台访问令牌",
+        "tags": [
+          "ops-auth"
+        ]
+      }
+    },
+    "/api/v1/ops/auth/logout": {
+      "post": {
+        "operationId": "PlatformAuthController_logout",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [],
+        "summary": "撤销平台刷新令牌，登出",
+        "tags": [
+          "ops-auth"
+        ]
+      }
+    },
+    "/api/v1/ops/auth/change-password": {
+      "post": {
+        "operationId": "PlatformAuthController_changePassword",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "平台账号改密；成功后撤销该账号全部平台刷新会话",
+        "tags": [
+          "ops-auth"
+        ]
+      }
+    },
+    "/api/v1/ops/accounts": {
+      "get": {
+        "operationId": "PlatformUsersController_listPlatformUsers",
+        "parameters": [
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "description": "每页条数，默认 20（最大 100）",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "页码，默认 1",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "keyword",
+            "required": false,
+            "in": "query",
+            "description": "账号名模糊",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformUserListDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "平台运营账号列表（不含密码）",
+        "tags": [
+          "ops-accounts"
+        ]
+      },
+      "post": {
+        "operationId": "PlatformUsersController_createPlatformUser",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlatformUserCreateBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformUserDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "新建平台运营账号（全局唯一；初始密码至少 8 位）",
+        "tags": [
+          "ops-accounts"
+        ]
+      }
+    },
+    "/api/v1/ops/accounts/{id}/status": {
+      "patch": {
+        "operationId": "PlatformUsersController_setPlatformUserStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlatformUserStatusBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformUserDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "启用 / 停用平台账号（不能停用自己或最后一个启用平台管理员）",
+        "tags": [
+          "ops-accounts"
+        ]
+      }
+    },
+    "/api/v1/ops/accounts/{id}/reset-password": {
+      "post": {
+        "operationId": "PlatformUsersController_resetPlatformUserPassword",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlatformUserResetPasswordBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "重置平台账号密码并撤销其全部平台刷新会话",
+        "tags": [
+          "ops-accounts"
+        ]
+      }
+    },
+    "/api/v1/ops/tenant-account-counts": {
+      "get": {
+        "operationId": "PlatformUsersController_tenantAccountCounts",
+        "parameters": [
+          {
+            "name": "tenantIds",
+            "required": true,
+            "in": "query",
+            "description": "租户 id，逗号分隔（最多 200）",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantAccountCountsDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "批量租户账号数（未删除、含停用；平台账号不计入）",
+        "tags": [
+          "ops-accounts"
+        ]
+      }
+    },
+    "/api/v1/ops/tenants/{tenantId}/admins": {
+      "get": {
+        "operationId": "PlatformUsersController_tenantAdmins",
+        "parameters": [
+          {
+            "name": "tenantId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantAdminListDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "租户 ADMIN 账号列表（跨租户受控作用域）",
+        "tags": [
+          "ops-accounts"
+        ]
+      },
+      "post": {
+        "operationId": "PlatformUsersController_createTenantAdmin",
+        "parameters": [
+          {
+            "name": "tenantId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TenantAdminCreateBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantAdminDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "补建 / 新增租户管理员（校验套餐额度）",
+        "tags": [
+          "ops-accounts"
+        ]
+      }
+    },
+    "/api/v1/ops/tenants/{tenantId}/admins/{userId}/reset-password": {
+      "post": {
+        "operationId": "PlatformUsersController_resetTenantAdminPassword",
+        "parameters": [
+          {
+            "name": "tenantId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TenantAdminResetPasswordBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "重置租户管理员密码并撤销该账号刷新会话",
+        "tags": [
+          "ops-accounts"
         ]
       }
     },
@@ -1591,6 +2551,641 @@
         ]
       }
     },
+    "/api/v1/material-issues": {
+      "get": {
+        "operationId": "ProductionController_listIssues",
+        "parameters": [
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "description": "每页条数，默认 20（最大 100）",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "页码，默认 1",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "dateTo",
+            "required": false,
+            "in": "query",
+            "description": "领用日期止（YYYY-MM-DD）",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateFrom",
+            "required": false,
+            "in": "query",
+            "description": "领用日期起（YYYY-MM-DD）",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MaterialIssueListDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "原木领用列表：领用日期区间 + 分页；含领用吨数合计",
+        "tags": [
+          "production"
+        ]
+      },
+      "post": {
+        "operationId": "ProductionController_createIssue",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MaterialIssueBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MaterialIssueDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "新建原木领用；重复提交防抖：请求头 Idempotency-Key",
+        "tags": [
+          "production"
+        ]
+      }
+    },
+    "/api/v1/material-issues/{id}": {
+      "get": {
+        "operationId": "ProductionController_issueDetail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MaterialIssueDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "原木领用详情",
+        "tags": [
+          "production"
+        ]
+      },
+      "put": {
+        "operationId": "ProductionController_updateIssue",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MaterialIssueBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MaterialIssueDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "更新原木领用",
+        "tags": [
+          "production"
+        ]
+      },
+      "delete": {
+        "operationId": "ProductionController_removeIssue",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "删除原木领用（软删除，编号不回收）",
+        "tags": [
+          "production"
+        ]
+      }
+    },
+    "/api/v1/material-issues/batch-delete": {
+      "post": {
+        "operationId": "ProductionController_batchDeleteIssues",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MaterialIssueBatchDeleteBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MaterialIssueBatchDeleteResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "批量删除原木领用（软删除；不存在/已删行静默跳过）",
+        "tags": [
+          "production"
+        ]
+      }
+    },
+    "/api/v1/production-outputs": {
+      "get": {
+        "operationId": "ProductionController_listOutputs",
+        "parameters": [
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "description": "每页条数，默认 20（最大 100）",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "页码，默认 1",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "dateTo",
+            "required": false,
+            "in": "query",
+            "description": "产出日期止（YYYY-MM-DD）",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateFrom",
+            "required": false,
+            "in": "query",
+            "description": "产出日期起（YYYY-MM-DD）",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductionOutputListDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "方木产出列表：产出日期区间 + 分页；含产出总方数合计",
+        "tags": [
+          "production"
+        ]
+      },
+      "post": {
+        "operationId": "ProductionController_createOutput",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductionOutputBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductionOutputDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "新建方木产出；重复提交防抖：请求头 Idempotency-Key",
+        "tags": [
+          "production"
+        ]
+      }
+    },
+    "/api/v1/production-outputs/{id}": {
+      "get": {
+        "operationId": "ProductionController_outputDetail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductionOutputDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "方木产出详情（含产出明细）",
+        "tags": [
+          "production"
+        ]
+      },
+      "put": {
+        "operationId": "ProductionController_updateOutput",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductionOutputUpdateBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductionOutputDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "更新方木产出（整单提交，产出明细同步）",
+        "tags": [
+          "production"
+        ]
+      },
+      "delete": {
+        "operationId": "ProductionController_removeOutput",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "删除方木产出（软删除，编号不回收）",
+        "tags": [
+          "production"
+        ]
+      }
+    },
+    "/api/v1/production-outputs/batch-delete": {
+      "post": {
+        "operationId": "ProductionController_batchDeleteOutputs",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductionOutputBatchDeleteBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductionOutputBatchDeleteResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "批量删除方木产出（软删除；不存在/已删行静默跳过）",
+        "tags": [
+          "production"
+        ]
+      }
+    },
+    "/api/v1/inventory/summary": {
+      "get": {
+        "operationId": "ProductionController_inventorySummary",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventorySummaryDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "当前库存汇总：原木 / 方木库存、成本、总值、负库存与期初状态",
+        "tags": [
+          "production"
+        ]
+      }
+    },
+    "/api/v1/inventory/openings/current": {
+      "get": {
+        "operationId": "ProductionController_openingCurrent",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventoryOpeningDetailDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "当前期初库存只读详情（头 + 原木 / 方木明细）",
+        "tags": [
+          "production"
+        ]
+      }
+    },
+    "/api/v1/inventory/counts": {
+      "get": {
+        "operationId": "ProductionController_countList",
+        "parameters": [
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "description": "每页条数，默认 20（最大 100）",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "页码，默认 1",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "dateTo",
+            "required": false,
+            "in": "query",
+            "description": "盘点日期止（YYYY-MM-DD）",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateFrom",
+            "required": false,
+            "in": "query",
+            "description": "盘点日期起（YYYY-MM-DD）",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "targetType",
+            "required": false,
+            "in": "query",
+            "description": "盘点类型筛选",
+            "schema": {
+              "enum": [
+                "raw_log",
+                "timber"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventoryCountListDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "盘点记录列表：类型 + 日期区间 + 分页；含操作人、盘盈 / 盘亏项数与差异金额",
+        "tags": [
+          "production"
+        ]
+      },
+      "post": {
+        "operationId": "ProductionController_createCount",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InventoryCountBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventoryAdjustmentResultDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "库存盘点（IC 编号；单类型、实盘可空、原因可选；Idempotency-Key）",
+        "tags": [
+          "production"
+        ]
+      }
+    },
+    "/api/v1/inventory/counts/{id}": {
+      "get": {
+        "operationId": "ProductionController_countDetail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventoryCountDetailDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "盘点记录详情（头含盘点类型 + 明细）",
+        "tags": [
+          "production"
+        ]
+      }
+    },
+    "/api/v1/inventory/openings": {
+      "post": {
+        "operationId": "ProductionController_createOpening",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InventoryOpeningBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventoryAdjustmentResultDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "设置库存期初（IC 编号；仅允许一次；Idempotency-Key）",
+        "tags": [
+          "production"
+        ]
+      }
+    },
     "/api/v1/sale-orders": {
       "get": {
         "operationId": "OrderController_list",
@@ -1752,6 +3347,68 @@
           }
         },
         "summary": "客户维度累计方量（未软删销售单合计，供客户列表/详情批量取数）",
+        "tags": [
+          "sale-orders"
+        ]
+      }
+    },
+    "/api/v1/sale-orders/{id}/profit": {
+      "get": {
+        "operationId": "OrderController_profit",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaleOrderProfitDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "销售单材料毛利快照（成本待补时毛利为 null）",
+        "tags": [
+          "sale-orders"
+        ]
+      }
+    },
+    "/api/v1/sale-orders/{id}/recalculate-cost": {
+      "post": {
+        "operationId": "OrderController_recalculateCost",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaleOrderProfitDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "重算成本待补订单的材料成本；仅 PENDING 可重算，成功后锁定",
         "tags": [
           "sale-orders"
         ]
@@ -2346,9 +4003,515 @@
           "items"
         ]
       },
+      "PlatformAuditLogItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "ISO 时间"
+          },
+          "actorId": {
+            "type": "string",
+            "nullable": true
+          },
+          "actorUsername": {
+            "type": "string",
+            "nullable": true
+          },
+          "domain": {
+            "type": "string",
+            "description": "领域"
+          },
+          "action": {
+            "type": "string",
+            "description": "动作标识"
+          },
+          "actionLabel": {
+            "type": "string",
+            "nullable": true,
+            "description": "中文动作名"
+          },
+          "targetTenantId": {
+            "type": "string",
+            "nullable": true,
+            "description": "目标租户 id 快照"
+          },
+          "targetTenantCode": {
+            "type": "string",
+            "nullable": true,
+            "description": "目标租户编号快照"
+          },
+          "targetTenantName": {
+            "type": "string",
+            "nullable": true,
+            "description": "目标租户名称快照"
+          },
+          "objectType": {
+            "type": "string",
+            "nullable": true
+          },
+          "objectId": {
+            "type": "string",
+            "nullable": true
+          },
+          "objectCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "result": {
+            "type": "string",
+            "description": "ok / failed"
+          },
+          "statusCode": {
+            "type": "number",
+            "nullable": true
+          },
+          "errorCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "ip": {
+            "type": "string",
+            "nullable": true
+          },
+          "userAgent": {
+            "type": "string",
+            "nullable": true
+          },
+          "requestId": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "createdAt",
+          "domain",
+          "action",
+          "result"
+        ]
+      },
+      "PlatformAuditLogListDto": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "number",
+            "description": "筛选后总数"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlatformAuditLogItemDto"
+            }
+          }
+        },
+        "required": [
+          "total",
+          "items"
+        ]
+      },
+      "TenantListItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "description": "租户编号（登录标识）"
+          },
+          "name": {
+            "type": "string"
+          },
+          "planId": {
+            "type": "string"
+          },
+          "planName": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "suspended"
+            ]
+          },
+          "maxAccounts": {
+            "type": "number",
+            "description": "套餐账号额度（账号数由 auth 批量接口前端组合）"
+          },
+          "note": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "创建时间（ISO）"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "planId",
+          "planName",
+          "status",
+          "maxAccounts",
+          "note",
+          "createdAt"
+        ]
+      },
+      "TenantListDto": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "number",
+            "description": "筛选后总数"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TenantListItemDto"
+            }
+          }
+        },
+        "required": [
+          "total",
+          "items"
+        ]
+      },
+      "TenantFeatureOverrideDto": {
+        "type": "object",
+        "properties": {
+          "featureCode": {
+            "type": "string",
+            "description": "可售功能标识"
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "true = 加购启用；false = 关闭"
+          }
+        },
+        "required": [
+          "featureCode",
+          "enabled"
+        ]
+      },
+      "TenantDetailDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "planId": {
+            "type": "string"
+          },
+          "planName": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "suspended"
+            ]
+          },
+          "maxAccounts": {
+            "type": "number"
+          },
+          "note": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "effectiveFeatures": {
+            "description": "有效功能（基础功能 ∪ 套餐功能 + 覆盖）",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "overrides": {
+            "description": "只含与套餐不同的覆盖项",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TenantFeatureOverrideDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "planId",
+          "planName",
+          "status",
+          "maxAccounts",
+          "note",
+          "createdAt",
+          "effectiveFeatures",
+          "overrides"
+        ]
+      },
+      "TenantCreateBodyDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "租户名称",
+            "example": "梅好木业"
+          },
+          "planId": {
+            "type": "string",
+            "description": "套餐 id"
+          },
+          "note": {
+            "type": "string",
+            "description": "备注",
+            "default": ""
+          }
+        },
+        "required": [
+          "name",
+          "planId"
+        ]
+      },
+      "TenantUpdateBodyDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "租户名称"
+          },
+          "note": {
+            "type": "string",
+            "description": "备注",
+            "default": ""
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "TenantStatusBodyDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "suspended"
+            ],
+            "description": "启用 / 停用"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "TenantPlanBodyDto": {
+        "type": "object",
+        "properties": {
+          "planId": {
+            "type": "string",
+            "description": "目标套餐 id（须为启用态）"
+          }
+        },
+        "required": [
+          "planId"
+        ]
+      },
+      "TenantPlanChangeDto": {
+        "type": "object",
+        "properties": {
+          "planId": {
+            "type": "string"
+          },
+          "planName": {
+            "type": "string"
+          },
+          "maxAccounts": {
+            "type": "number",
+            "description": "新套餐账号额度"
+          },
+          "effectiveFeatures": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "added": {
+            "description": "改套餐后新增的功能",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "removed": {
+            "description": "改套餐后失去的功能",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "planId",
+          "planName",
+          "maxAccounts",
+          "effectiveFeatures",
+          "added",
+          "removed"
+        ]
+      },
+      "TenantFeaturesBodyDto": {
+        "type": "object",
+        "properties": {
+          "overrides": {
+            "description": "全量提交覆盖项（只含与套餐不同的项）",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TenantFeatureOverrideDto"
+            }
+          }
+        },
+        "required": [
+          "overrides"
+        ]
+      },
+      "PlanDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "maxAccounts": {
+            "type": "number",
+            "description": "账号额度"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "inactive"
+            ]
+          },
+          "featureCodes": {
+            "description": "套餐包含的可售功能",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "note": {
+            "type": "string"
+          },
+          "tenantCount": {
+            "type": "number",
+            "description": "使用该套餐的租户数"
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "maxAccounts",
+          "status",
+          "featureCodes",
+          "note",
+          "tenantCount",
+          "createdAt"
+        ]
+      },
+      "PlanListDto": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "number",
+            "description": "总数"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlanDto"
+            }
+          }
+        },
+        "required": [
+          "total",
+          "items"
+        ]
+      },
+      "PlanCreateBodyDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "套餐名称（唯一）",
+            "example": "标准版"
+          },
+          "maxAccounts": {
+            "type": "number",
+            "description": "账号额度（0 表示不可新建账号）",
+            "example": 20
+          },
+          "featureCodes": {
+            "description": "可售功能标识集合",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "note": {
+            "type": "string",
+            "description": "备注",
+            "default": ""
+          }
+        },
+        "required": [
+          "name",
+          "maxAccounts",
+          "featureCodes"
+        ]
+      },
+      "PlanStatusBodyDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "inactive"
+            ],
+            "description": "启用 / 停用"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
       "LoginBodyDto": {
         "type": "object",
         "properties": {
+          "tenantCode": {
+            "type": "string",
+            "description": "租户编号（登录标识）",
+            "example": "TN-00001"
+          },
           "username": {
             "type": "string",
             "description": "账号，一人一号",
@@ -2366,6 +4529,7 @@
           }
         },
         "required": [
+          "tenantCode",
           "username",
           "password",
           "rememberMe"
@@ -2385,12 +4549,20 @@
           "role": {
             "type": "string",
             "description": "角色：ADMIN / SALES / FINANCE / WORKER"
+          },
+          "features": {
+            "description": "租户有效功能（菜单按 feature ∩ scope 裁剪）",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [
           "accessToken",
           "username",
-          "role"
+          "role",
+          "features"
         ]
       },
       "RefreshRequestDto": {
@@ -2408,10 +4580,18 @@
           "accessToken": {
             "type": "string",
             "description": "新签发的访问令牌"
+          },
+          "features": {
+            "description": "租户有效功能（刷新后重新下发，菜单据此裁剪）",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [
-          "accessToken"
+          "accessToken",
+          "features"
         ]
       },
       "ChangePasswordBodyDto": {
@@ -2478,23 +4658,49 @@
           "createdAt"
         ]
       },
+      "UserQuotaDto": {
+        "type": "object",
+        "properties": {
+          "used": {
+            "type": "number",
+            "description": "未删除账号数（含停用）"
+          },
+          "maxAccounts": {
+            "type": "number",
+            "description": "套餐账号额度"
+          }
+        },
+        "required": [
+          "used",
+          "maxAccounts"
+        ]
+      },
       "UserListDto": {
         "type": "object",
         "properties": {
           "total": {
             "type": "number",
-            "description": "总数"
+            "description": "筛选后总数"
           },
           "items": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/UserDto"
             }
+          },
+          "quota": {
+            "description": "账号额度（账号管理页显示与新建校验）",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UserQuotaDto"
+              }
+            ]
           }
         },
         "required": [
           "total",
-          "items"
+          "items",
+          "quota"
         ]
       },
       "UserCreateBodyDto": {
@@ -2568,6 +4774,284 @@
             "type": "string",
             "description": "新密码（至少 8 位）",
             "example": "Mcc@2026"
+          }
+        },
+        "required": [
+          "password"
+        ]
+      },
+      "PlatformLoginBodyDto": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "description": "平台账号",
+            "example": "opsadmin"
+          },
+          "password": {
+            "type": "string",
+            "description": "密码",
+            "example": "Mcc@2026"
+          },
+          "rememberMe": {
+            "type": "boolean",
+            "description": "记住登录：勾选 → 刷新令牌 30 天；不勾选 → 会话级",
+            "default": false
+          }
+        },
+        "required": [
+          "username",
+          "password",
+          "rememberMe"
+        ]
+      },
+      "PlatformLoginResponseDto": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string",
+            "description": "平台访问令牌，存内存并以 Bearer 请求头携带"
+          },
+          "username": {
+            "type": "string",
+            "description": "平台账号名"
+          },
+          "role": {
+            "type": "string",
+            "description": "平台角色（当前仅 PLATFORM_ADMIN）"
+          }
+        },
+        "required": [
+          "accessToken",
+          "username",
+          "role"
+        ]
+      },
+      "PlatformRefreshRequestDto": {
+        "type": "object",
+        "properties": {
+          "refreshToken": {
+            "type": "string",
+            "description": "无 Cookie 客户端经请求体传递刷新令牌；web 走 Cookie 时无需此字段"
+          }
+        }
+      },
+      "PlatformRefreshResponseDto": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string",
+            "description": "新签发的平台访问令牌"
+          }
+        },
+        "required": [
+          "accessToken"
+        ]
+      },
+      "PlatformUserDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "roleLabel": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "inactive"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "username",
+          "role",
+          "roleLabel",
+          "status",
+          "createdAt"
+        ]
+      },
+      "PlatformUserListDto": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "number"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlatformUserDto"
+            }
+          }
+        },
+        "required": [
+          "total",
+          "items"
+        ]
+      },
+      "PlatformUserCreateBodyDto": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "description": "平台账号（全局唯一）"
+          },
+          "password": {
+            "type": "string",
+            "description": "初始密码（至少 8 位）"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "PLATFORM_ADMIN"
+            ],
+            "description": "平台角色"
+          }
+        },
+        "required": [
+          "username",
+          "password",
+          "role"
+        ]
+      },
+      "PlatformUserStatusBodyDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "inactive"
+            ],
+            "description": "启用 / 停用"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "PlatformUserResetPasswordBodyDto": {
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": "string",
+            "description": "新密码（至少 8 位）"
+          }
+        },
+        "required": [
+          "password"
+        ]
+      },
+      "TenantAccountCountDto": {
+        "type": "object",
+        "properties": {
+          "tenantId": {
+            "type": "string"
+          },
+          "accountCount": {
+            "type": "number",
+            "description": "未删除账号数（含停用；平台账号不计入）"
+          }
+        },
+        "required": [
+          "tenantId",
+          "accountCount"
+        ]
+      },
+      "TenantAccountCountsDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TenantAccountCountDto"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "TenantAdminDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "inactive"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "username",
+          "status",
+          "createdAt"
+        ]
+      },
+      "TenantAdminListDto": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "number"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TenantAdminDto"
+            }
+          }
+        },
+        "required": [
+          "total",
+          "items"
+        ]
+      },
+      "TenantAdminCreateBodyDto": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "description": "账号（租户内唯一）"
+          },
+          "password": {
+            "type": "string",
+            "description": "初始密码（至少 8 位）"
+          }
+        },
+        "required": [
+          "username",
+          "password"
+        ]
+      },
+      "TenantAdminResetPasswordBodyDto": {
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": "string",
+            "description": "新密码（至少 8 位）"
           }
         },
         "required": [
@@ -3493,6 +5977,1048 @@
           "accountId"
         ]
       },
+      "MaterialIssueSummaryDto": {
+        "type": "object",
+        "properties": {
+          "tons": {
+            "type": "string",
+            "description": "领用吨数合计（3 位小数）"
+          }
+        },
+        "required": [
+          "tons"
+        ]
+      },
+      "MaterialIssueDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "description": "编号 MI-#####"
+          },
+          "issueDate": {
+            "type": "string",
+            "description": "领用日期"
+          },
+          "tons": {
+            "type": "string",
+            "description": "领用原木吨数（3 位小数）"
+          },
+          "note": {
+            "type": "string"
+          },
+          "settlementStatus": {
+            "type": "string",
+            "description": "结转状态：pending 待结转 / settled 已结转"
+          },
+          "settledAmount": {
+            "type": "string",
+            "description": "已结转金额（2 位小数）"
+          },
+          "pendingAmount": {
+            "type": "string",
+            "description": "待结转金额（2 位小数）"
+          },
+          "settledByCodes": {
+            "description": "结转过本单的产出单编号（按事件顺序）",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "issueDate",
+          "tons",
+          "note",
+          "settlementStatus",
+          "settledAmount",
+          "pendingAmount",
+          "settledByCodes",
+          "createdAt"
+        ]
+      },
+      "MaterialIssueListDto": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "number"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/MaterialIssueSummaryDto"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MaterialIssueDto"
+            }
+          }
+        },
+        "required": [
+          "total",
+          "summary",
+          "items"
+        ]
+      },
+      "MaterialIssueBodyDto": {
+        "type": "object",
+        "properties": {
+          "issueDate": {
+            "type": "string",
+            "description": "领用日期",
+            "example": "2026-11-15"
+          },
+          "tons": {
+            "type": "string",
+            "description": "领用原木吨数（3 位小数）",
+            "example": "5.000"
+          },
+          "note": {
+            "type": "string",
+            "description": "备注",
+            "default": ""
+          }
+        },
+        "required": [
+          "issueDate",
+          "tons"
+        ]
+      },
+      "MaterialIssueBatchDeleteBodyDto": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "description": "原木领用单 id 列表（1~200）",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "ids"
+        ]
+      },
+      "MaterialIssueBatchDeleteResponseDto": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "number",
+            "description": "实际删除条数"
+          }
+        },
+        "required": [
+          "deleted"
+        ]
+      },
+      "ProductionOutputSummaryDto": {
+        "type": "object",
+        "properties": {
+          "totalVolume": {
+            "type": "string",
+            "description": "产出总方数（4 位小数）"
+          }
+        },
+        "required": [
+          "totalVolume"
+        ]
+      },
+      "ProductionOutputListItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "description": "编号 PR-#####"
+          },
+          "outputDate": {
+            "type": "string",
+            "description": "产出日期"
+          },
+          "lineCount": {
+            "type": "number",
+            "description": "产出明细行数"
+          },
+          "totalVolume": {
+            "type": "string",
+            "description": "产出总方数（4 位小数）"
+          },
+          "settledAmount": {
+            "type": "string",
+            "description": "本次结转金额（2 位小数）"
+          },
+          "note": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "outputDate",
+          "lineCount",
+          "totalVolume",
+          "settledAmount",
+          "note",
+          "createdAt"
+        ]
+      },
+      "ProductionOutputListDto": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "number"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/ProductionOutputSummaryDto"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductionOutputListItemDto"
+            }
+          }
+        },
+        "required": [
+          "total",
+          "summary",
+          "items"
+        ]
+      },
+      "ProductionOutputLineDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "seq": {
+            "type": "number"
+          },
+          "lengthMm": {
+            "type": "number"
+          },
+          "widthMm": {
+            "type": "number"
+          },
+          "heightMm": {
+            "type": "number"
+          },
+          "pieces": {
+            "type": "number"
+          },
+          "volumeM3": {
+            "type": "string",
+            "description": "方量（m³，4 位小数）"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "seq",
+          "lengthMm",
+          "widthMm",
+          "heightMm",
+          "pieces",
+          "volumeM3",
+          "note"
+        ]
+      },
+      "ProductionOutputDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "description": "编号 PR-#####"
+          },
+          "outputDate": {
+            "type": "string",
+            "description": "产出日期"
+          },
+          "lineCount": {
+            "type": "number",
+            "description": "产出明细行数"
+          },
+          "totalVolume": {
+            "type": "string",
+            "description": "产出总方数（4 位小数）"
+          },
+          "settledAmount": {
+            "type": "string",
+            "description": "本次结转金额（2 位小数）"
+          },
+          "note": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "sourceIssueCodes": {
+            "description": "来源领用单编号（按最早未结转先结转推导）",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "outputs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductionOutputLineDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "outputDate",
+          "lineCount",
+          "totalVolume",
+          "settledAmount",
+          "note",
+          "createdAt",
+          "sourceIssueCodes",
+          "outputs"
+        ]
+      },
+      "ProductionOutputLineBodyDto": {
+        "type": "object",
+        "properties": {
+          "lengthMm": {
+            "type": "number",
+            "description": "长度（净尺寸，整数毫米）",
+            "example": 3000
+          },
+          "widthMm": {
+            "type": "number",
+            "description": "宽度（净尺寸，整数毫米）",
+            "example": 100
+          },
+          "heightMm": {
+            "type": "number",
+            "description": "高度（净尺寸，整数毫米）",
+            "example": 20
+          },
+          "pieces": {
+            "type": "number",
+            "description": "根数（正整数）",
+            "example": 10
+          },
+          "note": {
+            "type": "string",
+            "description": "行备注",
+            "default": ""
+          }
+        },
+        "required": [
+          "lengthMm",
+          "widthMm",
+          "heightMm",
+          "pieces"
+        ]
+      },
+      "ProductionOutputBodyDto": {
+        "type": "object",
+        "properties": {
+          "outputDate": {
+            "type": "string",
+            "description": "产出日期",
+            "example": "2026-11-15"
+          },
+          "note": {
+            "type": "string",
+            "description": "备注",
+            "default": ""
+          },
+          "outputs": {
+            "description": "产出明细（至少一行）",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductionOutputLineBodyDto"
+            }
+          }
+        },
+        "required": [
+          "outputDate",
+          "outputs"
+        ]
+      },
+      "ProductionOutputLineUpdateBodyDto": {
+        "type": "object",
+        "properties": {
+          "lengthMm": {
+            "type": "number",
+            "description": "长度（净尺寸，整数毫米）",
+            "example": 3000
+          },
+          "widthMm": {
+            "type": "number",
+            "description": "宽度（净尺寸，整数毫米）",
+            "example": 100
+          },
+          "heightMm": {
+            "type": "number",
+            "description": "高度（净尺寸，整数毫米）",
+            "example": 20
+          },
+          "pieces": {
+            "type": "number",
+            "description": "根数（正整数）",
+            "example": 10
+          },
+          "note": {
+            "type": "string",
+            "description": "行备注",
+            "default": ""
+          },
+          "id": {
+            "type": "string",
+            "description": "已有产出行 id（编辑时携带）"
+          }
+        },
+        "required": [
+          "lengthMm",
+          "widthMm",
+          "heightMm",
+          "pieces"
+        ]
+      },
+      "ProductionOutputUpdateBodyDto": {
+        "type": "object",
+        "properties": {
+          "outputDate": {
+            "type": "string",
+            "description": "产出日期",
+            "example": "2026-11-15"
+          },
+          "note": {
+            "type": "string",
+            "description": "备注",
+            "default": ""
+          },
+          "outputs": {
+            "description": "产出明细（至少一行；已有行带 id）",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductionOutputLineUpdateBodyDto"
+            }
+          }
+        },
+        "required": [
+          "outputDate",
+          "outputs"
+        ]
+      },
+      "ProductionOutputBatchDeleteBodyDto": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "description": "方木产出单 id 列表（1~200）",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "ids"
+        ]
+      },
+      "ProductionOutputBatchDeleteResponseDto": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "number",
+            "description": "实际删除条数"
+          }
+        },
+        "required": [
+          "deleted"
+        ]
+      },
+      "InventoryPoolDto": {
+        "type": "object",
+        "properties": {
+          "quantity": {
+            "type": "string",
+            "description": "数量：原木吨数 / 方木方数"
+          },
+          "unitCost": {
+            "type": "string",
+            "description": "平均成本：元/吨 或 元/m³（6 位）"
+          },
+          "amount": {
+            "type": "string",
+            "description": "库存金额"
+          },
+          "negative": {
+            "type": "boolean",
+            "description": "是否为负库存"
+          }
+        },
+        "required": [
+          "quantity",
+          "unitCost",
+          "amount",
+          "negative"
+        ]
+      },
+      "InventoryTimberLineDto": {
+        "type": "object",
+        "properties": {
+          "productType": {
+            "type": "string"
+          },
+          "lengthMm": {
+            "type": "number"
+          },
+          "widthMm": {
+            "type": "number"
+          },
+          "heightMm": {
+            "type": "number"
+          },
+          "quantity": {
+            "type": "string"
+          },
+          "unitCost": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "string"
+          },
+          "negative": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "productType",
+          "lengthMm",
+          "widthMm",
+          "heightMm",
+          "quantity",
+          "unitCost",
+          "amount",
+          "negative"
+        ]
+      },
+      "InventorySummaryDto": {
+        "type": "object",
+        "properties": {
+          "needsOpening": {
+            "type": "boolean",
+            "description": "是否尚未设置期初库存"
+          },
+          "openingDate": {
+            "type": "string",
+            "nullable": true,
+            "description": "期初日期"
+          },
+          "raw": {
+            "$ref": "#/components/schemas/InventoryPoolDto"
+          },
+          "timber": {
+            "$ref": "#/components/schemas/InventoryPoolDto"
+          },
+          "timberLines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InventoryTimberLineDto"
+            }
+          },
+          "totalAmount": {
+            "type": "string"
+          },
+          "pendingAmount": {
+            "type": "string",
+            "description": "待结转成本（不计入库存总值）"
+          },
+          "pendingIssueCount": {
+            "type": "number",
+            "description": "待结转的领用单笔数"
+          },
+          "earliestPendingIssueCode": {
+            "type": "string",
+            "nullable": true,
+            "description": "最早一笔待结转领用单编号"
+          },
+          "earliestPendingIssueDate": {
+            "type": "string",
+            "nullable": true,
+            "description": "最早一笔待结转领用单日期"
+          },
+          "negativeLineCount": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "needsOpening",
+          "openingDate",
+          "raw",
+          "timber",
+          "timberLines",
+          "totalAmount",
+          "pendingAmount",
+          "pendingIssueCount",
+          "earliestPendingIssueCode",
+          "earliestPendingIssueDate",
+          "negativeLineCount"
+        ]
+      },
+      "InventoryAdjustmentItemDto": {
+        "type": "object",
+        "properties": {
+          "targetType": {
+            "type": "string",
+            "enum": [
+              "raw_log",
+              "timber"
+            ]
+          },
+          "lengthMm": {
+            "type": "number",
+            "nullable": true
+          },
+          "widthMm": {
+            "type": "number",
+            "nullable": true
+          },
+          "heightMm": {
+            "type": "number",
+            "nullable": true
+          },
+          "bookQuantity": {
+            "type": "string"
+          },
+          "actualQuantity": {
+            "type": "string"
+          },
+          "differenceQuantity": {
+            "type": "string"
+          },
+          "unitCost": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "opening",
+              "measurement",
+              "missing",
+              "damage",
+              "other"
+            ],
+            "description": "差异原因；盘点未填时按 other 落库"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "targetType",
+          "lengthMm",
+          "widthMm",
+          "heightMm",
+          "bookQuantity",
+          "actualQuantity",
+          "differenceQuantity",
+          "unitCost",
+          "amount",
+          "reason",
+          "note"
+        ]
+      },
+      "InventoryOpeningDetailDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "openingDate": {
+            "type": "string"
+          },
+          "operatorName": {
+            "type": "string",
+            "description": "操作人；存量数据为空时显示「—」"
+          },
+          "note": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "totalAmount": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InventoryAdjustmentItemDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "openingDate",
+          "operatorName",
+          "note",
+          "createdAt",
+          "totalAmount",
+          "items"
+        ]
+      },
+      "InventoryCountListItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "targetType": {
+            "type": "string",
+            "enum": [
+              "raw_log",
+              "timber"
+            ],
+            "description": "盘点类型"
+          },
+          "adjustmentDate": {
+            "type": "string"
+          },
+          "operatorName": {
+            "type": "string"
+          },
+          "gainCount": {
+            "type": "number"
+          },
+          "lossCount": {
+            "type": "number"
+          },
+          "rawDifferenceTons": {
+            "type": "string",
+            "description": "原木差异吨数"
+          },
+          "timberDifferenceVolume": {
+            "type": "string",
+            "description": "方木差异方数"
+          },
+          "differenceAmount": {
+            "type": "string",
+            "description": "差异金额合计（盘盈为正、盘亏为负）"
+          },
+          "note": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "targetType",
+          "adjustmentDate",
+          "operatorName",
+          "gainCount",
+          "lossCount",
+          "rawDifferenceTons",
+          "timberDifferenceVolume",
+          "differenceAmount",
+          "note",
+          "createdAt"
+        ]
+      },
+      "InventoryCountListDto": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "number"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InventoryCountListItemDto"
+            }
+          }
+        },
+        "required": [
+          "total",
+          "items"
+        ]
+      },
+      "InventoryCountDetailDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "targetType": {
+            "type": "string",
+            "enum": [
+              "raw_log",
+              "timber"
+            ],
+            "description": "盘点类型"
+          },
+          "adjustmentDate": {
+            "type": "string"
+          },
+          "operatorName": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InventoryAdjustmentItemDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "targetType",
+          "adjustmentDate",
+          "operatorName",
+          "note",
+          "createdAt",
+          "items"
+        ]
+      },
+      "InventoryOpeningRawBodyDto": {
+        "type": "object",
+        "properties": {
+          "quantity": {
+            "type": "string",
+            "description": "期初原木吨数（4 位以内小数）"
+          },
+          "unitCost": {
+            "type": "string",
+            "description": "单位成本（元/吨，6 位以内小数）；与金额二选一"
+          },
+          "amount": {
+            "type": "string",
+            "description": "期初金额（元，2 位小数）；与单位成本二选一"
+          }
+        },
+        "required": [
+          "quantity"
+        ]
+      },
+      "InventoryOpeningTimberBodyDto": {
+        "type": "object",
+        "properties": {
+          "lengthMm": {
+            "type": "number"
+          },
+          "widthMm": {
+            "type": "number"
+          },
+          "heightMm": {
+            "type": "number"
+          },
+          "quantity": {
+            "type": "string",
+            "description": "期初方木方数"
+          },
+          "unitCost": {
+            "type": "string",
+            "description": "单位成本（元/m³）"
+          },
+          "amount": {
+            "type": "string",
+            "description": "期初金额（元）"
+          }
+        },
+        "required": [
+          "lengthMm",
+          "widthMm",
+          "heightMm",
+          "quantity"
+        ]
+      },
+      "InventoryOpeningBodyDto": {
+        "type": "object",
+        "properties": {
+          "openingDate": {
+            "type": "string",
+            "description": "期初日期"
+          },
+          "note": {
+            "type": "string",
+            "description": "备注",
+            "default": ""
+          },
+          "rawLog": {
+            "$ref": "#/components/schemas/InventoryOpeningRawBodyDto"
+          },
+          "timber": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InventoryOpeningTimberBodyDto"
+            }
+          }
+        },
+        "required": [
+          "openingDate",
+          "rawLog",
+          "timber"
+        ]
+      },
+      "InventoryAdjustmentResultDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "description": "IC 编号"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "opening",
+              "count"
+            ]
+          },
+          "adjustmentDate": {
+            "type": "string",
+            "description": "调整日期"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "type",
+          "adjustmentDate"
+        ]
+      },
+      "InventoryCountRawBodyDto": {
+        "type": "object",
+        "properties": {
+          "actualQuantity": {
+            "type": "string",
+            "description": "原木实盘吨数；留空表示本行不参与本次盘点"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "measurement",
+              "missing",
+              "damage",
+              "other"
+            ],
+            "description": "差异原因；选填，留空按 other 落库"
+          }
+        }
+      },
+      "InventoryCountTimberBodyDto": {
+        "type": "object",
+        "properties": {
+          "lengthMm": {
+            "type": "number"
+          },
+          "widthMm": {
+            "type": "number"
+          },
+          "heightMm": {
+            "type": "number"
+          },
+          "actualQuantity": {
+            "type": "string",
+            "description": "方木实盘方数；留空表示本行不参与本次盘点"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "measurement",
+              "missing",
+              "damage",
+              "other"
+            ],
+            "description": "差异原因；选填，留空按 other 落库"
+          }
+        },
+        "required": [
+          "lengthMm",
+          "widthMm",
+          "heightMm"
+        ]
+      },
+      "InventoryCountBodyDto": {
+        "type": "object",
+        "properties": {
+          "targetType": {
+            "type": "string",
+            "enum": [
+              "raw_log",
+              "timber"
+            ],
+            "description": "盘点类型：一张单只盘一类库存"
+          },
+          "countDate": {
+            "type": "string",
+            "description": "盘点日期；不早于期初日期、不晚于今天"
+          },
+          "note": {
+            "type": "string",
+            "description": "备注",
+            "default": ""
+          },
+          "rawLog": {
+            "description": "原木盘点行（targetType = raw_log 时必填）",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/InventoryCountRawBodyDto"
+              }
+            ]
+          },
+          "timber": {
+            "description": "方木盘点行（targetType = timber 时使用）",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InventoryCountTimberBodyDto"
+            }
+          }
+        },
+        "required": [
+          "targetType",
+          "countDate"
+        ]
+      },
       "SaleOrderSummaryDto": {
         "type": "object",
         "properties": {
@@ -3652,6 +7178,64 @@
         },
         "required": [
           "items"
+        ]
+      },
+      "SaleOrderProfitDto": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "revenue": {
+            "type": "string",
+            "description": "确认收入：现结取实收、赊销取合计"
+          },
+          "materialUnitCost": {
+            "type": "string",
+            "nullable": true,
+            "description": "下单时方木平均成本（元/m³）"
+          },
+          "materialCostAmount": {
+            "type": "string",
+            "description": "材料成本快照金额"
+          },
+          "materialCostStatus": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "final"
+            ],
+            "description": "成本状态：待补 / 已锁定"
+          },
+          "materialProfit": {
+            "type": "string",
+            "nullable": true,
+            "description": "材料毛利；待补时为 null"
+          },
+          "materialMargin": {
+            "type": "string",
+            "nullable": true,
+            "description": "材料毛利率（百分比，2 位）；待补时为 null"
+          },
+          "snapshottedAt": {
+            "type": "string",
+            "nullable": true,
+            "description": "快照时间"
+          }
+        },
+        "required": [
+          "orderId",
+          "code",
+          "revenue",
+          "materialUnitCost",
+          "materialCostAmount",
+          "materialCostStatus",
+          "materialProfit",
+          "materialMargin",
+          "snapshottedAt"
         ]
       },
       "SaleOrderItemResponseDto": {

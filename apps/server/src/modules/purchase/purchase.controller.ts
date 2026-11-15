@@ -26,6 +26,7 @@ import {
 } from '@mcc/shared';
 import { AuditAction } from '../../common/decorators/audit-action.decorator.js';
 import { CurrentUser, type AuthUser } from '../../common/decorators/current-user.decorator.js';
+import { RequireFeature } from '../../common/decorators/require-feature.decorator.js';
 import { RequireScopes } from '../../common/decorators/require-scopes.decorator.js';
 import { withIdempotency } from '../../common/idempotency.js';
 import { RedisService } from '../../common/redis.service.js';
@@ -43,6 +44,7 @@ import { PurchaseService } from './purchase.service.js';
 // 接口清单与路径（design/purchase.md §5）；契约由装饰器代码生成（ADR-006）。
 @ApiTags('purchase-orders')
 @Controller('purchase-orders')
+@RequireFeature('purchase')
 export class PurchaseController {
   constructor(
     private readonly purchaseService: PurchaseService,

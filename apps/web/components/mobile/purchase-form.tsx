@@ -13,10 +13,10 @@ import {
 import { Button } from '@/components/ui/button';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Segmented } from '@/components/ui/segmented';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { MobileField } from '@/components/mobile/field';
 import { MobileActionBar, MobileHeader } from '@/components/mobile/mobile-shell';
 import { api } from '@/lib/api';
 import { randomUuid } from '@/lib/uuid';
@@ -58,25 +58,6 @@ const decimalOk = (value: string, scale: number): boolean =>
   new RegExp(`^\\d+(\\.\\d{1,${scale}})?$`).test(value);
 
 // Label 在上、控件占满整行（移动页模式；与 PC 表单的左右并排不同）
-function MobileField({
-  label,
-  htmlFor,
-  children,
-}: {
-  label: string;
-  htmlFor?: string;
-  children: React.ReactNode;
-}): React.ReactElement {
-  return (
-    <div className="space-y-1.5">
-      <Label htmlFor={htmlFor} className="text-mobile-label text-muted-foreground">
-        {label}
-      </Label>
-      {children}
-    </div>
-  );
-}
-
 export function MobilePurchaseForm({
   orderId,
   initial,

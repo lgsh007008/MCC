@@ -15,6 +15,8 @@ export default defineConfig({
         'src/order.calc.ts',
         'src/purchase.calc.ts',
         'src/finance.calc.ts',
+        'src/inventory.calc.ts',
+        'src/tenant.calc.ts',
         'src/money.ts',
         'src/auth.permissions.ts',
       ],

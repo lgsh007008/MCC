@@ -24,6 +24,7 @@ test('手机登录 → 移动入口 → 开单 → 详情 → 列表', async ({ 
   const customerName = `e2e 手机客户-${Date.now()}`;
 
   await page.goto('/login');
+  await page.getByPlaceholder('如 TN-00001').fill('TN-00001');
   await page.getByPlaceholder('请输入账号').fill('admin');
   await page.getByPlaceholder('请输入密码').fill('Mcc@2026');
   await page.getByRole('button', { name: '登录' }).click();
@@ -89,6 +90,11 @@ test('手机登录 → 移动入口 → 开单 → 详情 → 列表', async ({ 
     await expect(page.getByText('抹零 1.00 元')).toBeVisible();
 
     await page.getByRole('button', { name: '保存' }).click();
+    await page
+      .getByRole('button', { name: '仍然保存' })
+      .waitFor({ state: 'visible', timeout: 1500 })
+      .then(() => page.getByRole('button', { name: '仍然保存' }).click())
+      .catch(() => {});
     await expect(page).toHaveURL(/\/m\/sale-orders\/[0-9a-f-]{36}$/);
     await expect(page.getByText('合计金额')).toBeVisible();
     await expect(page.getByText(customerName)).toBeVisible();
@@ -149,6 +155,7 @@ test('手机登录 → 移动入口 → 开单 → 详情 → 列表', async ({ 
 // 整体调整 tokens 时测试自动跟随；页面若另写一套字号会在此失败。
 test('移动字号与控件尺寸取自 tokens 角色', async ({ page }) => {
   await page.goto('/login');
+  await page.getByPlaceholder('如 TN-00001').fill('TN-00001');
   await page.getByPlaceholder('请输入账号').fill('admin');
   await page.getByPlaceholder('请输入密码').fill('Mcc@2026');
   await page.getByRole('button', { name: '登录' }).click();
@@ -215,6 +222,7 @@ test('移动字号与控件尺寸取自 tokens 角色', async ({ page }) => {
 // 表现为绿底近黑字；四选一分段在窄屏会折行溢出 48px 按钮。两条都在此兜底。
 test('移动主色按钮文字取近白、四选一分段不溢出', async ({ page }) => {
   await page.goto('/login');
+  await page.getByPlaceholder('如 TN-00001').fill('TN-00001');
   await page.getByPlaceholder('请输入账号').fill('admin');
   await page.getByPlaceholder('请输入密码').fill('Mcc@2026');
   await page.getByRole('button', { name: '登录' }).click();

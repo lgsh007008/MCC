@@ -13,15 +13,17 @@ import {
   type ApiSchemas,
 } from '@mcc/shared';
 import { Button } from '@/components/ui/button';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Segmented } from '@/components/ui/segmented';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { MobileField } from '@/components/mobile/field';
 import { MobileActionBar, MobileHeader } from '@/components/mobile/mobile-shell';
 import type { SaleOrderFormInitial } from '@/components/order/sale-order-form';
 import { api } from '@/lib/api';
+import { hasNoValidTimberCost, isMaterialCostPending } from '@/lib/timber-cost';
 import { randomUuid } from '@/lib/uuid';
 
 // 销售单移动表单（product/order.md 移动页；ADR-011 适老化基线）：
@@ -78,25 +80,6 @@ const emptyRow = (): FormRow => ({
 });
 
 // Label 在上、控件占满整行（移动页模式；与 PC 表单的左右并排不同）
-function MobileField({
-  label,
-  htmlFor,
-  children,
-}: {
-  label: string;
-  htmlFor?: string;
-  children: React.ReactNode;
-}): React.ReactElement {
-  return (
-    <div className="space-y-1.5">
-      <Label htmlFor={htmlFor} className="text-mobile-label text-muted-foreground">
-        {label}
-      </Label>
-      {children}
-    </div>
-  );
-}
-
 export function MobileSaleOrderForm({
   orderId,
   initial,
@@ -106,6 +89,7 @@ export function MobileSaleOrderForm({
 }): React.ReactElement {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const [saleDate, setSaleDate] = useState(initial?.saleDate ?? localToday());
   const [customerId, setCustomerId] = useState(initial?.customerId ?? '');
   // 结算：与 PC 表单同口径，现结才落收款账户与实收金额
@@ -299,6 +283,19 @@ export function MobileSaleOrderForm({
     }
     setSubmitting(true);
     try {
+      // 无有效方木成本时提示先录产出；确认后仍保存为「成本待补」（product/生产与库存.md R-生产-004）
+      const needsCostWarning = orderId ? await isMaterialCostPending(orderId) : true;
+      if (needsCostWarning && (await hasNoValidTimberCost())) {
+        const proceed = await confirm({
+          title: '当前无有效方木成本',
+          description:
+            '保存后材料成本将记为「成本待补」，库存估值也会受影响；建议先在「方木产出」录入产出，并把产出日期填在销售日期之前。仍要保存吗？',
+          confirmText: '仍然保存',
+        });
+        if (!proceed) {
+          return;
+        }
+      }
       const { data, response } = orderId
         ? await api.PUT('/api/v1/sale-orders/{id}', {
             params: { path: { id: orderId } },

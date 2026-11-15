@@ -21,6 +21,7 @@ test.beforeEach(async ({ page }) => {
 
 test('移动资金：登记流水 → 详情 → 编辑 → 删除 → 收支汇总', async ({ page }) => {
   await page.goto('/login');
+  await page.getByPlaceholder('如 TN-00001').fill('TN-00001');
   await page.getByPlaceholder('请输入账号').fill('admin');
   await page.getByPlaceholder('请输入密码').fill('Mcc@2026');
   await page.getByRole('button', { name: '登录' }).click();

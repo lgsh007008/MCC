@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation';
 import { supplierInputSchema } from '@mcc/shared';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { MobileField as Field } from '@/components/mobile/field';
 import { MobileActionBar, MobileHeader } from '@/components/mobile/mobile-shell';
 import { api } from '@/lib/api';
 import { randomUuid } from '@/lib/uuid';
@@ -20,25 +20,6 @@ export interface MobileSupplierFormInitial {
   contact: string;
   openingPayable: string;
   note: string;
-}
-
-function Field({
-  label,
-  htmlFor,
-  children,
-}: {
-  label: string;
-  htmlFor?: string;
-  children: React.ReactNode;
-}): React.ReactElement {
-  return (
-    <div className="space-y-1">
-      <Label htmlFor={htmlFor} className="text-mobile-label text-muted-foreground">
-        {label}
-      </Label>
-      {children}
-    </div>
-  );
 }
 
 export function MobileSupplierForm({

@@ -7,6 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from '../src/app.module.js';
 import { API_PREFIX } from '../src/common/api-prefix.js';
 import { PrismaService } from '../src/common/prisma.service.js';
+import { scopedClient, TEST_TENANT_CODE, TEST_TENANT_ID } from './helpers.js';
 
 // 账号管理与 RBAC（product/账号与权限.md R-002 / R-003；技术方案 §8.2）：
 // 账号接口仅管理员可用；工人只读（订单可看、写与客户/财务/账号拒绝）；
@@ -15,6 +16,7 @@ import { PrismaService } from '../src/common/prisma.service.js';
 describe('账号管理与 RBAC（契约/集成）', () => {
   let app: INestApplication;
   let prisma: PrismaService;
+  let db: PrismaService['client'];
   let adminToken: string;
   let workerToken: string;
   let adminId: string;
@@ -26,6 +28,7 @@ describe('账号管理与 RBAC（契约/集成）', () => {
 
   const login = async (username: string, pwd: string) => {
     return request(app.getHttpServer()).post(`/${API_PREFIX}/auth/login`).send({
+      tenantCode: TEST_TENANT_CODE,
       username,
       password: pwd,
       rememberMe: false,
@@ -38,13 +41,24 @@ describe('账号管理与 RBAC（契约/集成）', () => {
     app.setGlobalPrefix(API_PREFIX);
     await app.init();
     prisma = app.get(PrismaService);
+    db = scopedClient(prisma.client);
 
-    const admin = await prisma.client.user.create({
-      data: { username: adminName, passwordHash: await hash(password), role: 'ADMIN' },
+    const admin = await db.user.create({
+      data: {
+        tenantId: TEST_TENANT_ID,
+        username: adminName,
+        passwordHash: await hash(password),
+        role: 'ADMIN',
+      },
     });
     adminId = admin.id;
-    const worker = await prisma.client.user.create({
-      data: { username: workerName, passwordHash: await hash(password), role: 'WORKER' },
+    const worker = await db.user.create({
+      data: {
+        tenantId: TEST_TENANT_ID,
+        username: workerName,
+        passwordHash: await hash(password),
+        role: 'WORKER',
+      },
     });
     workerId = worker.id;
 
@@ -58,11 +72,11 @@ describe('账号管理与 RBAC（契约/集成）', () => {
 
   afterAll(async () => {
     const usernames = [adminName, workerName, `it-user-sales-${stamp}`];
-    await prisma.client.refreshToken.deleteMany({
+    await db.refreshToken.deleteMany({
       where: { user: { username: { in: usernames } } },
     });
-    await prisma.client.user.deleteMany({ where: { username: { in: usernames } } });
-    await prisma.client.eventLog.deleteMany({ where: { actorUsername: { in: usernames } } });
+    await db.user.deleteMany({ where: { username: { in: usernames } } });
+    await db.eventLog.deleteMany({ where: { actorUsername: { in: usernames } } });
     await app.close();
   });
 

@@ -30,6 +30,7 @@ import {
 } from '@mcc/shared';
 import { AuditAction } from '../../common/decorators/audit-action.decorator.js';
 import { CurrentUser, type AuthUser } from '../../common/decorators/current-user.decorator.js';
+import { RequireFeature } from '../../common/decorators/require-feature.decorator.js';
 import { RequireScopes } from '../../common/decorators/require-scopes.decorator.js';
 import { withIdempotency } from '../../common/idempotency.js';
 import { RedisService } from '../../common/redis.service.js';
@@ -51,6 +52,7 @@ import { FinanceService } from './finance.service.js';
 // 接口清单与路径（design/finance.md §5）；契约由装饰器代码生成（ADR-006）。
 @ApiTags('finance')
 @Controller('finance')
+@RequireFeature('finance')
 export class FinanceController {
   constructor(
     private readonly financeService: FinanceService,

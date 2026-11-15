@@ -26,6 +26,7 @@ import {
 } from '@mcc/shared';
 import { AuditAction } from '../../common/decorators/audit-action.decorator.js';
 import { CurrentUser, type AuthUser } from '../../common/decorators/current-user.decorator.js';
+import { RequireFeature } from '../../common/decorators/require-feature.decorator.js';
 import { RequireScopes } from '../../common/decorators/require-scopes.decorator.js';
 import { withIdempotency } from '../../common/idempotency.js';
 import { RedisService } from '../../common/redis.service.js';
@@ -38,6 +39,7 @@ import {
   SaleOrderDto,
   SaleOrderListDto,
   SaleOrderPrintEventDto,
+  SaleOrderProfitDto,
   SaleOrderUpdateBodyDto,
 } from './dto/order.dto.js';
 import { OrderService } from './order.service.js';
@@ -45,6 +47,7 @@ import { OrderService } from './order.service.js';
 // 接口清单与路径（design/order.md §5）；契约由装饰器代码生成（ADR-006）。
 @ApiTags('sale-orders')
 @Controller('sale-orders')
+@RequireFeature('order')
 export class OrderController {
   constructor(
     private readonly orderService: OrderService,
@@ -80,6 +83,29 @@ export class OrderController {
     query: CustomerVolumeSummaryQuery,
   ): Promise<{ items: Array<{ customerId: string; totalVolume: string }> }> {
     return this.orderService.customerVolumeSummary(query.customerIds);
+  }
+
+  @Get(':id/profit')
+  @RequireScopes('profit:view')
+  @ApiOperation({ summary: '销售单材料毛利快照（成本待补时毛利为 null）' })
+  @ApiOkResponse({ type: SaleOrderProfitDto })
+  profit(@Param('id', ParseUUIDPipe) id: string): Promise<SaleOrderProfitDto> {
+    return this.orderService.profit(id);
+  }
+
+  @Post(':id/recalculate-cost')
+  @RequireScopes('profit:manage')
+  @AuditAction({
+    domain: 'order',
+    action: 'recalculate-cost',
+    label: '重算销售单材料成本',
+    objectType: 'sale_order',
+  })
+  @HttpCode(200)
+  @ApiOperation({ summary: '重算成本待补订单的材料成本；仅 PENDING 可重算，成功后锁定' })
+  @ApiOkResponse({ type: SaleOrderProfitDto })
+  recalculateCost(@Param('id', ParseUUIDPipe) id: string): Promise<SaleOrderProfitDto> {
+    return this.orderService.recalculateCost(id);
   }
 
   @Get(':id')

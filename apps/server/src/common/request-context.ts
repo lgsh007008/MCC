@@ -4,7 +4,8 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 // AppLogger 输出日志时自动携带，实现同一请求内全部日志的串联。
 export interface RequestContext {
   requestId: string;
-  // ADR-005：多租户启用前恒为 undefined，数据访问层以 DEFAULT_TENANT_ID 兜底（prisma-tenant.extension.ts）
+  // ADR-012：租户作用域。租户请求由 TenantContextInterceptor 注入；
+  // 平台开通 / 平台守卫经 runWithTenant 显式进入；缺失时数据访问层直接拒绝业务表访问。
   tenantId?: string;
 }
 

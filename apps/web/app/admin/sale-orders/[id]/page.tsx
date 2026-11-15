@@ -10,6 +10,7 @@ import { useCan } from '@/components/auth/permission-context';
 import { usePageCrumb } from '@/components/admin/page-breadcrumb';
 import { PageFrame } from '@/components/admin/page-frame';
 import { PrintPreviewDialog } from '@/components/order/print-preview-dialog';
+import { SaleOrderProfitCard } from '@/components/order/sale-order-profit-card';
 import {
   Table,
   TableBody,
@@ -133,6 +134,8 @@ export default function SaleOrderDetailPage(): React.ReactElement {
             </span>
             {order.note ? <span>备注：{order.note}</span> : null}
           </div>
+
+          <SaleOrderProfitCard orderId={order.id} />
 
           <div className="rounded-lg border border-border bg-card">
             <Table containerClassName="max-h-[420px] overflow-y-auto">

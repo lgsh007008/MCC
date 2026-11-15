@@ -10,9 +10,11 @@ import { Label } from '@/components/ui/label';
 import { authSession } from '@/lib/auth/session';
 import { api } from '@/lib/api';
 
-// 登录页（product/账号与权限.md R-账号与权限-001）：账号、密码（显示/隐藏切换）、登录按钮、记住登录。
+// 登录页（product/账号与权限.md R-账号与权限-001）：租户编号、账号、密码（显示/隐藏切换）、登录按钮、记住登录。
 // 纯组件拼装，不单列页面设计；页面归属账号与权限领域。
 export default function LoginPage(): React.ReactElement {
+  // 单租户形态（梅好木业 / TN-00001）预填租户编号，见 product/账号与权限.md R-账号与权限-001
+  const [tenantCode, setTenantCode] = useState('TN-00001');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -24,7 +26,7 @@ export default function LoginPage(): React.ReactElement {
     event.preventDefault();
     setError(null);
 
-    const parsed = loginSchema.safeParse({ username, password, rememberMe });
+    const parsed = loginSchema.safeParse({ tenantCode, username, password, rememberMe });
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message ?? '输入不合法');
       return;
@@ -34,7 +36,7 @@ export default function LoginPage(): React.ReactElement {
     try {
       const { data, response } = await api.POST('/api/v1/auth/login', { body: parsed.data });
       if (response.ok && data) {
-        authSession.set(data.accessToken);
+        authSession.set(data.accessToken, data.features);
         // 两端共用登录页：窄屏进移动 Web 入口，宽屏进 PC 后台（product/平台布局.md 使用端）
         const narrow = window.matchMedia('(max-width: 767px)').matches;
         window.location.assign(narrow ? '/m' : '/admin');
@@ -54,6 +56,16 @@ export default function LoginPage(): React.ReactElement {
         <p className="mt-1 text-sm text-muted-foreground">梅好木业数字化系统</p>
 
         <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
+          <div className="space-y-2">
+            <Label htmlFor="tenantCode">租户编号</Label>
+            <Input
+              id="tenantCode"
+              autoComplete="organization"
+              value={tenantCode}
+              onChange={(e) => setTenantCode(e.target.value)}
+              placeholder="如 TN-00001"
+            />
+          </div>
           <div className="space-y-2">
             <Label htmlFor="username">账号</Label>
             <Input

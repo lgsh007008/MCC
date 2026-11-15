@@ -9,10 +9,12 @@ import {
   type AuditActionMeta,
 } from './decorators/audit-action.decorator.js';
 import { auditRequestMeta, parseAuditPath } from './audit.util.js';
+import { isOpsRequest } from './ops-path.js';
 import { AuditService } from '../modules/audit/index.js';
 
 // 审计拦截器（design/审计日志.md §3）：
 // 所有写方法按 @AuditAction 元数据落审计；登录/登出/刷新由 auth 显式记录并 @SkipAudit。
+// 平台写操作走独立的 PlatformAuditInterceptor（/api/v1/ops），本拦截器只处理租户请求。
 // 审计写入失败不得打断业务响应（AuditService 内部兜底）。
 const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
@@ -79,7 +81,7 @@ export class AuditInterceptor implements NestInterceptor {
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const request = context.switchToHttp().getRequest<RequestWithUser>();
-    if (!WRITE_METHODS.has(request.method)) {
+    if (!WRITE_METHODS.has(request.method) || isOpsRequest(request.path)) {
       return next.handle();
     }
     const skip = this.reflector.getAllAndOverride<boolean>(SKIP_AUDIT_KEY, [

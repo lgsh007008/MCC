@@ -12,9 +12,16 @@ export class UserDto {
   @ApiProperty({ type: String, description: '创建时间（ISO）' }) createdAt!: string;
 }
 
+export class UserQuotaDto {
+  @ApiProperty({ type: Number, description: '未删除账号数（含停用）' }) used!: number;
+  @ApiProperty({ type: Number, description: '套餐账号额度' }) maxAccounts!: number;
+}
+
 export class UserListDto {
-  @ApiProperty({ type: Number, description: '总数' }) total!: number;
+  @ApiProperty({ type: Number, description: '筛选后总数' }) total!: number;
   @ApiProperty({ type: () => [UserDto] }) items!: UserDto[];
+  @ApiProperty({ type: () => UserQuotaDto, description: '账号额度（账号管理页显示与新建校验）' })
+  quota!: UserQuotaDto;
 }
 
 export class UserCreateBodyDto {

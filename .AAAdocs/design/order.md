@@ -27,10 +27,11 @@ modules/order/
 
 | 表 | 字段要点 | 备注 |
 | --- | --- | --- |
-| `sale_order` | 编号（唯一）、销售日期、客户外键、客户名称快照、合计方量、小计金额、其他金额、合计金额、备注、结算方式、实收金额、收款账户 id 快照 | 通用字段（主键、`tenant_id`、`created_at/updated_at`、`deleted_at`）按技术方案 §5.1；编号唯一约束按租户复合 `(tenant_id, 编号)`；客户外键建索引；合计金额仍为原价 |
+| `sale_order` | 编号（唯一）、销售日期、客户外键、客户名称快照、合计方量、小计金额、其他金额、合计金额、备注、结算方式、实收金额、收款账户 id 快照、材料成本快照（单价 6 位 / 金额 2 位 / 状态 / 快照时间） | 通用字段（主键、`tenant_id`、`created_at/updated_at`、`deleted_at`）按技术方案 §5.1；编号唯一约束按租户复合 `(tenant_id, 编号)`；客户外键建索引；合计金额仍为原价 |
 | `sale_order_item` | 行序、产品类型（固定方木）、长度/宽度/高度（整数 mm）、根数、计价方式、方量、单价、小计金额、其他金额、备注、所属销售单 | 通用字段同上按 §5.1；尺寸为整数 `Int`，方量非空 |
 
 - 金额与尺寸一律 Decimal / Int，禁止浮点（§5.1）；精度按需求口径：方量 4 位、金额 2 位、尺寸整数毫米
+- **材料成本 = 下单快照**：新建时经 production 公开方法取当前方木平均成本，写入 `material_unit_cost` / `material_cost_amount` / `material_cost_status = FINAL`；无有效成本写 `PENDING`、金额 0。更新时 `FINAL` 按原快照单价 × 新方量重算，`PENDING` 尝试补成本；快照不随后续成本变化（`product/生产与库存.md` R-生产-004）
 - 产品类型枚举当前**仅一个值** `SQUARE_TIMBER`（方木），服务端固定写入，接口创建/更新不接收；详情/列表响应返回，供展示与未来扩展
 - 计价方式枚举 `pricing_mode`：`VOLUME`（默认）/ `PIECE`，行级；金额列与单价列复用，单价单位随计价方式变化
 - 方量对每一行**非空**：无论按方量还是按根数计价都计算落库（工资依据）
@@ -79,6 +80,8 @@ modules/order/
 | remove | `DELETE /api/v1/sale-orders/:id` | 删除（软删除，编号不回收） |
 | batch-delete | `POST /api/v1/sale-orders/batch-delete` | 批量删除（body `{ ids }`，软删除，返回删除条数；不存在/已删行静默跳过） |
 | customer-volume-summary | `GET /api/v1/sale-orders/customer-volume-summary?customerIds=` | 客户维度累计方量汇总：对未软删销售单按 `customer_id` 聚合 `total_volume` 与 `orderCount`（订单数），供客户列表页与详情页批量取数与删除确认（`product/customer.md` 只引用不重述） |
+| profit | `GET /api/v1/sale-orders/:id/profit` | 材料毛利快照：确认收入、材料成本、材料毛利、毛利率、成本状态；要求 `profit:view`；`PENDING` 时毛利与毛利率返回 null |
+| recalculate-cost | `POST /api/v1/sale-orders/:id/recalculate-cost` | 重算成本待补订单：调用 production 当前成本，写入快照并置 `FINAL`；仅 `PENDING` 可重算，已 `FINAL` 返回 409；要求 `profit:manage`，写审计 |
 
 ## 6. 后置边界（本轮不建）
 
@@ -92,8 +95,10 @@ modules/order/
 - **PC 页面骨架**：新建 / 编辑 / 详情统一用 `components/admin/page-frame.tsx`——标题区与底部操作区固定、中间内容区滚动；表单的 `<form>` 包裹 `PageFrame`，保存按钮 `type="submit"` 放操作区；详情标题含单号 + 客户括注，编辑 / 打印 / 返回列表放操作区；详情明细表 `containerClassName="max-h-[420px] overflow-y-auto"` + 表头 sticky。
 - 列表页（`/admin/sale-orders`）：筛选 / 多选 / 排序 / 分页按列表页模式（组件拼装见 `design/平台布局.md` §1.5）；客户筛选项为下拉（数据源 customer 列表接口，含停用客户，按 `customerId` 下发），列显示 `customerName` 快照；排序参数随请求下发（sortBy / sortOrder），批量删除调 batch-delete；路由与菜单随菜单表（`design/平台布局.md` §1.3 静态配置）登记更新
 - 表单页：客户为下拉选择（数据源 customer 列表接口，只列启用客户；编辑历史单且其客户已停用或已删除时，用单据自带的 `customerId + customerName` 快照补一个选项并保持选中，不再请求客户档案，否则单据无法保存）；新增结算区 = 结算方式（赊销 / 现结，默认赊销）+ 现结时的收款账户（只列启用账户）与实收金额（默认合计、可改，显示差额）；明细行动态增删（行操作 = 复制 / 删除，图标按钮）；复制为深拷贝当前行（去行 id，追加末尾，达 200 行禁用，新增行滚动到可见）；尺寸列顺序为长度、宽度、高度，均用文本输入 + `inputMode="numeric"`（整数毫米、不显示步进器），根数同样文本输入，计价方式下拉（按方量 / 按根数，最小宽度 `w-24`），单价标签随计价方式切换为「元/m³」或「元/根」；小计金额两种方式下均只读；输入时实时调用 `packages/shared` 计算纯函数显示方量 / 小计 / 合计（与服务端落账同源）；面包屑标识经 `usePageCrumb` 注入壳（新建 =「新建」；编辑 =「单号 / 编辑」，单号链接回详情）
+- 保存前成本提示：`apps/web/lib/timber-cost.ts` 的 `hasNoValidTimberCost()`（库存汇总未设期初或方木单位成本为 0）与 `isMaterialCostPending(orderId)`（材料毛利状态待补）；新建单直接检查，编辑单仅在待补时检查；命中后 `useConfirm` 二次确认（标题「当前无有效方木成本」、确认按钮「仍然保存」），取消中止保存；PC 与移动表单共用，不改后端接口
 - 保存：整单提交（主表 + 明细，明细不含 `productType`），服务端固定写入方木、重算校验后落账并回传；服务端经 customer 公开接口校验客户启用态，客户未变更的更新不校验
 - 详情页：只读展示 + 编辑入口；信息条展示客户编号与名称快照、结算方式（现结附实收金额与收款账户）、产品类型（方木）；客户档案已删除时编号后缀标注「已删除」；明细单价按行标注「元/m³」或「元/根」，不单列计价方式；面包屑标识经 `usePageCrumb` 注入壳（单号）
+- **材料毛利卡**：详情页在 `profit:view` 时请求 `GET /api/v1/sale-orders/:id/profit`；展示确认收入、材料成本（下单快照）、材料毛利、毛利率与「下单时成本快照，未含人工与费用」说明；状态 `PENDING` 时毛利与毛利率显示「—」并标「成本待补」；`profit:manage` 且 `PENDING` 时显示「重算材料成本」，`useConfirm` 确认后调 `POST /api/v1/sale-orders/:id/recalculate-cost`，成功后失效详情与利润查询；移动详情同口径；打印不展示
 - 移动页（移动 Web `/m`，ADR-011）：路由 `/m`（入口卡片）、`/m/sale-orders`（搜索 + 卡片列表 + 加载更多；搜索按 `customerName` 模糊，回车即查、查询后回第 1 页并清空已加载数据；卡片层级 = 销售日期大号 + 客户名称在上、合计方量 + 合计金额在下；统一使用 `components/mobile/list.tsx` 的搜索框 / 卡片 / 加载更多 / 空态）、`/m/sale-orders/new`、`/m/sale-orders/[id]`（详情）、`/m/sale-orders/[id]/edit`；**移动端支持现结**：结算方式用整行分段按钮（赊销 / 现结，`h-12`、选中实心），现结展开收款账户下拉（取 `/finance/accounts` 启用项，控件 `h-12`；仅一个启用账户时自动选中）与实收金额输入（`inputMode="decimal"`，默认合计，`receivedTouched` 后才采用手填值，与 PC 同逻辑），差额经 `calcSettlementDifference` 计算后转白话文案（正数为「抹零 N 元」、负数为「预收 N 元」）；切回赊销清空账户与实收；提交时按结算方式裁剪 body（非现结时 `settleAccountId` / `receivedAmount` 传 null）；移动详情展示结算方式，现结时附收款账户、实收金额与差额；**移动端不展示销售单编号、客户编号与明细编码**（PC 与打印单据保留，接口字段不删）；详情页在明细下方提供「删除销售单」（`order:manage` 才渲染，`useConfirm` 二次确认，`DELETE /api/v1/sale-orders/{id}` 成功后 `router.replace('/m/sale-orders')`）；壳用 `components/mobile/mobile-shell.tsx`（`data-mode="mobile"`，无侧边栏 / 标签页 / 面包屑），页面自带底部固定操作条；表单组件 `components/mobile/sale-order-form.tsx` 为新建 / 编辑共用，状态与校验沿用 PC 表单口径（`saleOrderUpdateSchema`、`calcVolumeM3` / `calcLineAmount` / `calcOrderTotals` 同源），明细逐行卡片、行内两列栅格、数字字段 `inputMode="numeric"`；保存成功跳 `/m/sale-orders/{id}`；不新增后端接口
 
 ## 8. 打印实现（web）
@@ -171,6 +176,15 @@ modules/order/
 | --- | --- | --- | --- | --- |
 | 3 计算规则 / 5 接口清单 / 6 后置边界 | 修改 | 现结同事务生成收入事件 + 收款流水；结算字段同步收入事件与收款流水 | 现结只生成收款流水（分类 = 销售回款）；赊销不生成流水；结算字段只同步收款流水 | 财务改为资金流水单轨制，业务发生台账下线 |
 | 7 前端实现节 · 移动页 | 修改 | 移动端固定按赊销保存，结算在 PC 处理 | 移动表单增加结算方式分段按钮与现结三字段（账户下拉、实收、白话差额）；详情展示结算三值；提交按结算方式裁剪 body | 移动端需要现场收现金；契约已支持，无需后端改动 |
+
+### v20261115
+
+| 位置 | 类型 | 原本 | 现在 | 原因 |
+| --- | --- | --- | --- | --- |
+| 2 数据模型 | 新增 | `sale_order` 无材料成本字段 | 增加 `material_unit_cost` / `material_cost_amount` / `material_cost_status` / `material_cost_snapshotted_at`；新建与更新写快照，历史单迁移为 `PENDING` | 历史销售单毛利必须稳定，成本改为下单快照 |
+| 5 接口清单 | 新增 | 无材料毛利接口 | 增加 profit 与 recalculate-cost 两个接口；分别要求 `profit:view` / `profit:manage` | 销售单详情展示材料毛利，成本待补订单可重算一次 |
+| 7 前端实现节 | 新增 | 详情页无材料毛利 | 详情页增加材料毛利卡与重算入口；移动端同口径；打印不展示 | 落地 `product/order.md` R-订单-003 |
+| 7 前端实现节 · 保存前成本提示 | 新增 | 无有效方木成本时静默保存 | 新增 `lib/timber-cost.ts`（`hasNoValidTimberCost` / `isMaterialCostPending`）；新建单直接检查、编辑单仅在成本待补时检查；命中后 `useConfirm` 二次确认「仍然保存」，PC 与移动共用；不改接口 | 先领用后产出期间销售出库会按 0 成本扣减，需在保存前提示录入顺序（方案 A） |
 
 ---
 

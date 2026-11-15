@@ -24,6 +24,7 @@ test('表单/详情固定页头页脚，详情明细区内部滚动', async ({ p
   const customerName = `e2e-frame-${Date.now()}`;
 
   await page.goto('/login');
+  await page.getByPlaceholder('如 TN-00001').fill('TN-00001');
   await page.getByPlaceholder('请输入账号').fill('admin');
   await page.getByPlaceholder('请输入密码').fill('Mcc@2026');
   await page.getByRole('button', { name: '登录' }).click();

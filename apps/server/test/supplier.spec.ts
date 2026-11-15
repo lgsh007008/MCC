@@ -7,6 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from '../src/app.module.js';
 import { API_PREFIX } from '../src/common/api-prefix.js';
 import { PrismaService } from '../src/common/prisma.service.js';
+import { scopedClient, TEST_TENANT_CODE, TEST_TENANT_ID } from './helpers.js';
 
 // 供应商列表排序（design/supplier.md §5 / §6）：
 // 创建日期表头正 / 倒序，默认倒序；两条档案显式设置不同创建时间以断言相对顺序。
@@ -15,6 +16,7 @@ import { PrismaService } from '../src/common/prisma.service.js';
 describe('供应商列表排序（契约/集成）', () => {
   let app: INestApplication;
   let prisma: PrismaService;
+  let db: PrismaService['client'];
   let accessToken: string;
   const username = `it-supplier-user-${Date.now()}`;
   const password = 'Secret#12345';
@@ -28,10 +30,12 @@ describe('供应商列表排序（契约/集成）', () => {
     app.setGlobalPrefix(API_PREFIX);
     await app.init();
     prisma = app.get(PrismaService);
-    await prisma.client.user.create({
-      data: { username, passwordHash: await hash(password), role: 'SALES' },
+    db = scopedClient(prisma.client);
+    await db.user.create({
+      data: { tenantId: TEST_TENANT_ID, username, passwordHash: await hash(password), role: 'SALES' },
     });
     const login = await request(app.getHttpServer()).post(`/${API_PREFIX}/auth/login`).send({
+      tenantCode: TEST_TENANT_CODE,
       username,
       password,
       rememberMe: false,
@@ -40,9 +44,9 @@ describe('供应商列表排序（契约/集成）', () => {
   });
 
   afterAll(async () => {
-    await prisma.client.supplier.deleteMany({ where: { name: { startsWith: 'it-supplier-' } } });
-    await prisma.client.user.deleteMany({ where: { username: { startsWith: 'it-supplier-user-' } } });
-    await prisma.client.eventLog.deleteMany({ where: { actorUsername: username } });
+    await db.supplier.deleteMany({ where: { name: { startsWith: 'it-supplier-' } } });
+    await db.user.deleteMany({ where: { username: { startsWith: 'it-supplier-user-' } } });
+    await db.eventLog.deleteMany({ where: { actorUsername: username } });
     await app.close();
   });
 
@@ -56,11 +60,11 @@ describe('供应商列表排序（契约/集成）', () => {
     expect(newer.status).toBe(201);
 
     // 显式错开创建时间，避免同一毫秒插入导致顺序不确定
-    await prisma.client.supplier.updateMany({
+    await db.supplier.updateMany({
       where: { id: older.body.id as string },
       data: { createdAt: new Date('2026-01-01T00:00:00.000Z') },
     });
-    await prisma.client.supplier.updateMany({
+    await db.supplier.updateMany({
       where: { id: newer.body.id as string },
       data: { createdAt: new Date('2026-01-02T00:00:00.000Z') },
     });

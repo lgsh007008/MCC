@@ -10,6 +10,7 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { useCan } from '@/components/auth/permission-context';
 import { MobileInfoRow } from '@/components/mobile/info-row';
+import { MobileSaleOrderProfit } from '@/components/order/sale-order-profit-card';
 import { MobileActionBar, MobileHeader } from '@/components/mobile/mobile-shell';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -155,6 +156,8 @@ export default function MobileSaleOrderDetailPage(): React.ReactElement {
             小计 {order.subtotalAmount} 元 · 其他 {order.otherAmount} 元
           </p>
         </section>
+
+        <MobileSaleOrderProfit orderId={order.id} />
 
         <section className="space-y-3">
           <h2 className="px-1 text-mobile-body font-semibold">明细（{order.items.length} 行）</h2>

@@ -13,10 +13,10 @@ import {
 import { Button } from '@/components/ui/button';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Segmented } from '@/components/ui/segmented';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { MobileField } from '@/components/mobile/field';
 import { MobileActionBar } from '@/components/mobile/mobile-shell';
 import { api } from '@/lib/api';
 import { randomUuid } from '@/lib/uuid';
@@ -56,25 +56,6 @@ const localToday = (): string => {
   const now = new Date();
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 };
-
-function MobileField({
-  label,
-  htmlFor,
-  children,
-}: {
-  label: string;
-  htmlFor?: string;
-  children: React.ReactNode;
-}): React.ReactElement {
-  return (
-    <div className="space-y-1.5">
-      <Label htmlFor={htmlFor} className="text-mobile-label text-muted-foreground">
-        {label}
-      </Label>
-      {children}
-    </div>
-  );
-}
 
 export function MobileCashEntryForm({
   entryId,

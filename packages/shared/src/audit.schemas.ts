@@ -21,3 +21,15 @@ export const auditLogQuerySchema = paginationQuerySchema.extend({
   result: auditResultSchema.optional(),
 });
 export type AuditLogQuery = z.infer<typeof auditLogQuerySchema>;
+
+// 平台运营审计查询（design/审计日志.md §9）：全局表、跨租户，
+// 用 targetTenant 同时匹配目标租户编号与名称。
+export const platformAuditLogQuerySchema = paginationQuerySchema.extend({
+  dateFrom: dateSchema,
+  dateTo: dateSchema,
+  actor: z.string().trim().max(100).optional(),
+  action: z.string().trim().max(100).optional(),
+  targetTenant: z.string().trim().max(100).optional(),
+  result: auditResultSchema.optional(),
+});
+export type PlatformAuditLogQuery = z.infer<typeof platformAuditLogQuerySchema>;

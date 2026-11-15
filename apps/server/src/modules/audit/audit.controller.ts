@@ -1,6 +1,7 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { auditLogQuerySchema, type AuditLogQuery } from '@mcc/shared';
+import { RequireFeature } from '../../common/decorators/require-feature.decorator.js';
 import { RequireScopes } from '../../common/decorators/require-scopes.decorator.js';
 import { ZodValidationPipe } from '../../common/zod-validation.pipe.js';
 import { AuditService } from './audit.service.js';
@@ -9,6 +10,7 @@ import { AuditLogListDto } from './dto/audit.dto.js';
 // 审计日志只读查询（design/审计日志.md §6）：仅管理员；无修改 / 删除接口。
 @ApiTags('audit-logs')
 @Controller('audit-logs')
+@RequireFeature('audit')
 export class AuditController {
   constructor(private readonly auditService: AuditService) {}
 

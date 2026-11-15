@@ -29,7 +29,7 @@ modules/purchase/
 
 | 表 | 字段要点 | 备注 |
 | --- | --- | --- |
-| `purchase_orders` | 编号（唯一）、采购日期、供应商 id + 名称快照、送货吨数、结算吨数、单价、小计、其他金额、合计、结算方式、现结账户 id、实付金额、备注 | 通用字段按技术方案 §5.1；编号唯一按租户复合 `(tenant_id, code)`；`supplier_id` 外键 `RESTRICT`、`settle_account_id` 外键 `SET NULL`；索引 `(tenant_id, supplier_id)`、`(tenant_id, purchase_date)`；软删除 |
+| `purchase_orders` | 编号（唯一）、采购日期、供应商 id + 名称快照、送货吨数、结算吨数、单价、小计、其他金额、合计、结算方式、现结账户 id、实付金额、备注 | 通用字段按技术方案 §5.1；编号唯一按租户复合 `(tenant_id, code)`；`supplier_id` 外键 `RESTRICT`；`settle_account_id` 为资金账户 id 快照（跨模块不建外键，账户删除后历史单据仍可读）；索引 `(tenant_id, supplier_id)`、`(tenant_id, purchase_date)`；软删除 |
 
 - 吨数 `decimal(12,3)`，单价 `decimal(12,2)`，金额 `decimal(18,2)`
 - 枚举 `purchase_settlement_mode`：`CREDIT` / `SETTLED`（接口层 `credit` / `settled`）
@@ -108,3 +108,9 @@ modules/purchase/
 | 7 前端实现节 · PC 列表 | 修改 | 筛选含编号模糊输入（`filters.code` 传 `code` 参数） | 删除编号筛选控件与 `filters.code`；接口保留 `code` 查询参数 | 与销售单列表筛选结构一致 |
 | 7 前端实现节 · PC 表单备注 | 修改 | 备注 `h-8 min-h-8 px-2.5 py-1 resize-y rounded-lg`，固定单行高 | 改为与销售单一致的 `min-h-8 w-full max-w-72`，保留默认内边距、可拖动拉高 | 单行过矮，多行备注不便录入 |
 | 5 接口清单 / 7 前端实现节 · PC 列表 | 新增 | 列表只有单行删除，无多选与批量动作 | 增 `batch-delete`（`POST /api/v1/purchase-orders/batch-delete`，`{ ids }`，软删除 + 派生流水软删，返回 `{ deleted }`）；前端补首列多选 / 本页全选 / 批量删除按钮 / 二次确认 / 翻页与筛选清空选择 | 用户要求采购单列表支持批量删除，对齐销售单列表 |
+
+### v20261115
+
+| 位置 | 类型 | 原本 | 现在 | 原因 |
+| --- | --- | --- | --- | --- |
+| 2 数据模型概览 | 修改 | `settle_account_id` 外键 `SET NULL` | `settle_account_id` 为资金账户 id 快照（跨模块不建外键） | schema 中该列无外键约束，原描述与实现不符；跨模块外键也违反模块边界约定 |

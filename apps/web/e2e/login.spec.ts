@@ -27,6 +27,7 @@ test('登录 → 首页 → 订单菜单 → 销售单列表 → 退出 → 未�
   await page.goto('/login');
   await expect(page.getByRole('heading', { name: '登录' })).toBeVisible();
 
+  await page.getByPlaceholder('如 TN-00001').fill('TN-00001');
   await page.getByPlaceholder('请输入账号').fill('admin');
   await page.getByPlaceholder('请输入密码').fill('Mcc@2026');
   await page.getByRole('button', { name: '登录' }).click();

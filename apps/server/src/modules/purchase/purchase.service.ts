@@ -10,6 +10,7 @@ import {
 } from '@mcc/shared';
 import { problem } from '../../common/http-problem.js';
 import { PrismaService } from '../../common/prisma.service.js';
+import { currentTenantId } from '../../common/prisma-tenant.extension.js';
 import { FinanceService } from '../finance/index.js';
 import { SupplierService } from '../supplier/index.js';
 import type { PurchaseOrderDto, PurchaseOrderListDto } from './dto/purchase.dto.js';
@@ -183,6 +184,7 @@ export class PurchaseService {
           const paidAmount = settled ? input.paidAmount ?? total : null;
           const row = await tx.purchaseOrder.create({
             data: {
+              tenantId: currentTenantId(),
               code,
               purchaseDate: toDate(input.purchaseDate),
               supplierId: supplier.id,

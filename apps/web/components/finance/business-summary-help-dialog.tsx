@@ -1,6 +1,6 @@
 'use client';
 
-import { HelpDialogShell, HelpRow, HelpSection } from '@/components/finance/summary-help-parts';
+import { HelpDialogShell, HelpRow, HelpSection } from '@/components/ui/help-dialog';
 
 // 经营收支口径说明弹窗（product/finance.md R-财务-001）：
 // 只读说明，沿用平台弹窗覆盖层与信息条形态（520px，未新增平台形态）；
@@ -39,6 +39,7 @@ export function BusinessSummaryHelpDialog({
         <HelpRow label="借款还款">只是负债增减，不是赚或花</HelpRow>
         <HelpRow label="资产购置">买设备是资产转换，不是经营消耗</HelpRow>
         <HelpRow label="内部转账">只是钱在账户之间搬动</HelpRow>
+        <HelpRow label="生产盘点">原木领用、方木产出、库存盘点只是库存内部结转与调整，没有钱进出；采购成本已在采购单计入一次</HelpRow>
       </HelpSection>
 
       <p className="text-muted-foreground">

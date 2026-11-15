@@ -20,11 +20,13 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('工人移动端越权路由被拦截，订单只读可访问', async ({ page, browser }) => {
-  const username = `e2e-worker-${Date.now()}`;
+  // 固定账号复用：E2E 无删除接口，重复运行不新增账号，避免占满套餐额度
+  const username = 'e2e-worker-permissions';
   const password = 'Worker@2026';
 
   // 管理员建一个工人账号（没有删除接口，结束时停用）
   await page.goto('/login');
+  await page.getByPlaceholder('如 TN-00001').fill('TN-00001');
   await page.getByPlaceholder('请输入账号').fill('admin');
   await page.getByPlaceholder('请输入密码').fill('Mcc@2026');
   await page.getByRole('button', { name: '登录' }).click();
@@ -35,12 +37,34 @@ test('工人移动端越权路由被拦截，订单只读可访问', async ({ pa
   const adminToken = ((await adminRefresh.json()) as { accessToken: string }).accessToken;
   const adminAuth = { Authorization: `Bearer ${adminToken}` };
 
-  const created = await page.request.post('/api/v1/users', {
-    data: { username, password, role: 'WORKER' },
-    headers: adminAuth,
-  });
-  expect(created.ok()).toBeTruthy();
-  const worker = (await created.json()) as { id: string };
+  const existingRes = await page.request.get(
+    `/api/v1/users?keyword=${encodeURIComponent(username)}&page=1&pageSize=20`,
+    { headers: adminAuth },
+  );
+  const existingList = (await existingRes.json()) as {
+    items: Array<{ id: string; username: string }>;
+  };
+  const existing = existingList.items.find((item) => item.username === username);
+  let worker: { id: string };
+  if (existing) {
+    // 已存在：重置密码并恢复启用，保证可用
+    await page.request.post(`/api/v1/users/${existing.id}/reset-password`, {
+      data: { password },
+      headers: adminAuth,
+    });
+    await page.request.patch(`/api/v1/users/${existing.id}/status`, {
+      data: { status: 'active' },
+      headers: adminAuth,
+    });
+    worker = existing;
+  } else {
+    const created = await page.request.post('/api/v1/users', {
+      data: { username, password, role: 'WORKER' },
+      headers: adminAuth,
+    });
+    expect(created.ok()).toBeTruthy();
+    worker = (await created.json()) as { id: string };
+  }
 
   // 独立上下文登录工人，避免与管理员会话互相覆盖
   const workerContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
@@ -48,6 +72,7 @@ test('工人移动端越权路由被拦截，订单只读可访问', async ({ pa
 
   try {
     await workerPage.goto('/login');
+    await workerPage.getByPlaceholder('如 TN-00001').fill('TN-00001');
     await workerPage.getByPlaceholder('请输入账号').fill(username);
     await workerPage.getByPlaceholder('请输入密码').fill(password);
     await workerPage.getByRole('button', { name: '登录' }).click();

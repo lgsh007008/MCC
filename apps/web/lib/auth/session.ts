@@ -1,9 +1,11 @@
-import { isUserRole, type UserRole } from '@mcc/shared';
+import { isFeatureCode, isUserRole, type FeatureCode, type UserRole } from '@mcc/shared';
 
 // 访问令牌的网页端存储（design/账号与权限.md §4、§7）：
 // 只存内存、不落 localStorage 等任何持久存储——页面刷新即丢，
 // 登录态由 httpOnly Cookie 里的刷新令牌经 refresh 接口静默恢复。
+// 有效功能随登录 / 刷新响应下发，用于菜单 feature ∩ scope 裁剪；不在 JWT 中冗余。
 let accessToken: string | null = null;
+let features: FeatureCode[] | null = null;
 
 const readPayload = (): { username?: string; role?: string } | null => {
   if (!accessToken) {
@@ -19,15 +21,25 @@ const readPayload = (): { username?: string; role?: string } | null => {
   }
 };
 
+const toFeatures = (values: readonly string[]): FeatureCode[] =>
+  values.filter(isFeatureCode);
+
 export const authSession = {
   get(): string | null {
     return accessToken;
   },
-  set(token: string): void {
+  set(token: string, nextFeatures?: readonly string[]): void {
     accessToken = token;
+    if (nextFeatures) {
+      features = toFeatures(nextFeatures);
+    }
+  },
+  features(): FeatureCode[] | null {
+    return features;
   },
   clear(): void {
     accessToken = null;
+    features = null;
   },
 };
 
@@ -42,4 +54,10 @@ export function currentUsername(): string | null {
 export function currentRole(): UserRole | null {
   const role = readPayload()?.role;
   return isUserRole(role) ? role : null;
+}
+
+// 当前租户有效功能（design/账号与权限.md §7：菜单按 feature ∩ scope 裁剪）。
+// null 表示尚未从登录 / 刷新响应取得；调用方此时不做功能裁剪。
+export function currentFeatures(): FeatureCode[] | null {
+  return features;
 }

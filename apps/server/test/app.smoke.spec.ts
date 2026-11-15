@@ -26,4 +26,10 @@ describe('服务骨架（契约/集成）', () => {
     const res = await request(app.getHttpServer()).get(`/${API_PREFIX}`);
     expect(res.status).toBe(404);
   });
+
+  it('健康检查公开可访问', async () => {
+    const res = await request(app.getHttpServer()).get(`/${API_PREFIX}/health`);
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ status: 'ok' });
+  });
 });

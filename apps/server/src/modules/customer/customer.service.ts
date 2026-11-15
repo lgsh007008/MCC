@@ -11,6 +11,7 @@ import type {
 } from '@mcc/shared';
 import { problem } from '../../common/http-problem.js';
 import { PrismaService } from '../../common/prisma.service.js';
+import { currentTenantId } from '../../common/prisma-tenant.extension.js';
 import type { CustomerDto, CustomerListDto } from './dto/customer.dto.js';
 
 // 客户档案（product/customer.md R-客户-001；design/customer.md）。
@@ -128,6 +129,7 @@ export class CustomerService {
           const code = await this.nextCode(tx);
           return tx.customer.create({
             data: {
+              tenantId: currentTenantId(),
               code,
               name: input.name,
               contact: input.contact,

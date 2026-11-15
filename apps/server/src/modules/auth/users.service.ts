@@ -8,9 +8,11 @@ import type {
   UserRoleInput,
   UserStatusInput,
 } from '@mcc/shared';
-import { ROLE_LABELS, type UserRole } from '@mcc/shared';
+import { isOverQuota, ROLE_LABELS, type UserRole } from '@mcc/shared';
 import { problem } from '../../common/http-problem.js';
+import { currentTenantId } from '../../common/prisma-tenant.extension.js';
 import { PrismaService } from '../../common/prisma.service.js';
+import { TenantService } from '../tenant/index.js';
 import type { UserDto, UserListDto } from './dto/user.dto.js';
 
 // 账号管理（design/账号与权限.md §2、§3）：
@@ -38,14 +40,17 @@ const toDto = (row: UserRow): UserDto => ({
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly tenants: TenantService,
+  ) {}
 
   async list(query: UserListQuery): Promise<UserListDto> {
     const where: Prisma.UserWhereInput = { deletedAt: null };
     if (query.keyword) {
       where.username = { contains: query.keyword, mode: 'insensitive' };
     }
-    const [total, rows] = await Promise.all([
+    const [total, rows, used, maxAccounts] = await Promise.all([
       this.prisma.client.user.count({ where }),
       this.prisma.client.user.findMany({
         where,
@@ -54,11 +59,15 @@ export class UsersService {
         take: query.pageSize,
         select: { id: true, username: true, role: true, status: true, createdAt: true },
       }),
+      // 额度口径：未删除账号数（含停用），与筛选无关
+      this.prisma.client.user.count({ where: { deletedAt: null } }),
+      this.tenants.getQuota(currentTenantId()),
     ]);
-    return { total, items: rows.map(toDto) };
+    return { total, items: rows.map(toDto), quota: { used, maxAccounts } };
   }
 
   async create(input: UserCreateInput): Promise<UserDto> {
+    await this.assertQuota();
     const existing = await this.prisma.client.user.findFirst({
       where: { username: input.username },
       select: { id: true, deletedAt: true },
@@ -69,6 +78,7 @@ export class UsersService {
     try {
       const created = await this.prisma.client.user.create({
         data: {
+          tenantId: currentTenantId(),
           username: input.username,
           passwordHash: await hash(input.password),
           role: input.role,
@@ -152,6 +162,22 @@ export class UsersService {
       throw problem(404, 'NOT_FOUND', '账号不存在');
     }
     return target;
+  }
+
+  // 额度校验（design/租户.md §3 / design/账号与权限.md §6）：
+  // 新建后账号数（未删除，含停用）将超过套餐额度即拒绝；平台账号不在本表，天然不计入。
+  private async assertQuota(): Promise<void> {
+    const [accountCount, maxAccounts] = await Promise.all([
+      this.prisma.client.user.count({ where: { deletedAt: null } }),
+      this.tenants.getQuota(currentTenantId()),
+    ]);
+    if (isOverQuota(accountCount + 1, maxAccounts)) {
+      throw problem(
+        409,
+        'QUOTA_EXCEEDED',
+        `账号数已达套餐上限（${maxAccounts}），请联系平台运营调整套餐`,
+      );
+    }
   }
 
   private async reload(id: string): Promise<UserDto> {

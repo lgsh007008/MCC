@@ -10,11 +10,16 @@ export function MobileStatCard({
   value,
   note,
   emphasis = false,
+  action,
+  valueClassName,
 }: {
   label: string;
   value: React.ReactNode;
   note?: string;
   emphasis?: boolean;
+  /** 卡片标题右侧的次要动作（如口径说明入口） */
+  action?: React.ReactNode;
+  valueClassName?: string;
 }): React.ReactElement {
   return (
     <div
@@ -23,8 +28,11 @@ export function MobileStatCard({
         emphasis ? 'border-l-2 border-l-primary/40 bg-muted/40' : 'bg-card',
       )}
     >
-      <p className="text-mobile-label text-muted-foreground">{label}</p>
-      <p className="mt-1 text-mobile-numeric-strong font-semibold tabular-nums">{value}</p>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-mobile-label text-muted-foreground">{label}</p>
+        {action}
+      </div>
+      <p className={cn('mt-1 text-mobile-numeric-strong font-semibold tabular-nums', valueClassName)}>{value}</p>
       {note ? <p className="mt-1 text-mobile-label text-muted-foreground">{note}</p> : null}
     </div>
   );

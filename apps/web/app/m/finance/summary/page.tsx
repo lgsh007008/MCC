@@ -10,8 +10,11 @@ import { MobileListState } from '@/components/mobile/list';
 import { MobileStatCard } from '@/components/mobile/stat-card';
 import { MobileHeader } from '@/components/mobile/mobile-shell';
 import { Button } from '@/components/ui/button';
-import { DatePicker } from '@/components/ui/date-picker';
 import { Segmented } from '@/components/ui/segmented';
+import {
+  MobileDateRangeFields,
+  defaultMobileDateRange,
+} from '@/components/mobile/date-range-fields';
 import { api } from '@/lib/api';
 
 // 收支汇总移动页（product/finance.md R-财务-001 移动页；适老化基线）：
@@ -20,28 +23,14 @@ import { api } from '@/lib/api';
 type FinanceSummary = ApiSchemas['FinanceSummaryDto'];
 type CashSummary = ApiSchemas['FinanceCashSummaryDto'];
 
-const pad = (n: number): string => String(n).padStart(2, '0');
-const localToday = (): string => {
-  const now = new Date();
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-};
-const monthStart = (): string => {
-  const now = new Date();
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`;
-};
-const defaultRange = (): { dateFrom: string; dateTo: string } => ({
-  dateFrom: monthStart(),
-  dateTo: localToday(),
-});
-
 function SummaryContent(): React.ReactElement {
   const router = useRouter();
   const searchParams = useSearchParams();
   const tab = searchParams.get('tab') === 'funds' ? 'funds' : 'business';
   const [businessHelpOpen, setBusinessHelpOpen] = useState(false);
   const [cashHelpOpen, setCashHelpOpen] = useState(false);
-  const [filters, setFilters] = useState(defaultRange());
-  const [applied, setApplied] = useState(defaultRange());
+  const [filters, setFilters] = useState(defaultMobileDateRange());
+  const [applied, setApplied] = useState(defaultMobileDateRange());
 
   const { data, isError } = useQuery({
     queryKey: ['finance-summary', applied.dateFrom, applied.dateTo],
@@ -97,24 +86,11 @@ function SummaryContent(): React.ReactElement {
         />
 
         <section className="space-y-3 rounded-xl border border-border bg-card p-4">
-          <div className="space-y-1.5">
-            <span className="text-mobile-label text-muted-foreground">日期从</span>
-            <DatePicker
-              value={filters.dateFrom}
-              onChange={(value) => setFilters({ ...filters, dateFrom: value })}
-              size="touch"
-              className="w-full"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <span className="text-mobile-label text-muted-foreground">日期至</span>
-            <DatePicker
-              value={filters.dateTo}
-              onChange={(value) => setFilters({ ...filters, dateTo: value })}
-              size="touch"
-              className="w-full"
-            />
-          </div>
+          <MobileDateRangeFields
+            dateFrom={filters.dateFrom}
+            dateTo={filters.dateTo}
+            onChange={setFilters}
+          />
           <div className="flex gap-2 pt-1">
             <Button
               type="button"
@@ -128,7 +104,7 @@ function SummaryContent(): React.ReactElement {
               variant="outline"
               className="h-12 flex-1 text-mobile-body"
               onClick={() => {
-                const defaults = defaultRange();
+                const defaults = defaultMobileDateRange();
                 setFilters(defaults);
                 setApplied(defaults);
               }}
@@ -154,15 +130,15 @@ function SummaryContent(): React.ReactElement {
               ))}
             </div>
 
-            <div className="flex items-start justify-between gap-3">
+            <div className="space-y-2">
               <p className="text-mobile-body text-muted-foreground">
-                收入按销售单确认（赊销也计入），支出按实际付款计入，净额不等于手里的现金。
+                看这段时间生意赚了多少：收入按销售单、采购按采购单确认（赊销赊购都计入），工资费用按实付计入，所以净额不等于手里的现金。
               </p>
               <Button
                 type="button"
                 variant="link"
                 size="xs"
-                className="shrink-0 px-0 text-mobile-body"
+                className="h-auto px-0 text-mobile-body"
                 onClick={() => setBusinessHelpOpen(true)}
               >
                 口径说明
@@ -171,7 +147,8 @@ function SummaryContent(): React.ReactElement {
 
             <section className="rounded-xl border border-border bg-card p-4">
               <p className="text-mobile-label text-muted-foreground">
-                本期计入 {data?.orderCount ?? 0} 张销售单、{data?.cashEntryCount ?? 0} 条收支流水
+                本期计入 {data?.orderCount ?? 0} 张销售单、{data?.purchaseCount ?? 0} 张采购单、
+                {data?.cashEntryCount ?? 0} 条收支流水
               </p>
               <div className="mt-3 space-y-2 border-t border-border pt-3">
                 {(data?.categories ?? []).map((row) => (

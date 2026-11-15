@@ -3,9 +3,14 @@ import { Prisma } from '@mcc/db';
 import {
   addAmounts,
   calcLineAmount,
+  calcMaterialCostAmount,
+  calcMaterialMargin,
+  calcMaterialProfit,
   calcOrderTotals,
   calcVolumeM3,
+  fromScaled,
   sumVolumes,
+  toScaled,
   type SaleOrderInput,
   type SaleOrderItemInput,
   type SaleOrderItemUpdateInput,
@@ -14,13 +19,16 @@ import {
 } from '@mcc/shared';
 import { problem } from '../../common/http-problem.js';
 import { PrismaService } from '../../common/prisma.service.js';
+import { currentTenantId } from '../../common/prisma-tenant.extension.js';
 import { CustomerService } from '../customer/index.js';
 import { FinanceService } from '../finance/index.js';
+import { ProductionService } from '../production/index.js';
 import type {
   SaleOrderDto,
   SaleOrderItemResponseDto,
   SaleOrderListItemDto,
   SaleOrderListDto,
+  SaleOrderProfitDto,
 } from './dto/order.dto.js';
 
 // 单据金额与方量一律以字符串计算（design/order.md §3：纯函数在 @mcc/shared，禁浮点）。
@@ -113,6 +121,7 @@ export class OrderService {
     private readonly prisma: PrismaService,
     private readonly customers: CustomerService,
     private readonly finance: FinanceService,
+    private readonly production: ProductionService,
   ) {}
 
   // 编号：SO-#####（全局流水，不含日期；design/order.md §4）。
@@ -284,6 +293,12 @@ export class OrderService {
       })),
       money(input.otherAmount),
     );
+    // 材料成本快照（product/生产与库存.md R-生产-004）：下单前取当前方木平均成本；
+    // 无有效成本时记 PENDING、金额 0，后续由 profit:manage 手动重算一次。
+    const materialUnitCost = await this.production.currentTimberUnitCost();
+    const materialCostStatus = materialUnitCost !== '0.000000' ? 'FINAL' : 'PENDING';
+    const materialCostAmount = calcMaterialCostAmount(totals.totalVolume, materialUnitCost);
+    const materialCostSnapshottedAt = materialCostStatus === 'FINAL' ? new Date() : null;
 
     for (let attempt = 0; attempt < CODE_RETRY_LIMIT; attempt++) {
       try {
@@ -293,6 +308,7 @@ export class OrderService {
           const receivedAmount = settled ? input.receivedAmount ?? totals.totalAmount : '0.00';
           const created = await tx.saleOrder.create({
             data: {
+              tenantId: currentTenantId(),
               code,
               saleDate: toDate(input.saleDate),
               customerId: customer.id,
@@ -305,10 +321,15 @@ export class OrderService {
               settlementMode: settled ? 'SETTLED' : 'CREDIT',
               receivedAmount,
               settleAccountId: settled ? input.settleAccountId ?? null : null,
+              materialUnitCost,
+              materialCostAmount,
+              materialCostStatus,
+              materialCostSnapshottedAt,
             },
           });
           await tx.saleOrderItem.createMany({
             data: computed.map((item, index) => ({
+              tenantId: currentTenantId(),
               orderId: created.id,
               seq: index + 1,
               productType: item.productType,
@@ -368,6 +389,9 @@ export class OrderService {
         tenantId: true,
         customerId: true,
         customerName: true,
+        materialUnitCost: true,
+        materialCostStatus: true,
+        materialCostSnapshottedAt: true,
       },
     });
     if (!existing || existing.deletedAt !== null) {
@@ -389,6 +413,26 @@ export class OrderService {
       })),
       money(input.otherAmount),
     );
+
+    // 材料成本快照：已锁定订单沿用原单价 × 新方量；待补订单尝试补一次当前成本。
+    let snapshotUnitCost = existing.materialUnitCost?.toString() ?? null;
+    let snapshotStatus: 'PENDING' | 'FINAL' = existing.materialCostStatus;
+    let snapshotAt = existing.materialCostSnapshottedAt;
+    if (snapshotStatus !== 'FINAL' || !snapshotUnitCost) {
+      const current = await this.production.currentTimberUnitCost();
+      if (current !== '0.000000') {
+        snapshotUnitCost = current;
+        snapshotStatus = 'FINAL';
+        snapshotAt = new Date();
+      } else {
+        snapshotUnitCost = null;
+        snapshotStatus = 'PENDING';
+        snapshotAt = null;
+      }
+    }
+    const snapshotAmount = snapshotUnitCost
+      ? calcMaterialCostAmount(totals.totalVolume, snapshotUnitCost)
+      : '0.00';
 
     const itemData = (item: ComputedItem) => ({
       productType: item.productType,
@@ -421,6 +465,10 @@ export class OrderService {
           settlementMode: settled ? 'SETTLED' : 'CREDIT',
           receivedAmount,
           settleAccountId: settled ? input.settleAccountId ?? null : null,
+          materialUnitCost: snapshotUnitCost,
+          materialCostAmount: snapshotAmount,
+          materialCostStatus: snapshotStatus,
+          materialCostSnapshottedAt: snapshotAt,
         },
       });
 
@@ -443,7 +491,7 @@ export class OrderService {
         } else {
           nextSeq += 1;
           await tx.saleOrderItem.create({
-            data: { orderId: id, seq: nextSeq, ...itemData(computedItem) },
+            data: { tenantId: currentTenantId(), orderId: id, seq: nextSeq, ...itemData(computedItem) },
           });
         }
       }
@@ -476,6 +524,95 @@ export class OrderService {
     });
 
     return this.detail(id);
+  }
+
+  // 材料毛利快照（design/order.md §5）：主详情不返回成本字段，仅本接口在 profit:view 下返回。
+  async profit(id: string): Promise<SaleOrderProfitDto> {
+    const order = await this.prisma.client.saleOrder.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        code: true,
+        deletedAt: true,
+        tenantId: true,
+        totalAmount: true,
+        receivedAmount: true,
+        settlementMode: true,
+        materialUnitCost: true,
+        materialCostAmount: true,
+        materialCostStatus: true,
+        materialCostSnapshottedAt: true,
+      },
+    });
+    if (!order || order.deletedAt !== null) {
+      throw problem(404, 'NOT_FOUND', '销售单不存在');
+    }
+    const revenue = money(
+      order.settlementMode === 'SETTLED' ? order.receivedAmount.toString() : order.totalAmount.toString(),
+    );
+    const materialCostAmount = money(order.materialCostAmount.toString());
+    const unitCost = order.materialUnitCost
+      ? fromScaled(toScaled(order.materialUnitCost.toString(), 6), 6)
+      : null;
+    if (order.materialCostStatus !== 'FINAL') {
+      return {
+        orderId: order.id,
+        code: order.code,
+        revenue,
+        materialUnitCost: unitCost,
+        materialCostAmount,
+        materialCostStatus: 'pending',
+        materialProfit: null,
+        materialMargin: null,
+        snapshottedAt: order.materialCostSnapshottedAt?.toISOString() ?? null,
+      };
+    }
+    const materialProfit = calcMaterialProfit(revenue, materialCostAmount);
+    return {
+      orderId: order.id,
+      code: order.code,
+      revenue,
+      materialUnitCost: unitCost,
+      materialCostAmount,
+      materialCostStatus: 'final',
+      materialProfit,
+      materialMargin: calcMaterialMargin(materialProfit, revenue),
+      snapshottedAt: order.materialCostSnapshottedAt?.toISOString() ?? null,
+    };
+  }
+
+  // 成本待补订单重算一次（design/order.md §5）：仅 PENDING 可重算；成功后锁定 FINAL。
+  async recalculateCost(id: string): Promise<SaleOrderProfitDto> {
+    const order = await this.prisma.client.saleOrder.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        deletedAt: true,
+        tenantId: true,
+        totalVolume: true,
+        materialCostStatus: true,
+      },
+    });
+    if (!order || order.deletedAt !== null) {
+      throw problem(404, 'NOT_FOUND', '销售单不存在');
+    }
+    if (order.materialCostStatus === 'FINAL') {
+      throw problem(409, 'COST_FINAL', '材料成本已锁定，不能重算');
+    }
+    const unitCost = await this.production.currentTimberUnitCost();
+    if (unitCost === '0.000000') {
+      throw problem(400, 'COST_UNAVAILABLE', '当前没有有效方木成本，无法重算');
+    }
+    await this.prisma.client.saleOrder.updateMany({
+      where: { id },
+      data: {
+        materialUnitCost: unitCost,
+        materialCostAmount: calcMaterialCostAmount(order.totalVolume.toString(), unitCost),
+        materialCostStatus: 'FINAL',
+        materialCostSnapshottedAt: new Date(),
+      },
+    });
+    return this.profit(id);
   }
 
   // 客户维度累计方量（product/customer.md 累计下单方量；design/order.md §5）：

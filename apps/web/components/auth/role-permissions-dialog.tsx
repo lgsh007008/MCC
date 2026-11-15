@@ -36,7 +36,12 @@ const MODULES: Array<{
 }> = [
   { label: '订单', view: 'order:view', manage: 'order:manage' },
   { label: '客户', view: 'customer:view', manage: 'customer:manage' },
+  { label: '采购', view: 'purchase:view', manage: 'purchase:manage' },
+  { label: '供应商', view: 'supplier:view', manage: 'supplier:manage' },
+  { label: '生产单据', view: 'production:view', manage: 'production:manage' },
+  { label: '库存', view: 'inventory:view', manage: 'inventory:manage' },
   { label: '财务', view: 'finance:view', manage: 'finance:manage' },
+  { label: '材料毛利', view: 'profit:view', manage: 'profit:manage' },
   { label: '账号管理', view: 'account:manage', manage: null },
   { label: '审计日志', view: 'audit:view', manage: null },
 ];
@@ -61,7 +66,7 @@ export function RolePermissionsDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="w-[min(860px,94vw)] max-w-none sm:max-w-none"
+        className="max-h-[85vh] w-[min(1100px,96vw)] max-w-none overflow-y-auto sm:max-w-none"
         data-testid="role-permissions-dialog"
       >
         <DialogHeader>
@@ -72,7 +77,7 @@ export function RolePermissionsDialog({
         </DialogHeader>
 
         <div className="rounded-lg border border-border">
-          <Table>
+          <Table containerClassName="overflow-x-auto">
             <TableHeader>
               <TableRow>
                 <TableHead>角色</TableHead>
@@ -104,9 +109,9 @@ export function RolePermissionsDialog({
         </div>
 
         <ul className="space-y-1 text-xs text-muted-foreground">
-          <li>PC 与手机端共用同一套权限；手机端目前仅提供销售单页面，客户、财务、账号管理与审计日志只在 PC 端使用。</li>
+          <li>PC 与手机端共用同一套权限；手机端提供销售、客户、采购、供应商、生产与库存、资金页面；账号管理与审计日志只在 PC 端使用。</li>
           <li>管理员可以有多个，但必须保留至少一个启用状态的管理员；不能停用自己或最后一个管理员。</li>
-          <li>销售单的查看、打印属于查看权限；新建、编辑与删除需要维护权限。</li>
+          <li>销售单的查看、打印属于查看权限；新建、编辑与删除需要维护权限；材料毛利仅管理员 / 销售可重算成本待补订单。</li>
         </ul>
 
         <DialogFooter>

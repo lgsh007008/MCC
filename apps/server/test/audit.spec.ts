@@ -9,6 +9,7 @@ import { AppModule } from '../src/app.module.js';
 import { API_PREFIX } from '../src/common/api-prefix.js';
 import { PrismaService } from '../src/common/prisma.service.js';
 import { RedisService } from '../src/common/redis.service.js';
+import { scopedClient, TEST_TENANT_CODE, TEST_TENANT_ID } from './helpers.js';
 
 // 审计日志（product/审计日志.md R-审计-001；design/审计日志.md §8）：
 // 写操作成功 / 失败、登录成功 / 失败、权限拒绝、打印均落库；非管理员查询 403；响应不含敏感 payload。
@@ -18,6 +19,7 @@ describe('审计日志（契约/集成）', () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let redis: RedisService;
+  let db: PrismaService['client'];
   const stamp = Date.now();
   const adminUsername = `it-audit-admin-${stamp}`;
   const salesUsername = `it-audit-sales-${stamp}`;
@@ -31,7 +33,7 @@ describe('审计日志（契约/集成）', () => {
   ): Promise<Prisma.EventLogGetPayload<object>> => {
     const start = Date.now();
     while (Date.now() - start < 3_000) {
-      const row = await prisma.client.eventLog.findFirst({
+      const row = await db.eventLog.findFirst({
         where,
         orderBy: { createdAt: 'desc' },
       });
@@ -49,19 +51,22 @@ describe('审计日志（契约/集成）', () => {
     app.setGlobalPrefix(API_PREFIX);
     await app.init();
     prisma = app.get(PrismaService);
+    db = scopedClient(prisma.client);
     redis = app.get(RedisService);
     const rateKeys = await redis.keys('rate:*');
     if (rateKeys.length > 0) {
       await redis.del(...rateKeys);
     }
-    await prisma.client.user.createMany({
+    await db.user.createMany({
       data: [
         {
+          tenantId: TEST_TENANT_ID,
           username: adminUsername,
           passwordHash: await hash(password),
           role: 'ADMIN',
         },
         {
+          tenantId: TEST_TENANT_ID,
           username: salesUsername,
           passwordHash: await hash(password),
           role: 'SALES',
@@ -70,23 +75,23 @@ describe('审计日志（契约/集成）', () => {
     });
     const adminLogin = await request(app.getHttpServer())
       .post(`/${API_PREFIX}/auth/login`)
-      .send({ username: adminUsername, password, rememberMe: false });
+      .send({ tenantCode: TEST_TENANT_CODE, username: adminUsername, password, rememberMe: false });
     adminToken = adminLogin.body.accessToken as string;
     const salesLogin = await request(app.getHttpServer())
       .post(`/${API_PREFIX}/auth/login`)
-      .send({ username: salesUsername, password, rememberMe: false });
+      .send({ tenantCode: TEST_TENANT_CODE, username: salesUsername, password, rememberMe: false });
     salesToken = salesLogin.body.accessToken as string;
   });
 
   afterAll(async () => {
-    await prisma.client.saleOrder.deleteMany({
+    await db.saleOrder.deleteMany({
       where: { customerName: { startsWith: 'it-audit-customer-' } },
     });
-    await prisma.client.customer.deleteMany({ where: { name: { startsWith: 'it-audit-customer-' } } });
-    await prisma.client.user.deleteMany({
+    await db.customer.deleteMany({ where: { name: { startsWith: 'it-audit-customer-' } } });
+    await db.user.deleteMany({
       where: { username: { startsWith: 'it-audit-' } },
     });
-    await prisma.client.eventLog.deleteMany({
+    await db.eventLog.deleteMany({
       where: { actorUsername: { startsWith: 'it-audit-' } },
     });
     await app.close();
@@ -113,7 +118,7 @@ describe('审计日志（契约/集成）', () => {
     const ghost = `it-audit-ghost-${stamp}`;
     const res = await http()
       .post(`/${API_PREFIX}/auth/login`)
-      .send({ username: ghost, password: 'wrong-password', rememberMe: false });
+      .send({ tenantCode: TEST_TENANT_CODE, username: ghost, password: 'wrong-password', rememberMe: false });
     expect(res.status).toBe(401);
     const row = await waitForLog({
       actorUsername: ghost,

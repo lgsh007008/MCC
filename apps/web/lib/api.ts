@@ -14,7 +14,7 @@ export async function refreshSession(): Promise<boolean> {
     try {
       const { data, response } = await api.POST('/api/v1/auth/refresh', { body: {} });
       if (response.ok && data) {
-        authSession.set(data.accessToken);
+        authSession.set(data.accessToken, data.features);
         return true;
       }
       return false;

@@ -23,6 +23,7 @@ test('管理员查询审计日志并筛出自己的写操作', async ({ page }) 
   const customerName = `e2e-audit-${Date.now()}`;
 
   await page.goto('/login');
+  await page.getByPlaceholder('如 TN-00001').fill('TN-00001');
   await page.getByPlaceholder('请输入账号').fill('admin');
   await page.getByPlaceholder('请输入密码').fill('Mcc@2026');
   await page.getByRole('button', { name: '登录' }).click();

@@ -24,6 +24,7 @@ import type { AuthUser } from '../../common/decorators/current-user.decorator.js
 import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
 import { Public } from '../../common/decorators/public.decorator.js';
 import { ZodValidationPipe } from '../../common/zod-validation.pipe.js';
+import { runWithTenant, TenantService } from '../tenant/index.js';
 import {
   AUTH_COOKIE_NAME,
   AUTH_COOKIE_PATH,
@@ -38,12 +39,14 @@ const readRefreshCookie = (req: Request): string | undefined =>
   (req.cookies as Record<string, string> | undefined)?.[AUTH_COOKIE_NAME];
 
 // 接口清单与路径（design/账号与权限.md §3）；契约由装饰器代码生成（ADR-006）。
+// 登录 / 登出 / 刷新由本控制器显式写审计并 @SkipAudit；审计写库需要租户上下文，故按租户 runWithTenant。
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly audit: AuditService,
+    private readonly tenants: TenantService,
   ) {}
 
   @Public()
@@ -51,7 +54,7 @@ export class AuthController {
   @SkipAudit()
   @Post('login')
   @HttpCode(200)
-  @ApiOperation({ summary: '登录：校验账号密码，签发访问令牌 + 刷新令牌', security: [] })
+  @ApiOperation({ summary: '登录：租户编号 + 账号 + 密码，签发访问令牌 + 刷新令牌', security: [] })
   @ApiBody({ type: LoginBodyDto })
   @ApiOkResponse({ type: LoginResponseDto })
   async login(
@@ -62,25 +65,27 @@ export class AuthController {
     try {
       const result = await this.authService.login(body);
       const requestMeta = auditRequestMeta(req);
-      void this.audit.write({
-        actorId: result.userId,
-        actorUsername: result.username,
-        actorRole: result.role,
-        domain: 'auth',
-        action: 'login',
-        actionLabel: '登录',
-        objectType: 'user',
-        objectId: result.userId,
-        objectCode: result.username,
-        result: 'ok',
-        statusCode: 200,
-        method: req.method,
-        path: req.path,
-        ip: requestMeta.ip,
-        userAgent: requestMeta.userAgent,
-        requestId: requestMeta.requestId,
-        payload: { method: req.method, path: req.path },
-      });
+      void runWithTenant(result.tenantId, () =>
+        this.audit.write({
+          actorId: result.userId,
+          actorUsername: result.username,
+          actorRole: result.role,
+          domain: 'auth',
+          action: 'login',
+          actionLabel: '登录',
+          objectType: 'user',
+          objectId: result.userId,
+          objectCode: result.username,
+          result: 'ok',
+          statusCode: 200,
+          method: req.method,
+          path: req.path,
+          ip: requestMeta.ip,
+          userAgent: requestMeta.userAgent,
+          requestId: requestMeta.requestId,
+          payload: { method: req.method, path: req.path },
+        }),
+      );
       res.cookie(AUTH_COOKIE_NAME, result.refreshToken, {
         httpOnly: true,
         sameSite: 'lax',
@@ -90,7 +95,12 @@ export class AuthController {
         // 不勾选「记住登录」→ 会话级 cookie（无 maxAge，浏览器关闭即失效）
         maxAge: result.rememberMe ? REFRESH_REMEMBER_TTL_DAYS * DAY_MS : undefined,
       });
-      return { accessToken: result.accessToken, username: result.username, role: result.role };
+      return {
+        accessToken: result.accessToken,
+        username: result.username,
+        role: result.role,
+        features: result.features,
+      };
     } catch (error) {
       const requestMeta = auditRequestMeta(req);
       const statusCode = error instanceof HttpException ? error.getStatus() : 500;
@@ -102,22 +112,29 @@ export class AuthController {
         typeof (response as { code?: unknown }).code === 'string'
           ? (response as { code: string }).code
           : null;
-      void this.audit.write({
-        actorUsername: body.username,
-        domain: 'auth',
-        action: 'login',
-        actionLabel: '登录',
-        objectType: 'user',
-        result: 'failed',
-        statusCode,
-        errorCode,
-        method: req.method,
-        path: req.path,
-        ip: requestMeta.ip,
-        userAgent: requestMeta.userAgent,
-        requestId: requestMeta.requestId,
-        payload: { method: req.method, path: req.path },
-      });
+      // 租户不存在时无法归属租户审计（租户审计按 tenant_id 隔离），不落库；
+      // 租户存在但凭证错误 / 停用租户等失败均留痕。
+      const tenant = await this.tenants.findByCode(body.tenantCode).catch(() => null);
+      if (tenant) {
+        void runWithTenant(tenant.id, () =>
+          this.audit.write({
+            actorUsername: body.username,
+            domain: 'auth',
+            action: 'login',
+            actionLabel: '登录',
+            objectType: 'user',
+            result: 'failed',
+            statusCode,
+            errorCode,
+            method: req.method,
+            path: req.path,
+            ip: requestMeta.ip,
+            userAgent: requestMeta.userAgent,
+            requestId: requestMeta.requestId,
+            payload: { method: req.method, path: req.path },
+          }),
+        );
+      }
       throw error;
     }
   }
@@ -151,26 +168,30 @@ export class AuthController {
     @Body(new ZodValidationPipe(logoutSchema)) _body: unknown,
   ): Promise<void> {
     const actor = await this.authService.logout(readRefreshCookie(req));
-    const requestMeta = auditRequestMeta(req);
-    void this.audit.write({
-      actorId: actor?.userId ?? null,
-      actorUsername: actor?.username ?? null,
-      actorRole: actor?.role ?? null,
-      domain: 'auth',
-      action: 'logout',
-      actionLabel: '登出',
-      objectType: 'user',
-      objectId: actor?.userId ?? null,
-      objectCode: actor?.username ?? null,
-      result: 'ok',
-      statusCode: 204,
-      method: req.method,
-      path: req.path,
-      ip: requestMeta.ip,
-      userAgent: requestMeta.userAgent,
-      requestId: requestMeta.requestId,
-      payload: { method: req.method, path: req.path },
-    });
+    if (actor) {
+      const requestMeta = auditRequestMeta(req);
+      void runWithTenant(actor.tenantId, () =>
+        this.audit.write({
+          actorId: actor.userId,
+          actorUsername: actor.username,
+          actorRole: actor.role,
+          domain: 'auth',
+          action: 'logout',
+          actionLabel: '登出',
+          objectType: 'user',
+          objectId: actor.userId,
+          objectCode: actor.username,
+          result: 'ok',
+          statusCode: 204,
+          method: req.method,
+          path: req.path,
+          ip: requestMeta.ip,
+          userAgent: requestMeta.userAgent,
+          requestId: requestMeta.requestId,
+          payload: { method: req.method, path: req.path },
+        }),
+      );
+    }
     res.clearCookie(AUTH_COOKIE_NAME, { path: AUTH_COOKIE_PATH });
   }
 

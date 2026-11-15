@@ -1,6 +1,6 @@
 'use client';
 
-import { HelpDialogShell, HelpRow, HelpSection } from '@/components/finance/summary-help-parts';
+import { HelpDialogShell, HelpRow, HelpSection } from '@/components/ui/help-dialog';
 
 // 资金收付口径说明弹窗（product/finance.md R-财务-001 / R-财务-002）：
 // 与经营收支弹窗同构（520px、三组信息条 + 收尾句、底部只有关闭）；

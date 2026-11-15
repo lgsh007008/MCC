@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { LogOutIcon, ShoppingCartIcon, TruckIcon, WalletIcon } from 'lucide-react';
+import { FactoryIcon, LogOutIcon, ShoppingCartIcon, TruckIcon, WalletIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCan } from '@/components/auth/permission-context';
 import { MobileEntryCard } from '@/components/mobile/entry-card';
@@ -17,6 +17,8 @@ export default function MobileHomePage(): React.ReactElement {
   const canCustomer = useCan('customer:view');
   const canPurchase = useCan('purchase:view');
   const canFinance = useCan('finance:view');
+  const canProduction = useCan('production:view');
+  const canInventory = useCan('inventory:view');
   const [loggingOut, setLoggingOut] = useState(false);
 
   async function handleLogout(): Promise<void> {
@@ -64,6 +66,14 @@ export default function MobileHomePage(): React.ReactElement {
             icon={TruckIcon}
             title="采购"
             description="采购单 / 供应商"
+          />
+        ) : null}
+        {canProduction || canInventory ? (
+          <MobileEntryCard
+            href="/m/production"
+            icon={FactoryIcon}
+            title="生产"
+            description="原木领用 / 方木产出 / 库存 / 盘点"
           />
         ) : null}
         {canFinance ? (
