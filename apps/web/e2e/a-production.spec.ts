@@ -4,6 +4,8 @@ import { expectPageFrame } from './support/page-frame';
 // 生产与库存冒烟（product/生产与库存.md R-生产-001 / R-生产-003 / R-生产-005）：
 // API 预置原木领用与方木产出，验证 PC / 移动列表、表单、详情、库存页、盘点页与销售单材料毛利卡；
 // 结束后经 API 软删两张单据，避免污染后续用例。
+// 文件名前缀 a- 是刻意的：盘点与期初要求「期初日期早于全部库存变动」，
+// 必须排在所有会开单的用例之前执行，否则干净库无法补建期初。
 
 test('原木领用与方木产出：PC / 移动页面与材料毛利卡可达', async ({ page, request }) => {
   const login = await request.post('/api/v1/auth/login', {
@@ -17,6 +19,31 @@ test('原木领用与方木产出：PC / 移动页面与材料毛利卡可达', 
   expect(login.ok()).toBeTruthy();
   const token = (await login.json()).accessToken as string;
   const headers = { Authorization: `Bearer ${token}` };
+
+  // 干净库尚未设期初时先补建：盘点页要求期初已设，且期初日期必须早于任何库存变动，
+  // 因此必须在下面的领用 / 产出之前建立；已设期初的库直接跳过，重复执行安全。
+  const preSummary = await request.get('/api/v1/inventory/summary', { headers });
+  expect(preSummary.ok()).toBeTruthy();
+  if ((await preSummary.json()).needsOpening) {
+    const opening = await request.post('/api/v1/inventory/openings', {
+      headers: { ...headers, 'Idempotency-Key': `e2e-opening-${Date.now()}` },
+      data: {
+        openingDate: '2020-01-01',
+        note: 'e2e 期初库存',
+        rawLog: { quantity: '10.000', unitCost: '500.000000' },
+        timber: [
+          {
+            lengthMm: 2500,
+            widthMm: 100,
+            heightMm: 20,
+            quantity: '1.0000',
+            unitCost: '600.000000',
+          },
+        ],
+      },
+    });
+    expect(opening.status()).toBe(201);
+  }
 
   const issue = await request.post('/api/v1/material-issues', {
     headers: { ...headers, 'Idempotency-Key': `e2e-issue-${Date.now()}` },

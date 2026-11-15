@@ -94,6 +94,15 @@ test('登录 → 首页 → 订单菜单 → 销售单列表 → 退出 → 未�
   await cellInput(3).fill('10');
   await cellInput(6).fill('600.00');
   await page.getByRole('button', { name: '保存' }).click();
+  // 干净库首次开单时尚无方木产出，保存会先弹「成本待补」确认
+  // （product/生产与库存.md R-生产-004）；已有产出成本时不会出现
+  const materialCostDialog = page.getByRole('alertdialog', { name: '当前无有效方木成本' });
+  await materialCostDialog
+    .waitFor({ state: 'visible', timeout: 2000 })
+    .catch(() => undefined);
+  if (await materialCostDialog.isVisible()) {
+    await materialCostDialog.getByRole('button', { name: '仍然保存' }).click();
+  }
 
   await expect(page).toHaveURL(/\/admin\/sale-orders\/[0-9a-f-]{36}$/);
   await expect(breadcrumb.getByText(/^SO-\d{5}$/)).toBeVisible();
