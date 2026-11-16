@@ -1,0 +1,30 @@
+# 临时应急：web 容器异常停止时恢复到上一个可用镜像。
+# 仅在 mcc-web-1 未运行时执行，恢复后重复触发无副作用。
+name: Hotfix restore web
+
+on:
+  push:
+    paths:
+      - '.github/workflows/hotfix-restore.yml'
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 恢复 web 容器
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -e
+            cd /opt/mcc
+            if docker ps --format '{{.Names}}' | grep -q '^mcc-web-1$'; then
+              echo 'web 已在运行，跳过恢复'
+              exit 0
+            fi
+            sed -i 's/^IMAGE_TAG=.*/IMAGE_TAG=v0.1.27/' .env.prod
+            docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --no-deps web
+            sleep 5
+            docker ps --format '{{.Names}} {{.Image}} {{.Status}}'
