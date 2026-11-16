@@ -161,7 +161,7 @@ export class FinanceController {
 
   @Get('cash-summary')
   @RequireScopes('finance:view')
-  @ApiOperation({ summary: '资金汇总（期间收款 / 付款 / 净流入 + 各账户当前余额）' })
+  @ApiOperation({ summary: '资金汇总（期间进账 / 出账 / 净流入 + 各账户当前余额）' })
   @ApiQuery({ name: 'dateFrom', required: false, type: String })
   @ApiQuery({ name: 'dateTo', required: false, type: String })
   @ApiOkResponse({ type: FinanceCashSummaryDto })

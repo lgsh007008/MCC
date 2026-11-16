@@ -55,8 +55,8 @@ test('登录 → 收支汇总两个 Tab → 指标卡与分类表', async ({ pag
 
   await page.getByRole('tab', { name: '资金收付' }).click();
   await expect(page).toHaveURL(/\?tab=funds$/);
-  await expect(page.getByText('期间收款', { exact: true })).toBeVisible();
-  await expect(page.getByText('期间付款', { exact: true })).toBeVisible();
+  await expect(page.getByText('期间进账', { exact: true })).toBeVisible();
+  await expect(page.getByText('期间出账', { exact: true })).toBeVisible();
   await expect(page.getByText('净流入', { exact: true })).toBeVisible();
   // 四卡同排：期间三卡 + 「当前资金总额 · 此刻」（资金总额不随日期筛选变化）
   await expect(page.getByText(/当前资金总额/)).toBeVisible();

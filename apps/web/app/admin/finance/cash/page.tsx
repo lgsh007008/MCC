@@ -478,9 +478,9 @@ export default function FinanceCashPage(): React.ReactElement {
               ariaLabel="方向"
               options={[
                 { value: '', label: '全部' },
-                { value: 'in', label: '收款' },
-                { value: 'out', label: '付款' },
-                { value: 'transfer', label: '内部转账' },
+                { value: 'in', label: FINANCE_CASH_DIRECTION_LABELS.in },
+                { value: 'out', label: FINANCE_CASH_DIRECTION_LABELS.out },
+                { value: 'transfer', label: FINANCE_CASH_DIRECTION_LABELS.transfer },
               ]}
               className="w-28"
             />
@@ -681,7 +681,7 @@ export default function FinanceCashPage(): React.ReactElement {
                   合计
                 </TableCell>
                 <TableCell className="text-right tabular-nums">
-                  收款 {data.summary.receipts} / 付款 {data.summary.payments}
+                  进账 {data.summary.receipts} / 出账 {data.summary.payments}
                 </TableCell>
                 <TableCell className="tabular-nums">净额 {data.summary.net}</TableCell>
                 <TableCell />

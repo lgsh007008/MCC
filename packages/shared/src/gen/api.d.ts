@@ -794,7 +794,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** 资金汇总（期间收款 / 付款 / 净流入 + 各账户当前余额） */
+        /** 资金汇总（期间进账 / 出账 / 净流入 + 各账户当前余额） */
         get: operations["FinanceController_cashSummary"];
         put?: never;
         post?: never;
@@ -1950,11 +1950,11 @@ export interface components {
             active: boolean;
         };
         FinanceCashEntryListSummaryDto: {
-            /** @description 筛选全量收款合计 */
+            /** @description 筛选全量进账合计 */
             receipts: string;
-            /** @description 筛选全量付款合计 */
+            /** @description 筛选全量出账合计 */
             payments: string;
-            /** @description 净额 = 收款 − 付款 */
+            /** @description 净额 = 进账 − 出账 */
             net: string;
         };
         FinanceCashEntryDto: {
@@ -1996,11 +1996,11 @@ export interface components {
             items: components["schemas"]["FinanceCashEntryDto"][];
         };
         FinanceCashSummaryDto: {
-            /** @description 期间收款合计 */
+            /** @description 期间进账合计 */
             receipts: string;
-            /** @description 期间付款合计 */
+            /** @description 期间出账合计 */
             payments: string;
-            /** @description 净流入 = 收款 − 付款 */
+            /** @description 净流入 = 进账 − 出账 */
             netFlow: string;
             /** @description 全部账户当前资金总额（含票据） */
             totalFunds: string;
@@ -2037,7 +2037,7 @@ export interface components {
         };
         FinanceCashEntryBodyDto: {
             /**
-             * @description 方向：收款 / 付款 / 内部转账
+             * @description 方向：进账 / 出账 / 内部转账
              * @enum {string}
              */
             direction: "in" | "out" | "transfer";
@@ -2056,7 +2056,7 @@ export interface components {
             /** @description 内部转账的转入账户 id */
             toAccountId?: string | null;
             /**
-             * @description 收支分类：收款 3 项 / 付款 5 项；内部转账为空
+             * @description 收支分类：进账 3 项 / 出账 5 项；内部转账为空
              * @enum {string|null}
              */
             category?: "sales_receipt" | "other_revenue" | "loan_in" | "purchase_payment" | "labor_cost" | "operating_expense" | "asset_purchase" | "loan_repay" | null;
@@ -2065,7 +2065,7 @@ export interface components {
             /** @description 供应商 id（仅采购付款必填） */
             supplierId?: string | null;
             /**
-             * @description 备注（付款写对象与事由；承兑写票号 / 到期日）
+             * @description 备注（出账写对象与事由；承兑写票号 / 到期日）
              * @default
              */
             note: string;

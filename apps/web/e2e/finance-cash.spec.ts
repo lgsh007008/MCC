@@ -181,9 +181,9 @@ test('资金流水 → 收支汇总资金卡', async ({ page }) => {
     await expect(rowA).toBeVisible();
     await expect(rowC).toHaveCount(0);
 
-    // 方向 → 收支分类级联：选收款只列收款分类；内部转账无分类，分类清空并禁用
+    // 方向 → 收支分类级联：选进账只列进账分类；内部转账无分类，分类清空并禁用
     await page.getByLabel('方向', { exact: true }).click();
-    await page.getByRole('option', { name: '收款', exact: true }).click();
+    await page.getByRole('option', { name: '进账', exact: true }).click();
     await page.getByLabel('收支分类', { exact: true }).click();
     await expect(page.getByRole('option', { name: '销售回款', exact: true })).toBeVisible();
     await expect(page.getByRole('option', { name: '采购付款', exact: true })).toHaveCount(0);
@@ -268,8 +268,8 @@ test('资金流水 → 收支汇总资金卡', async ({ page }) => {
     await expect(page.getByText('总收入', { exact: true })).toBeVisible();
     await page.getByRole('tab', { name: '资金收付' }).click();
     await expect(page).toHaveURL(/\/admin\/finance\/summary\?tab=funds$/);
-    await expect(page.getByText('期间收款', { exact: true })).toBeVisible();
-    await expect(page.getByText('期间付款', { exact: true })).toBeVisible();
+    await expect(page.getByText('期间进账', { exact: true })).toBeVisible();
+    await expect(page.getByText('期间出账', { exact: true })).toBeVisible();
     await expect(page.getByText('净流入', { exact: true })).toBeVisible();
     await expect(page.getByText(/当前资金总额/)).toBeVisible();
     await expect(page.getByRole('row').filter({ hasText: accountNameA })).toBeVisible();

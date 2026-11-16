@@ -2389,7 +2389,7 @@
             }
           }
         },
-        "summary": "资金汇总（期间收款 / 付款 / 净流入 + 各账户当前余额）",
+        "summary": "资金汇总（期间进账 / 出账 / 净流入 + 各账户当前余额）",
         "tags": [
           "finance"
         ]
@@ -5824,15 +5824,15 @@
         "properties": {
           "receipts": {
             "type": "string",
-            "description": "筛选全量收款合计"
+            "description": "筛选全量进账合计"
           },
           "payments": {
             "type": "string",
-            "description": "筛选全量付款合计"
+            "description": "筛选全量出账合计"
           },
           "net": {
             "type": "string",
-            "description": "净额 = 收款 − 付款"
+            "description": "净额 = 进账 − 出账"
           }
         },
         "required": [
@@ -5992,15 +5992,15 @@
         "properties": {
           "receipts": {
             "type": "string",
-            "description": "期间收款合计"
+            "description": "期间进账合计"
           },
           "payments": {
             "type": "string",
-            "description": "期间付款合计"
+            "description": "期间出账合计"
           },
           "netFlow": {
             "type": "string",
-            "description": "净流入 = 收款 − 付款"
+            "description": "净流入 = 进账 − 出账"
           },
           "totalFunds": {
             "type": "string",
@@ -6122,7 +6122,7 @@
               "out",
               "transfer"
             ],
-            "description": "方向：收款 / 付款 / 内部转账"
+            "description": "方向：进账 / 出账 / 内部转账"
           },
           "occurredDate": {
             "type": "string",
@@ -6156,7 +6156,7 @@
               "loan_repay"
             ],
             "nullable": true,
-            "description": "收支分类：收款 3 项 / 付款 5 项；内部转账为空"
+            "description": "收支分类：进账 3 项 / 出账 5 项；内部转账为空"
           },
           "customerId": {
             "type": "string",
@@ -6170,7 +6170,7 @@
           },
           "note": {
             "type": "string",
-            "description": "备注（付款写对象与事由；承兑写票号 / 到期日）",
+            "description": "备注（出账写对象与事由；承兑写票号 / 到期日）",
             "default": ""
           }
         },

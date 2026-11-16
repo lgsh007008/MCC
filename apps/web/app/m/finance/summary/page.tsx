@@ -170,8 +170,8 @@ function SummaryContent(): React.ReactElement {
 
             <div className="space-y-3">
               {[
-                { label: '期间收款', value: cash?.receipts ?? '0.00' },
-                { label: '期间付款', value: cash?.payments ?? '0.00' },
+                { label: '期间进账', value: cash?.receipts ?? '0.00' },
+                { label: '期间出账', value: cash?.payments ?? '0.00' },
                 { label: '净流入', value: cash?.netFlow ?? '0.00' },
               ].map((card) => (
                 <MobileStatCard key={card.label} label={card.label} value={`${card.value} 元`} />
@@ -186,7 +186,7 @@ function SummaryContent(): React.ReactElement {
 
             <div className="flex items-start justify-between gap-3">
               <p className="text-mobile-body text-muted-foreground">
-                收款与付款按流水实际发生计入，内部转账不算；净流入 = 收款 − 付款。
+                进账与出账按流水实际发生计入，内部转账不算；净流入 = 进账 − 出账。
               </p>
               <Button
                 type="button"

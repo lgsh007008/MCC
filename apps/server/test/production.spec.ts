@@ -18,11 +18,13 @@ describe('生产与库存接口（契约/集成）', () => {
   let prisma: PrismaService;
   let db: PrismaService['client'];
   let token: string;
+  let adminToken: string;
   let workerToken: string;
   let financeToken: string;
   let customerId: string;
   const stamp = Date.now();
   const username = `it-production-user-${stamp}`;
+  const adminName = `it-production-admin-${stamp}`;
   const workerName = `it-production-worker-${stamp}`;
   const financeName = `it-production-finance-${stamp}`;
   const password = 'Secret#12345';
@@ -98,11 +100,13 @@ describe('生产与库存接口（契约/集成）', () => {
     await db.user.createMany({
       data: [
         { tenantId: TEST_TENANT_ID, username, passwordHash: await hash(password), role: 'SALES' },
+        { tenantId: TEST_TENANT_ID, username: adminName, passwordHash: await hash(password), role: 'ADMIN' },
         { tenantId: TEST_TENANT_ID, username: workerName, passwordHash: await hash(password), role: 'WORKER' },
         { tenantId: TEST_TENANT_ID, username: financeName, passwordHash: await hash(password), role: 'FINANCE' },
       ],
     });
     token = await login(username);
+    adminToken = await login(adminName);
     workerToken = await login(workerName);
     financeToken = await login(financeName);
     const batch = await http()
@@ -135,10 +139,10 @@ describe('生产与库存接口（契约/集成）', () => {
     await db.inventoryAdjustment.deleteMany({ where: { id: { in: adjustmentIds } } });
     await db.customer.deleteMany({ where: { name: { startsWith: 'it-production-' } } });
     await db.user.deleteMany({
-      where: { username: { in: [username, workerName, financeName] } },
+      where: { username: { in: [username, adminName, workerName, financeName] } },
     });
     await db.eventLog.deleteMany({
-      where: { actorUsername: { in: [username, workerName, financeName] } },
+      where: { actorUsername: { in: [username, adminName, workerName, financeName] } },
     });
     await app.close();
   });
@@ -175,7 +179,7 @@ describe('生产与库存接口（契约/集成）', () => {
     expect(res.status).toBe(201);
     const profit = await http()
       .get(`/${API_PREFIX}/sale-orders/${res.body.id}/profit`)
-      .set(auth(token));
+      .set(auth(adminToken));
     expect(profit.status).toBe(200);
     expect(profit.body.materialCostStatus).toBe('pending');
     expect(profit.body.materialProfit).toBeNull();
@@ -344,7 +348,7 @@ describe('生产与库存接口（契约/集成）', () => {
 
     const profit = await http()
       .get(`/${API_PREFIX}/sale-orders/${pending?.id}/profit`)
-      .set(auth(token));
+      .set(auth(adminToken));
     expect(profit.status).toBe(200);
     expect(profit.body.materialCostStatus).toBe('final');
     expect(profit.body.materialUnitCost).toBe('1000.000000');
@@ -379,7 +383,7 @@ describe('生产与库存接口（契约/集成）', () => {
     expect(first.status).toBe(201);
     const profit = await http()
       .get(`/${API_PREFIX}/sale-orders/${first.body.id}/profit`)
-      .set(auth(token));
+      .set(auth(adminToken));
     expect(profit.body.materialCostStatus).toBe('final');
     expect(profit.body.materialCostAmount).toBe('2500.00');
 
@@ -703,7 +707,7 @@ describe('生产与库存接口（契约/集成）', () => {
     expect((await db.productionBatch.findUnique({ where: { id: validId } }))?.status).toBe('OPEN');
   });
 
-  it('权限：工人无领用 / 产出 / 库存权限；财务可看库存、盘点与两张单据但不能新建', async () => {
+  it('权限：工人无领用 / 产出 / 库存权限；财务可看库存、盘点与两张单据但不能新建；材料毛利仅管理员', async () => {
     expect((await http().get(`/${API_PREFIX}/material-issues`).set(auth(workerToken))).status).toBe(403);
     expect((await http().get(`/${API_PREFIX}/production-outputs`).set(auth(workerToken))).status).toBe(403);
     expect((await http().get(`/${API_PREFIX}/inventory/summary`).set(auth(workerToken))).status).toBe(403);
@@ -721,6 +725,16 @@ describe('生产与库存接口（契约/集成）', () => {
     expect(
       (await http().get(`/${API_PREFIX}/sale-orders/${first?.id}/profit`).set(auth(workerToken))).status,
     ).toBe(403);
+    // 材料毛利仅管理员可见：销售 / 财务同样 403
+    expect(
+      (await http().get(`/${API_PREFIX}/sale-orders/${first?.id}/profit`).set(auth(token))).status,
+    ).toBe(403);
+    expect(
+      (await http().get(`/${API_PREFIX}/sale-orders/${first?.id}/profit`).set(auth(financeToken))).status,
+    ).toBe(403);
+    expect(
+      (await http().get(`/${API_PREFIX}/sale-orders/${first?.id}/profit`).set(auth(adminToken))).status,
+    ).toBe(200);
 
     expect((await http().get(`/${API_PREFIX}/inventory/summary`).set(auth(financeToken))).status).toBe(200);
     expect(

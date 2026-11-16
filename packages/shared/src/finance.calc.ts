@@ -133,8 +133,8 @@ export const FINANCE_ACCOUNT_CHANNEL_LABELS: Record<FinanceAccountChannel, strin
 };
 
 export const FINANCE_CASH_DIRECTION_LABELS: Record<FinanceCashDirection, string> = {
-  in: '收款',
-  out: '付款',
+  in: '进账',
+  out: '出账',
   transfer: '内部转账',
 };
 

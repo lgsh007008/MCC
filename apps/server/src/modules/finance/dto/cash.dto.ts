@@ -57,7 +57,7 @@ export class FinanceAccountListDto {
 // ── 资金流水 ─────────────────────────────────────────────
 
 export class FinanceCashEntryBodyDto {
-  @ApiProperty({ type: String, enum: CASH_DIRECTIONS, description: '方向：收款 / 付款 / 内部转账' })
+  @ApiProperty({ type: String, enum: CASH_DIRECTIONS, description: '方向：进账 / 出账 / 内部转账' })
   direction!: 'in' | 'out' | 'transfer';
 
   @ApiProperty({ type: String, description: '发生日期', example: '2026-11-12' })
@@ -75,7 +75,7 @@ export class FinanceCashEntryBodyDto {
     type: String,
     enum: CASH_CATEGORIES,
     nullable: true,
-    description: '收支分类：收款 3 项 / 付款 5 项；内部转账为空',
+    description: '收支分类：进账 3 项 / 出账 5 项；内部转账为空',
   })
   category?: string | null;
 
@@ -85,7 +85,7 @@ export class FinanceCashEntryBodyDto {
   @ApiPropertyOptional({ type: String, nullable: true, description: '供应商 id（仅采购付款必填）' })
   supplierId?: string | null;
 
-  @ApiPropertyOptional({ type: String, description: '备注（付款写对象与事由；承兑写票号 / 到期日）', default: '' })
+  @ApiPropertyOptional({ type: String, description: '备注（出账写对象与事由；承兑写票号 / 到期日）', default: '' })
   note?: string;
 }
 
@@ -120,9 +120,9 @@ export class FinanceCashEntryDto {
 }
 
 export class FinanceCashEntryListSummaryDto {
-  @ApiProperty({ type: String, description: '筛选全量收款合计' }) receipts!: string;
-  @ApiProperty({ type: String, description: '筛选全量付款合计' }) payments!: string;
-  @ApiProperty({ type: String, description: '净额 = 收款 − 付款' }) net!: string;
+  @ApiProperty({ type: String, description: '筛选全量进账合计' }) receipts!: string;
+  @ApiProperty({ type: String, description: '筛选全量出账合计' }) payments!: string;
+  @ApiProperty({ type: String, description: '净额 = 进账 − 出账' }) net!: string;
 }
 
 export class FinanceCashEntryListDto {
@@ -133,9 +133,9 @@ export class FinanceCashEntryListDto {
 }
 
 export class FinanceCashSummaryDto {
-  @ApiProperty({ type: String, description: '期间收款合计' }) receipts!: string;
-  @ApiProperty({ type: String, description: '期间付款合计' }) payments!: string;
-  @ApiProperty({ type: String, description: '净流入 = 收款 − 付款' }) netFlow!: string;
+  @ApiProperty({ type: String, description: '期间进账合计' }) receipts!: string;
+  @ApiProperty({ type: String, description: '期间出账合计' }) payments!: string;
+  @ApiProperty({ type: String, description: '净流入 = 进账 − 出账' }) netFlow!: string;
   @ApiProperty({ type: String, description: '全部账户当前资金总额（含票据）' }) totalFunds!: string;
   @ApiProperty({ type: () => [FinanceAccountDto], description: '各账户当前余额' })
   accounts!: FinanceAccountDto[];

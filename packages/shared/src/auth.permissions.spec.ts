@@ -59,6 +59,13 @@ describe('角色与权限矩阵', () => {
     expect(scopeSatisfied(['audit:view'], 'audit:manage' as Scope)).toBe(false);
   });
 
+  it('材料毛利仅管理员可查看', () => {
+    expect(hasScope('ADMIN', 'profit:view')).toBe(true);
+    expect(hasScope('SALES', 'profit:view')).toBe(false);
+    expect(hasScope('FINANCE', 'profit:view')).toBe(false);
+    expect(hasScope('WORKER', 'profit:view')).toBe(false);
+  });
+
   it('未知角色无任何 scope', () => {
     expect(scopesOf(null)).toEqual([]);
     expect(scopesOf('GUEST')).toEqual([]);

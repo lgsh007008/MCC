@@ -101,8 +101,8 @@ export default function FinanceSummaryPage(): React.ReactElement {
 
   // 期间三卡 + 「当前资金总额 · 此刻」：四卡同排，资金总额卡靠竖线、浅底与「此刻」区分
   const fundCards: Array<{ label: string; value: string; current?: boolean; note?: string }> = [
-    { label: '期间收款', value: cash?.receipts ?? '0.00' },
-    { label: '期间付款', value: cash?.payments ?? '0.00' },
+    { label: '期间进账', value: cash?.receipts ?? '0.00' },
+    { label: '期间出账', value: cash?.payments ?? '0.00' },
     { label: '净流入', value: cash?.netFlow ?? '0.00' },
     {
       label: '当前资金总额 · 此刻',
@@ -251,7 +251,7 @@ export default function FinanceSummaryPage(): React.ReactElement {
             </div>
             <div className="flex flex-wrap items-start justify-between gap-2">
               <p className="text-xs text-muted-foreground">
-                看这段时间钱怎么动：收款与付款按流水实际发生计入，内部转账不算；净流入 = 收款 − 付款。
+                看这段时间钱怎么动：进账与出账按流水实际发生计入，内部转账不算；净流入 = 进账 − 出账。
               </p>
               <Button
                 type="button"

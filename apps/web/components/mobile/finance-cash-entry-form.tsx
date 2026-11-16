@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   FINANCE_CASH_CATEGORIES_BY_DIRECTION,
   FINANCE_CASH_CATEGORY_LABELS,
+  FINANCE_CASH_DIRECTION_LABELS,
   financeCashEntryInputSchema,
   type ApiSchemas,
   type FinanceCashCategoryValue,
@@ -226,9 +227,9 @@ export function MobileCashEntryForm({
             ariaLabel="方向"
             value={direction}
             options={[
-              { value: 'in', label: '收款' },
-              { value: 'out', label: '付款' },
-              { value: 'transfer', label: '内部转账' },
+              { value: 'in', label: FINANCE_CASH_DIRECTION_LABELS.in },
+              { value: 'out', label: FINANCE_CASH_DIRECTION_LABELS.out },
+              { value: 'transfer', label: FINANCE_CASH_DIRECTION_LABELS.transfer },
             ]}
             onValueChange={handleDirectionChange}
           />
