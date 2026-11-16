@@ -25,5 +25,13 @@ jobs:
             docker inspect -f 'status={{.State.Status}} health={{if .State.Health}}{{.State.Health.Status}}{{end}} restarts={{.RestartCount}}' mcc-web-1
             echo '=== server logs (tail 200) ==='
             docker logs mcc-server-1 --tail 200 2>&1
+            echo '=== redis logs (tail 60) ==='
+            docker logs mcc-redis-1 --tail 60 2>&1
+            echo '=== disk ==='
+            df -h
+            echo '=== docker disk ==='
+            docker system df
+            echo '=== opt size ==='
+            du -sh /opt/mcc/backups /var/lib/docker 2>/dev/null
             echo '=== deploy log ==='
             tail -40 deploy/last-deploy.log
