@@ -4082,6 +4082,264 @@
           "purchase-orders"
         ]
       }
+    },
+    "/api/v1/pallet/projects": {
+      "get": {
+        "operationId": "PalletController_list",
+        "parameters": [
+          {
+            "name": "sortOrder",
+            "required": false,
+            "in": "query",
+            "description": "更新时间排序，默认 desc",
+            "schema": {
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "description": "每页条数，默认 20（最大 100）",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "页码，默认 1",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "templateType",
+            "required": false,
+            "in": "query",
+            "description": "结构模板",
+            "schema": {
+              "enum": [
+                "block",
+                "stringer",
+                "notched",
+                "skid",
+                "plywood",
+                "custom"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "keyword",
+            "required": false,
+            "in": "query",
+            "description": "项目名称 / 编号 / 客户名称模糊",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PalletProjectListDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "托盘项目列表：关键字 / 模板筛选 + 分页",
+        "tags": [
+          "pallet"
+        ]
+      },
+      "post": {
+        "operationId": "PalletController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PalletProjectBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PalletProjectDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "新建托盘项目（PD 编号自动生成）",
+        "tags": [
+          "pallet"
+        ]
+      }
+    },
+    "/api/v1/pallet/projects/{id}": {
+      "get": {
+        "operationId": "PalletController_detail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PalletProjectDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "托盘项目详情（含构件）",
+        "tags": [
+          "pallet"
+        ]
+      },
+      "put": {
+        "operationId": "PalletController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PalletProjectBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PalletProjectDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "更新托盘项目与构件（整单提交，服务端重算合计）",
+        "tags": [
+          "pallet"
+        ]
+      },
+      "delete": {
+        "operationId": "PalletController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "已删除"
+          }
+        },
+        "summary": "删除托盘项目（软删除，编号不回收）",
+        "tags": [
+          "pallet"
+        ]
+      }
+    },
+    "/api/v1/pallet/projects/{id}/duplicate": {
+      "post": {
+        "operationId": "PalletController_duplicate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PalletProjectDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "复制托盘项目（生成新编号）",
+        "tags": [
+          "pallet"
+        ]
+      }
+    },
+    "/api/v1/pallet/materials": {
+      "get": {
+        "operationId": "PalletController_materials",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PalletMaterialDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "托盘材料目录（只读）",
+        "tags": [
+          "pallet"
+        ]
+      }
     }
   },
   "info": {
@@ -8639,6 +8897,473 @@
         },
         "required": [
           "deleted"
+        ]
+      },
+      "PalletProjectListItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "项目 id"
+          },
+          "code": {
+            "type": "string",
+            "description": "项目编号"
+          },
+          "name": {
+            "type": "string",
+            "description": "项目名称"
+          },
+          "customerName": {
+            "type": "string",
+            "description": "客户名称快照"
+          },
+          "templateType": {
+            "type": "string",
+            "description": "结构模板"
+          },
+          "lengthMm": {
+            "type": "number",
+            "description": "外形长度（mm）"
+          },
+          "widthMm": {
+            "type": "number",
+            "description": "外形宽度（mm）"
+          },
+          "totalHeightMm": {
+            "type": "number",
+            "description": "外形高度（mm）"
+          },
+          "totalVolumeM3": {
+            "type": "string",
+            "description": "木材净体积（m³）"
+          },
+          "totalWeightKg": {
+            "type": "string",
+            "description": "估算重量（kg）"
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "更新时间（ISO）"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "customerName",
+          "templateType",
+          "lengthMm",
+          "widthMm",
+          "totalHeightMm",
+          "totalVolumeM3",
+          "totalWeightKg",
+          "updatedAt"
+        ]
+      },
+      "PalletProjectListDto": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "number",
+            "description": "总数"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PalletProjectListItemDto"
+            }
+          }
+        },
+        "required": [
+          "total",
+          "items"
+        ]
+      },
+      "PalletComponentDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "构件 id"
+          },
+          "seq": {
+            "type": "number",
+            "description": "行序（从 1 开始）"
+          },
+          "role": {
+            "type": "string",
+            "description": "构件类型"
+          },
+          "name": {
+            "type": "string",
+            "description": "构件名称"
+          },
+          "materialCode": {
+            "type": "string",
+            "description": "材料 code"
+          },
+          "orientation": {
+            "type": "string",
+            "description": "方向"
+          },
+          "lengthMm": {
+            "type": "number",
+            "description": "长度（mm）"
+          },
+          "widthMm": {
+            "type": "number",
+            "description": "宽度（mm）"
+          },
+          "heightMm": {
+            "type": "number",
+            "description": "厚度（mm）"
+          },
+          "quantity": {
+            "type": "number",
+            "description": "数量"
+          },
+          "wastePct": {
+            "type": "number",
+            "description": "损耗比例"
+          },
+          "processCost": {
+            "type": "number",
+            "description": "加工费（元/件）"
+          },
+          "priceOverride": {
+            "type": "number",
+            "description": "单价覆盖（元/m³）"
+          }
+        },
+        "required": [
+          "id",
+          "seq",
+          "role",
+          "name",
+          "materialCode",
+          "orientation",
+          "lengthMm",
+          "widthMm",
+          "heightMm",
+          "quantity",
+          "wastePct",
+          "processCost",
+          "priceOverride"
+        ]
+      },
+      "PalletProjectDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "项目 id"
+          },
+          "code": {
+            "type": "string",
+            "description": "项目编号（PD-#####）"
+          },
+          "name": {
+            "type": "string",
+            "description": "项目名称"
+          },
+          "customerName": {
+            "type": "string",
+            "description": "客户名称快照"
+          },
+          "templateType": {
+            "type": "string",
+            "description": "结构模板"
+          },
+          "destination": {
+            "type": "string",
+            "description": "使用范围"
+          },
+          "entryDirection": {
+            "type": "string",
+            "description": "进叉方向"
+          },
+          "lengthMm": {
+            "type": "number",
+            "description": "外形长度（mm）"
+          },
+          "widthMm": {
+            "type": "number",
+            "description": "外形宽度（mm）"
+          },
+          "totalHeightMm": {
+            "type": "number",
+            "description": "外形高度（mm）"
+          },
+          "targetLoadKg": {
+            "type": "number",
+            "nullable": true,
+            "description": "目标载荷（kg）"
+          },
+          "loadType": {
+            "type": "string",
+            "description": "载荷形式"
+          },
+          "totalVolumeM3": {
+            "type": "string",
+            "description": "木材净体积（m³，5 位小数）"
+          },
+          "totalWeightKg": {
+            "type": "string",
+            "description": "估算重量（kg，1 位小数）"
+          },
+          "materialCost": {
+            "type": "string",
+            "description": "材料费（元，2 位小数）"
+          },
+          "processingCost": {
+            "type": "string",
+            "description": "加工费（元，2 位小数）"
+          },
+          "note": {
+            "type": "string",
+            "description": "备注"
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "创建时间（ISO）"
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "更新时间（ISO）"
+          },
+          "components": {
+            "description": "构件列表",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PalletComponentDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "customerName",
+          "templateType",
+          "destination",
+          "entryDirection",
+          "lengthMm",
+          "widthMm",
+          "totalHeightMm",
+          "targetLoadKg",
+          "loadType",
+          "totalVolumeM3",
+          "totalWeightKg",
+          "materialCost",
+          "processingCost",
+          "note",
+          "createdAt",
+          "updatedAt",
+          "components"
+        ]
+      },
+      "PalletComponentBodyDto": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "topDeck",
+              "endDeck",
+              "stringerBoard",
+              "block",
+              "bottomDeck",
+              "stringer",
+              "runner",
+              "plywood",
+              "spacer",
+              "custom"
+            ],
+            "description": "构件类型"
+          },
+          "name": {
+            "type": "string",
+            "description": "构件名称",
+            "example": "面板"
+          },
+          "materialCode": {
+            "type": "string",
+            "description": "材料 code",
+            "example": "pine"
+          },
+          "orientation": {
+            "type": "string",
+            "enum": [
+              "x",
+              "y"
+            ],
+            "description": "方向：x 沿长度 / y 沿宽度"
+          },
+          "lengthMm": {
+            "type": "number",
+            "description": "长度（整数毫米）"
+          },
+          "widthMm": {
+            "type": "number",
+            "description": "宽度（整数毫米）"
+          },
+          "heightMm": {
+            "type": "number",
+            "description": "厚度（整数毫米）"
+          },
+          "quantity": {
+            "type": "number",
+            "description": "数量（正整数）"
+          },
+          "wastePct": {
+            "type": "number",
+            "description": "损耗比例，0.08 表示 8%",
+            "default": 0.08
+          },
+          "processCost": {
+            "type": "number",
+            "description": "加工费（元/件）",
+            "default": 0
+          },
+          "priceOverride": {
+            "type": "number",
+            "description": "单价覆盖（元/m³），0 表示使用材料单价",
+            "default": 0
+          }
+        },
+        "required": [
+          "role",
+          "name",
+          "materialCode",
+          "orientation",
+          "lengthMm",
+          "widthMm",
+          "heightMm",
+          "quantity"
+        ]
+      },
+      "PalletProjectBodyDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "项目名称",
+            "example": "1200×800 出口实木托盘"
+          },
+          "customerName": {
+            "type": "string",
+            "description": "客户名称快照",
+            "default": ""
+          },
+          "templateType": {
+            "type": "string",
+            "enum": [
+              "block",
+              "stringer",
+              "notched",
+              "skid",
+              "plywood",
+              "custom"
+            ],
+            "description": "结构模板"
+          },
+          "destination": {
+            "type": "string",
+            "enum": [
+              "export",
+              "domestic"
+            ],
+            "description": "使用范围",
+            "default": "domestic"
+          },
+          "entryDirection": {
+            "type": "string",
+            "enum": [
+              "4",
+              "2"
+            ],
+            "description": "进叉方向",
+            "default": "4"
+          },
+          "lengthMm": {
+            "type": "number",
+            "description": "外形长度（整数毫米）"
+          },
+          "widthMm": {
+            "type": "number",
+            "description": "外形宽度（整数毫米）"
+          },
+          "targetLoadKg": {
+            "type": "number",
+            "description": "目标载荷（kg）",
+            "nullable": true
+          },
+          "loadType": {
+            "type": "string",
+            "enum": [
+              "uniform",
+              "concentrated"
+            ],
+            "description": "载荷形式",
+            "default": "uniform"
+          },
+          "note": {
+            "type": "string",
+            "description": "备注",
+            "default": ""
+          },
+          "components": {
+            "description": "构件列表（从上到下）",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PalletComponentBodyDto"
+            }
+          }
+        },
+        "required": [
+          "name",
+          "templateType",
+          "lengthMm",
+          "widthMm",
+          "components"
+        ]
+      },
+      "PalletMaterialDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "材料 code"
+          },
+          "name": {
+            "type": "string",
+            "description": "材料名称"
+          },
+          "densityKgM3": {
+            "type": "number",
+            "description": "密度（kg/m³）"
+          },
+          "pricePerM3": {
+            "type": "string",
+            "description": "采购单价（元/m³）"
+          },
+          "fumigation": {
+            "type": "boolean",
+            "description": "出口是否通常需要熏蒸"
+          },
+          "color": {
+            "type": "string",
+            "description": "图纸颜色"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "densityKgM3",
+          "pricePerM3",
+          "fumigation",
+          "color"
         ]
       }
     }

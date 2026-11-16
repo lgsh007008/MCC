@@ -25,7 +25,7 @@ describe('导航图标', () => {
 // 菜单按角色 scope 裁剪（product/账号与权限.md R-账号与权限-003）
 describe('菜单可见性', () => {
   it('管理员可见全部业务分组', () => {
-    expect(visibleNavGroups('ADMIN').flatMap((group) => group.items)).toHaveLength(11);
+    expect(visibleNavGroups('ADMIN').flatMap((group) => group.items)).toHaveLength(12);
   });
 
   it('工人只看到销售单', () => {
@@ -34,13 +34,20 @@ describe('菜单可见性', () => {
     expect(groups[0]?.items.map((item) => item.title)).toEqual(['销售单']);
   });
 
-  it('财务看到销售、采购、生产与财务，看不到账号管理（账号管理不在侧边菜单）', () => {
+  it('财务看到销售、设计、采购、生产与财务，看不到账号管理（账号管理不在侧边菜单）', () => {
     expect(visibleNavGroups('FINANCE').map((group) => group.label)).toEqual([
       '销售',
+      '设计',
       '采购',
       '生产',
       '财务',
     ]);
+  });
+
+  it('托盘设计在独立的「设计」分组', () => {
+    const design = visibleNavGroups('ADMIN').find((group) => group.label === '设计');
+    expect(design?.items.map((item) => item.title)).toEqual(['托盘设计']);
+    expect(design?.items[0]?.href).toBe('/admin/pallet-design');
   });
 });
 
@@ -81,6 +88,10 @@ describe('路由 scope', () => {
     expect(scopeForPath('/admin/customers')).toBe('customer:view');
     expect(scopeForPath('/admin/customers/new')).toBe('customer:manage');
     expect(scopeForPath('/admin/customers/abc/edit')).toBe('customer:manage');
+    expect(scopeForPath('/admin/pallet-design')).toBe('pallet:view');
+    expect(scopeForPath('/admin/pallet-design/new')).toBe('pallet:manage');
+    expect(scopeForPath('/admin/pallet-design/abc')).toBe('pallet:view');
+    expect(scopeForPath('/admin/pallet-design/abc/report')).toBe('pallet:view');
     expect(scopeForPath('/admin/purchases')).toBe('purchase:view');
     expect(scopeForPath('/admin/purchases/new')).toBe('purchase:manage');
     expect(scopeForPath('/admin/purchases/abc/edit')).toBe('purchase:manage');

@@ -16,6 +16,7 @@ import { AuthModule } from './modules/auth/index.js';
 import { CustomerModule } from './modules/customer/index.js';
 import { FinanceModule } from './modules/finance/index.js';
 import { OrderModule } from './modules/order/index.js';
+import { PalletModule } from './modules/pallet/index.js';
 import { ProductionModule } from './modules/production/index.js';
 import { PurchaseModule } from './modules/purchase/index.js';
 import { SupplierModule } from './modules/supplier/index.js';
@@ -37,6 +38,7 @@ import { TenantModule } from './modules/tenant/index.js';
     ProductionModule,
     OrderModule,
     PurchaseModule,
+    PalletModule,
   ],
   controllers: [HealthController],
   providers: [

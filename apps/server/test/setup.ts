@@ -18,6 +18,7 @@ const SELLABLE_FEATURES = [
   'production',
   'finance',
   'audit',
+  'pallet_design',
 ];
 
 const prisma = new PrismaClient();

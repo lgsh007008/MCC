@@ -11,6 +11,7 @@ export const SELLABLE_FEATURES = [
   'production',
   'finance',
   'audit',
+  'pallet_design',
 ] as const;
 
 export const FEATURE_CODES = [...BASE_FEATURES, ...SELLABLE_FEATURES] as const;
@@ -28,6 +29,7 @@ export const FEATURE_LABELS: Record<FeatureCode, string> = {
   production: '生产与库存',
   finance: '财务',
   audit: '审计',
+  pallet_design: '托盘设计',
 };
 
 export interface FeatureOverride {

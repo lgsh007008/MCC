@@ -1297,6 +1297,77 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/pallet/projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 托盘项目列表：关键字 / 模板筛选 + 分页 */
+        get: operations["PalletController_list"];
+        put?: never;
+        /** 新建托盘项目（PD 编号自动生成） */
+        post: operations["PalletController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pallet/projects/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 托盘项目详情（含构件） */
+        get: operations["PalletController_detail"];
+        /** 更新托盘项目与构件（整单提交，服务端重算合计） */
+        put: operations["PalletController_update"];
+        post?: never;
+        /** 删除托盘项目（软删除，编号不回收） */
+        delete: operations["PalletController_remove"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pallet/projects/{id}/duplicate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 复制托盘项目（生成新编号） */
+        post: operations["PalletController_duplicate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pallet/materials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 托盘材料目录（只读） */
+        get: operations["PalletController_materials"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -3011,6 +3082,212 @@ export interface components {
         PurchaseOrderBatchDeleteResponseDto: {
             /** @description 实际删除（软删除）条数 */
             deleted: number;
+        };
+        PalletProjectListItemDto: {
+            /** @description 项目 id */
+            id: string;
+            /** @description 项目编号 */
+            code: string;
+            /** @description 项目名称 */
+            name: string;
+            /** @description 客户名称快照 */
+            customerName: string;
+            /** @description 结构模板 */
+            templateType: string;
+            /** @description 外形长度（mm） */
+            lengthMm: number;
+            /** @description 外形宽度（mm） */
+            widthMm: number;
+            /** @description 外形高度（mm） */
+            totalHeightMm: number;
+            /** @description 木材净体积（m³） */
+            totalVolumeM3: string;
+            /** @description 估算重量（kg） */
+            totalWeightKg: string;
+            /** @description 更新时间（ISO） */
+            updatedAt: string;
+        };
+        PalletProjectListDto: {
+            /** @description 总数 */
+            total: number;
+            items: components["schemas"]["PalletProjectListItemDto"][];
+        };
+        PalletComponentDto: {
+            /** @description 构件 id */
+            id: string;
+            /** @description 行序（从 1 开始） */
+            seq: number;
+            /** @description 构件类型 */
+            role: string;
+            /** @description 构件名称 */
+            name: string;
+            /** @description 材料 code */
+            materialCode: string;
+            /** @description 方向 */
+            orientation: string;
+            /** @description 长度（mm） */
+            lengthMm: number;
+            /** @description 宽度（mm） */
+            widthMm: number;
+            /** @description 厚度（mm） */
+            heightMm: number;
+            /** @description 数量 */
+            quantity: number;
+            /** @description 损耗比例 */
+            wastePct: number;
+            /** @description 加工费（元/件） */
+            processCost: number;
+            /** @description 单价覆盖（元/m³） */
+            priceOverride: number;
+        };
+        PalletProjectDto: {
+            /** @description 项目 id */
+            id: string;
+            /** @description 项目编号（PD-#####） */
+            code: string;
+            /** @description 项目名称 */
+            name: string;
+            /** @description 客户名称快照 */
+            customerName: string;
+            /** @description 结构模板 */
+            templateType: string;
+            /** @description 使用范围 */
+            destination: string;
+            /** @description 进叉方向 */
+            entryDirection: string;
+            /** @description 外形长度（mm） */
+            lengthMm: number;
+            /** @description 外形宽度（mm） */
+            widthMm: number;
+            /** @description 外形高度（mm） */
+            totalHeightMm: number;
+            /** @description 目标载荷（kg） */
+            targetLoadKg: number | null;
+            /** @description 载荷形式 */
+            loadType: string;
+            /** @description 木材净体积（m³，5 位小数） */
+            totalVolumeM3: string;
+            /** @description 估算重量（kg，1 位小数） */
+            totalWeightKg: string;
+            /** @description 材料费（元，2 位小数） */
+            materialCost: string;
+            /** @description 加工费（元，2 位小数） */
+            processingCost: string;
+            /** @description 备注 */
+            note: string;
+            /** @description 创建时间（ISO） */
+            createdAt: string;
+            /** @description 更新时间（ISO） */
+            updatedAt: string;
+            /** @description 构件列表 */
+            components: components["schemas"]["PalletComponentDto"][];
+        };
+        PalletComponentBodyDto: {
+            /**
+             * @description 构件类型
+             * @enum {string}
+             */
+            role: "topDeck" | "endDeck" | "stringerBoard" | "block" | "bottomDeck" | "stringer" | "runner" | "plywood" | "spacer" | "custom";
+            /**
+             * @description 构件名称
+             * @example 面板
+             */
+            name: string;
+            /**
+             * @description 材料 code
+             * @example pine
+             */
+            materialCode: string;
+            /**
+             * @description 方向：x 沿长度 / y 沿宽度
+             * @enum {string}
+             */
+            orientation: "x" | "y";
+            /** @description 长度（整数毫米） */
+            lengthMm: number;
+            /** @description 宽度（整数毫米） */
+            widthMm: number;
+            /** @description 厚度（整数毫米） */
+            heightMm: number;
+            /** @description 数量（正整数） */
+            quantity: number;
+            /**
+             * @description 损耗比例，0.08 表示 8%
+             * @default 0.08
+             */
+            wastePct: number;
+            /**
+             * @description 加工费（元/件）
+             * @default 0
+             */
+            processCost: number;
+            /**
+             * @description 单价覆盖（元/m³），0 表示使用材料单价
+             * @default 0
+             */
+            priceOverride: number;
+        };
+        PalletProjectBodyDto: {
+            /**
+             * @description 项目名称
+             * @example 1200×800 出口实木托盘
+             */
+            name: string;
+            /**
+             * @description 客户名称快照
+             * @default
+             */
+            customerName: string;
+            /**
+             * @description 结构模板
+             * @enum {string}
+             */
+            templateType: "block" | "stringer" | "notched" | "skid" | "plywood" | "custom";
+            /**
+             * @description 使用范围
+             * @default domestic
+             * @enum {string}
+             */
+            destination: "export" | "domestic";
+            /**
+             * @description 进叉方向
+             * @default 4
+             * @enum {string}
+             */
+            entryDirection: "4" | "2";
+            /** @description 外形长度（整数毫米） */
+            lengthMm: number;
+            /** @description 外形宽度（整数毫米） */
+            widthMm: number;
+            /** @description 目标载荷（kg） */
+            targetLoadKg?: number | null;
+            /**
+             * @description 载荷形式
+             * @default uniform
+             * @enum {string}
+             */
+            loadType: "uniform" | "concentrated";
+            /**
+             * @description 备注
+             * @default
+             */
+            note: string;
+            /** @description 构件列表（从上到下） */
+            components: components["schemas"]["PalletComponentBodyDto"][];
+        };
+        PalletMaterialDto: {
+            /** @description 材料 code */
+            code: string;
+            /** @description 材料名称 */
+            name: string;
+            /** @description 密度（kg/m³） */
+            densityKgM3: number;
+            /** @description 采购单价（元/m³） */
+            pricePerM3: string;
+            /** @description 出口是否通常需要熏蒸 */
+            fumigation: boolean;
+            /** @description 图纸颜色 */
+            color: string;
         };
     };
     responses: never;
@@ -5518,6 +5795,165 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PurchaseOrderBatchDeleteResponseDto"];
+                };
+            };
+        };
+    };
+    PalletController_list: {
+        parameters: {
+            query?: {
+                /** @description 更新时间排序，默认 desc */
+                sortOrder?: "asc" | "desc";
+                /** @description 每页条数，默认 20（最大 100） */
+                pageSize?: number;
+                /** @description 页码，默认 1 */
+                page?: number;
+                /** @description 结构模板 */
+                templateType?: "block" | "stringer" | "notched" | "skid" | "plywood" | "custom";
+                /** @description 项目名称 / 编号 / 客户名称模糊 */
+                keyword?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PalletProjectListDto"];
+                };
+            };
+        };
+    };
+    PalletController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PalletProjectBodyDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PalletProjectDto"];
+                };
+            };
+        };
+    };
+    PalletController_detail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PalletProjectDto"];
+                };
+            };
+        };
+    };
+    PalletController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PalletProjectBodyDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PalletProjectDto"];
+                };
+            };
+        };
+    };
+    PalletController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 已删除 */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PalletController_duplicate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PalletProjectDto"];
+                };
+            };
+        };
+    };
+    PalletController_materials: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PalletMaterialDto"][];
                 };
             };
         };

@@ -8,9 +8,11 @@ import {
   ClipboardListIcon,
   FactoryIcon,
   FileTextIcon,
+  FrameIcon,
   HomeIcon,
   LayersIcon,
   ListChecksIcon,
+  RulerIcon,
   ScrollTextIcon,
   ShoppingCartIcon,
   TruckIcon,
@@ -59,6 +61,20 @@ export const navGroups: NavGroup[] = [
     items: [
       { title: '销售单', icon: FileTextIcon, href: '/admin/sale-orders', scope: 'order:view', feature: 'order' },
       { title: '客户档案', icon: UsersIcon, href: '/admin/customers', scope: 'customer:view', feature: 'customer' },
+    ],
+  },
+  {
+    label: '设计',
+    domain: 'pallet',
+    icon: RulerIcon,
+    items: [
+      {
+        title: '托盘设计',
+        icon: FrameIcon,
+        href: '/admin/pallet-design',
+        scope: 'pallet:view',
+        feature: 'pallet_design',
+      },
     ],
   },
   {
@@ -130,6 +146,9 @@ export function featureForPath(pathname: string): FeatureCode | null {
   }
   if (pathname.startsWith('/admin/customers')) {
     return 'customer';
+  }
+  if (pathname.startsWith('/admin/pallet-design')) {
+    return 'pallet_design';
   }
   if (pathname.startsWith('/admin/purchases')) {
     return 'purchase';
@@ -261,6 +280,9 @@ export function scopeForPath(pathname: string): Scope | null {
     return /^\/admin\/customers\/(new|[^/]+\/edit)$/.test(pathname)
       ? 'customer:manage'
       : 'customer:view';
+  }
+  if (pathname.startsWith('/admin/pallet-design')) {
+    return pathname === '/admin/pallet-design/new' ? 'pallet:manage' : 'pallet:view';
   }
   if (pathname.startsWith('/admin/production/batches')) {
     return 'production:view';

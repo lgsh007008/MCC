@@ -498,7 +498,7 @@ model SaleOrder {
   materialCostStatus        SaleOrderMaterialCostStatus @default(PENDING) @map("material_cost_status")
   materialCostSnapshottedAt DateTime?                   @map("material_cost_snapshotted_at") @db.Timestamptz(3)
 
-  items SaleOrderItem[]
+  items      SaleOrderItem[]
   costLayers SaleOrderCostLayer[]
 
   @@unique([tenantId, code])
@@ -751,12 +751,12 @@ model ProductionBatch {
   deletedAt DateTime? @map("deleted_at")
 
   // 批次编号：BT + 连字符 + 5 位全局流水（1-产品文档.md 五）
-  code      String               @map("code")
-  batchDate DateTime             @map("batch_date") @db.Date
+  code      String                @map("code")
+  batchDate DateTime              @map("batch_date") @db.Date
   status    ProductionBatchStatus @default(OPEN) @map("status")
   kind      ProductionBatchKind   @default(PRODUCTION) @map("kind")
-  note      String               @default("") @map("note")
-  closedAt  DateTime?            @map("closed_at") @db.Timestamptz(3)
+  note      String                @default("") @map("note")
+  closedAt  DateTime?             @map("closed_at") @db.Timestamptz(3)
 
   issues  MaterialIssue[]
   outputs ProductionOutput[]
@@ -776,13 +776,13 @@ model MaterialIssue {
   deletedAt DateTime? @map("deleted_at")
 
   // 原木领用单编号：MI + 连字符 + 5 位全局流水（1-产品文档.md 五）
-  code      String   @map("code")
-  issueDate DateTime @map("issue_date") @db.Date
+  code      String          @map("code")
+  issueDate DateTime        @map("issue_date") @db.Date
   // 领用原木吨数：实际领用，3 位小数
-  tons      Decimal  @map("tons") @db.Decimal(12, 3)
-  note      String   @default("") @map("note")
+  tons      Decimal         @map("tons") @db.Decimal(12, 3)
+  note      String          @default("") @map("note")
   // 所属生产批次：成本对象，待结转与产出结转都按批次隔离
-  batchId   String   @map("batch_id") @db.Uuid
+  batchId   String          @map("batch_id") @db.Uuid
   batch     ProductionBatch @relation(fields: [batchId], references: [id])
 
   @@unique([tenantId, code])
@@ -800,11 +800,11 @@ model ProductionOutput {
   deletedAt DateTime? @map("deleted_at")
 
   // 方木产出单编号：PR + 连字符 + 5 位全局流水（1-产品文档.md 五）
-  code       String   @map("code")
-  outputDate DateTime @map("output_date") @db.Date
-  note       String   @default("") @map("note")
+  code       String          @map("code")
+  outputDate DateTime        @map("output_date") @db.Date
+  note       String          @default("") @map("note")
   // 所属生产批次：产出把本批次待结转全额转入本批次方木池
-  batchId    String   @map("batch_id") @db.Uuid
+  batchId    String          @map("batch_id") @db.Uuid
   batch      ProductionBatch @relation(fields: [batchId], references: [id])
 
   lines ProductionOutputLine[]
@@ -893,4 +893,143 @@ model InventoryAdjustmentItem {
   @@index([adjustmentId])
   @@index([targetType])
   @@map("inventory_adjustment_items")
+}
+
+// ── 托盘设计领域（pallet，design/托盘设计.md §2）────────────
+// 项目、构件与只读材料目录；本轮不建报价、力学与批次模型。
+
+enum PalletTemplateType {
+  BLOCK
+  STRINGER
+  NOTCHED
+  SKID
+  PLYWOOD
+  CUSTOM
+
+  @@map("pallet_template_type")
+}
+
+enum PalletComponentRole {
+  TOP_DECK
+  END_DECK
+  STRINGER_BOARD
+  BLOCK
+  BOTTOM_DECK
+  STRINGER
+  RUNNER
+  PLYWOOD
+  SPACER
+  CUSTOM
+
+  @@map("pallet_component_role")
+}
+
+enum PalletOrientation {
+  X
+  Y
+
+  @@map("pallet_orientation")
+}
+
+enum PalletDestination {
+  EXPORT
+  DOMESTIC
+
+  @@map("pallet_destination")
+}
+
+enum PalletLoadType {
+  UNIFORM
+  CONCENTRATED
+
+  @@map("pallet_load_type")
+}
+
+model PalletProject {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @map("tenant_id")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at")
+
+  // 编号 PD-#####（租户内流水，软删不回收）
+  code           String             @map("code")
+  name           String             @map("name")
+  customerName   String             @default("") @map("customer_name")
+  templateType   PalletTemplateType @map("template_type")
+  destination    PalletDestination  @default(DOMESTIC) @map("destination")
+  // 四向 / 两向
+  entryDirection String             @default("4") @map("entry_direction")
+
+  lengthMm      Int            @map("length_mm")
+  widthMm       Int            @map("width_mm")
+  totalHeightMm Int            @default(0) @map("total_height_mm")
+  targetLoadKg  Int?           @map("target_load_kg")
+  loadType      PalletLoadType @default(UNIFORM) @map("load_type")
+
+  // 合计由服务端重算落库，不信任前端提交值
+  totalVolumeM3  Decimal @default(0) @map("total_volume_m3") @db.Decimal(18, 5)
+  totalWeightKg  Decimal @default(0) @map("total_weight_kg") @db.Decimal(18, 1)
+  materialCost   Decimal @default(0) @map("material_cost") @db.Decimal(18, 2)
+  processingCost Decimal @default(0) @map("processing_cost") @db.Decimal(18, 2)
+
+  note String @default("") @map("note")
+
+  components PalletComponent[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, updatedAt])
+  @@index([tenantId, templateType])
+  @@map("pallet_projects")
+}
+
+model PalletComponent {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @map("tenant_id")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at")
+
+  projectId String        @map("project_id") @db.Uuid
+  project   PalletProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  // 行序：从上到下的物理层级，生成后不回改
+  seq Int @map("seq")
+
+  role          PalletComponentRole @map("role")
+  name          String              @map("name")
+  materialCode  String              @map("material_code")
+  orientation   PalletOrientation   @map("orientation")
+  lengthMm      Int                 @map("length_mm")
+  widthMm       Int                 @map("width_mm")
+  heightMm      Int                 @map("height_mm")
+  quantity      Int                 @map("quantity")
+  // 0.08 表示 8%
+  wastePct      Decimal             @default(0.08) @map("waste_pct") @db.Decimal(5, 4)
+  processCost   Decimal             @default(0) @map("process_cost") @db.Decimal(12, 2)
+  priceOverride Decimal             @default(0) @map("price_override") @db.Decimal(12, 2)
+
+  @@unique([projectId, seq])
+  @@index([projectId])
+  @@map("pallet_components")
+}
+
+model PalletMaterial {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @map("tenant_id")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at")
+
+  code        String  @map("code")
+  name        String  @map("name")
+  densityKgM3 Int     @map("density_kg_m3")
+  pricePerM3  Decimal @map("price_per_m3") @db.Decimal(12, 2)
+  fumigation  Boolean @default(false) @map("fumigation")
+  color       String  @default("#b9824e") @map("color")
+  isSystem    Boolean @default(true) @map("is_system")
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@map("pallet_materials")
 }
