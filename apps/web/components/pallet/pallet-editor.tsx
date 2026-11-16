@@ -27,6 +27,7 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { api } from '@/lib/api';
+import { randomUuid } from '@/lib/uuid';
 import { PalletBomSummary } from './pallet-bom-summary';
 import { PalletComponentTable } from './pallet-component-table';
 import { PalletDrawing2D, type PalletDrawingView } from './pallet-drawing-2d';
@@ -246,7 +247,7 @@ export function PalletEditor({ initial }: PalletEditorProps): React.ReactElement
       } else {
         const { data, response } = await api.POST('/api/v1/pallet/projects', {
           body,
-          headers: { 'Idempotency-Key': crypto.randomUUID() },
+          headers: { 'Idempotency-Key': randomUuid() },
         });
         if (!response.ok || !data) {
           throw new Error(`保存失败（${response.status}）`);
