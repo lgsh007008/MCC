@@ -181,6 +181,29 @@ export class SaleOrderPrintEventDto {
   code!: string;
 }
 
+export class SaleOrderCostLayerDto {
+  @ApiProperty({ type: String, description: '成本来源批次编号；负库存层为空字符串' })
+  batchCode!: string;
+
+  @ApiProperty({ type: Number })
+  lengthMm!: number;
+
+  @ApiProperty({ type: Number })
+  widthMm!: number;
+
+  @ApiProperty({ type: Number })
+  heightMm!: number;
+
+  @ApiProperty({ type: String, description: '扣层方数' })
+  volumeM3!: string;
+
+  @ApiProperty({ type: String, description: '批次单位成本（元/m³）' })
+  unitCost!: string;
+
+  @ApiProperty({ type: String, description: '扣层金额' })
+  amount!: string;
+}
+
 export class SaleOrderProfitDto {
   @ApiProperty({ type: String })
   orderId!: string;
@@ -208,6 +231,9 @@ export class SaleOrderProfitDto {
 
   @ApiProperty({ type: String, nullable: true, description: '快照时间' })
   snapshottedAt!: string | null;
+
+  @ApiProperty({ type: () => [SaleOrderCostLayerDto], description: '材料成本来源批次层' })
+  costLayers!: SaleOrderCostLayerDto[];
 }
 
 export class SaleOrderSummaryDto {

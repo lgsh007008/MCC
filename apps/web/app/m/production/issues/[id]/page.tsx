@@ -93,6 +93,14 @@ export default function MobileMaterialIssueDetailPage(): React.ReactElement {
       <div className="space-y-4 p-4">
         <section className="space-y-2 rounded-xl border border-border bg-card p-4">
           <MobileInfoRow label="领用日期" value={issue.issueDate} />
+          <MobileInfoRow
+            label="生产批次"
+            value={
+              <Link href={`/m/production/batches/${issue.batchId}`} className="text-primary">
+                {issue.batchCode}
+              </Link>
+            }
+          />
           <MobileInfoRow label="领用吨数" value={`${formatQuantity(issue.tons)} 吨`} />
           <MobileInfoRow
             label="结转状态"

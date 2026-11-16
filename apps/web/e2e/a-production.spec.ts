@@ -45,9 +45,24 @@ test('原木领用与方木产出：PC / 移动页面与材料毛利卡可达', 
     expect(opening.status()).toBe(201);
   }
 
+  const batch = await request.post('/api/v1/production-batches', {
+    headers: { ...headers, 'Idempotency-Key': `e2e-batch-${Date.now()}` },
+    data: { batchDate: '2031-01-01', note: 'e2e 生产批次' },
+  });
+  expect(batch.status()).toBe(201);
+  const batchBody = await batch.json();
+
+  // 待关闭批次：用于验证行关闭 / 批量关闭，避免影响上面批次后续的编辑与删除
+  const closeTarget = await request.post('/api/v1/production-batches', {
+    headers: { ...headers, 'Idempotency-Key': `e2e-batch-close-${Date.now()}` },
+    data: { batchDate: '2031-03-01', note: 'e2e 待关闭批次' },
+  });
+  expect(closeTarget.status()).toBe(201);
+  const closeTargetBody = await closeTarget.json();
+
   const issue = await request.post('/api/v1/material-issues', {
     headers: { ...headers, 'Idempotency-Key': `e2e-issue-${Date.now()}` },
-    data: { issueDate: '2031-02-01', tons: '5.000', note: 'e2e 原木领用' },
+    data: { issueDate: '2031-02-01', tons: '5.000', note: 'e2e 原木领用', batchId: batchBody.id },
   });
   expect(issue.status()).toBe(201);
   const issueBody = await issue.json();
@@ -66,6 +81,7 @@ test('原木领用与方木产出：PC / 移动页面与材料毛利卡可达', 
     data: {
       outputDate: '2031-02-01',
       note: 'e2e 方木产出',
+      batchId: batchBody.id,
       outputs: [{ lengthMm: 2500, widthMm: 100, heightMm: 20, pieces: 500, note: '' }],
     },
   });
@@ -89,6 +105,7 @@ test('原木领用与方木产出：PC / 移动页面与材料毛利卡可达', 
     // 结转状态列 + 筛选（方案 B：页面只做追溯展示）
     await expect(page.getByRole('columnheader', { name: '结转状态' })).toBeVisible();
     await expect(page.getByRole('combobox', { name: '结转状态' })).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: '生产批次' })).toBeVisible();
     await page.goto(`/admin/production/issues/${issueBody.id}`);
     await expectPageFrame(page, { title: String(issueBody.code), actions: ['编辑', '返回列表'] });
     await expect(page.getByText('领用吨数：')).toBeVisible();
@@ -119,6 +136,43 @@ test('原木领用与方木产出：PC / 移动页面与材料毛利卡可达', 
     await expect(page.getByText(/编辑方木产出/).first()).toBeVisible();
     await expect(page.locator('input[type="date"]')).toHaveCount(0);
     await expect(page.locator('[data-slot="page-frame-body"]')).toBeVisible();
+
+    // PC 生产批次：弹窗新建 / 编辑、行关闭、批量关闭、详情（成本池 + 领用 / 产出）
+    await page.goto('/admin/production/batches');
+    await expect(page.getByText(String(batchBody.code)).first()).toBeVisible();
+    await expect(page.getByText(String(closeTargetBody.code)).first()).toBeVisible();
+
+    // 新建 / 编辑改为弹窗，不再有独立表单页
+    await page.getByRole('button', { name: '新建生产批次' }).click();
+    await expect(page.getByRole('dialog').getByRole('heading', { name: '新建生产批次' })).toBeVisible();
+    await page.getByRole('dialog').getByRole('button', { name: '取消' }).click();
+
+    const targetRow = page.getByRole('row', { name: new RegExp(String(closeTargetBody.code)) });
+    await targetRow.getByRole('button', { name: '编辑' }).click();
+    await expect(
+      page.getByRole('dialog').getByRole('heading', { name: `编辑生产批次 ${closeTargetBody.code}` }),
+    ).toBeVisible();
+    await page.getByRole('dialog').getByRole('button', { name: '取消' }).click();
+
+    // 行关闭：二次确认可取消
+    await targetRow.getByRole('button', { name: '关闭批次' }).click();
+    await expect(page.getByRole('alertdialog')).toBeVisible();
+    await page.getByRole('alertdialog').getByRole('button', { name: '取消' }).click();
+    await expect(targetRow.getByText('进行中')).toBeVisible();
+
+    // 批量关闭：选中后关闭，已关闭批次自动跳过
+    await page.getByRole('checkbox', { name: `选择 ${closeTargetBody.code}` }).click();
+    await page.getByRole('button', { name: '批量关闭（1）' }).click();
+    await expect(page.getByRole('alertdialog').getByText(/已关闭的批次自动跳过/)).toBeVisible();
+    await page.getByRole('alertdialog').getByRole('button', { name: '批量关闭' }).click();
+    await expect(targetRow.getByText('已关闭')).toBeVisible();
+
+    await page.goto(`/admin/production/batches/${batchBody.id}`);
+    await expectPageFrame(page, {
+      title: String(batchBody.code),
+      actions: ['编辑', '关闭批次', '返回列表'],
+    });
+    await expect(page.getByText('方木明细')).toBeVisible();
 
     // 库存页：未设期初时显示引导，已设期初时显示指标卡；原木 / 方木双 Tab；只保留期初入口
     await page.goto('/admin/production/inventory');
@@ -184,7 +238,13 @@ test('原木领用与方木产出：PC / 移动页面与材料毛利卡可达', 
     if (orderItems[0]) {
       await page.goto(`/admin/sale-orders/${orderItems[0].id}`);
       await expect(page.getByText('材料毛利').first()).toBeVisible();
-      await expect(page.getByText('下单时成本快照，未含人工与费用。')).toBeVisible();
+      await expect(page.getByText('下单时按批次先进先出快照，未含人工与费用。')).toBeVisible();
+      // 成本来源默认收起：有扣层时展开可看明细
+      const sourceToggle = page.getByRole('button', { name: '展开成本来源' });
+      if ((await sourceToggle.count()) > 0) {
+        await sourceToggle.click();
+        await expect(page.getByRole('button', { name: '收起成本来源' })).toBeVisible();
+      }
       // 材料毛利口径说明弹窗
       await page.getByRole('button', { name: '口径说明' }).click();
       await expect(
@@ -230,6 +290,21 @@ test('原木领用与方木产出：PC / 移动页面与材料毛利卡可达', 
     await expect(page.getByText('2.500 m³').first()).toBeVisible();
     await expect(page.getByText('本次结转金额')).toBeVisible();
     await expect(page.getByText('来源领用单')).toBeVisible();
+
+    // 移动生产批次：列表底部新建弹窗 + 详情编辑弹窗（与 PC 共用同一弹窗）
+    await page.goto('/m/production/batches');
+    await expect(page.getByRole('heading', { name: '生产批次' })).toBeVisible();
+    await expect(page.getByText(String(batchBody.code)).first()).toBeVisible();
+    await page.getByRole('button', { name: '新建生产批次' }).click();
+    await expect(page.getByRole('dialog').getByRole('heading', { name: '新建生产批次' })).toBeVisible();
+    await page.getByRole('dialog').getByRole('button', { name: '取消' }).click();
+    await page.goto(`/m/production/batches/${batchBody.id}`);
+    await expect(page.getByRole('heading', { name: String(batchBody.code) })).toBeVisible();
+    await page.getByRole('button', { name: '编辑' }).click();
+    await expect(
+      page.getByRole('dialog').getByRole('heading', { name: `编辑生产批次 ${batchBody.code}` }),
+    ).toBeVisible();
+    await page.getByRole('dialog').getByRole('button', { name: '取消' }).click();
 
     // 移动库存页：底部只保留期初入口，不再放盘点按钮
     await page.goto('/m/production/inventory');

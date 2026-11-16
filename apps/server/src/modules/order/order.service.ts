@@ -36,6 +36,7 @@ import type {
 
 const money = (value: string): string => addAmounts(value, '0.00');
 const volume = (value: string): string => sumVolumes([value]);
+const cost6 = (value: string): string => fromScaled(toScaled(value, 6), 6);
 const isoDate = (value: Date): string => value.toISOString().slice(0, 10);
 // Prisma 的 Date 列不接受纯日期字符串，取 UTC 午夜构造（业务日期为日历日，读回即原值）
 const toDate = (value: string): Date => new Date(`${value}T00:00:00.000Z`);
@@ -293,11 +294,12 @@ export class OrderService {
       })),
       money(input.otherAmount),
     );
-    // 材料成本快照（product/生产与库存.md R-生产-004）：下单前取当前方木平均成本；
-    // 无有效成本时记 PENDING、金额 0，后续由 profit:manage 手动重算一次。
-    const materialUnitCost = await this.production.currentTimberUnitCost();
-    const materialCostStatus = materialUnitCost !== '0.000000' ? 'FINAL' : 'PENDING';
-    const materialCostAmount = calcMaterialCostAmount(totals.totalVolume, materialUnitCost);
+    // 材料成本快照（product/生产与库存.md R-生产-004）：下单时按当前批次层先进先出扣层；
+    // 无有效成本时记 PENDING、金额 0，后续编辑保存本单时尝试补录一次。
+    const materialCost = await this.production.calcSaleMaterialCost(computed);
+    const materialUnitCost = materialCost.status === 'final' ? materialCost.unitCost : null;
+    const materialCostStatus = materialCost.status === 'final' ? 'FINAL' : 'PENDING';
+    const materialCostAmount = materialCost.amount;
     const materialCostSnapshottedAt = materialCostStatus === 'FINAL' ? new Date() : null;
 
     for (let attempt = 0; attempt < CODE_RETRY_LIMIT; attempt++) {
@@ -345,6 +347,22 @@ export class OrderService {
               note: item.note,
             })),
           });
+          if (materialCost.layers.length > 0) {
+            await tx.saleOrderCostLayer.createMany({
+              data: materialCost.layers.map((layer, index) => ({
+                tenantId: currentTenantId(),
+                orderId: created.id,
+                seq: index + 1,
+                batchCode: layer.batchRef,
+                lengthMm: layer.spec.lengthMm,
+                widthMm: layer.spec.widthMm,
+                heightMm: layer.spec.heightMm,
+                volumeM3: layer.volume,
+                unitCost: layer.unitCost,
+                amount: layer.amount,
+              })),
+            });
+          }
           // 财务联动（design/finance.md §6）：仅现结时同事务生成收款流水，失败则整单回滚
           if (settled && input.settleAccountId) {
             await this.finance.syncSourceCashEntry(tx, {
@@ -389,9 +407,15 @@ export class OrderService {
         tenantId: true,
         customerId: true,
         customerName: true,
+        totalVolume: true,
         materialUnitCost: true,
         materialCostStatus: true,
         materialCostSnapshottedAt: true,
+        items: {
+          where: { deletedAt: null },
+          orderBy: { seq: 'asc' },
+          select: { lengthMm: true, widthMm: true, heightMm: true, pieces: true, volumeM3: true },
+        },
       },
     });
     if (!existing || existing.deletedAt !== null) {
@@ -414,25 +438,54 @@ export class OrderService {
       money(input.otherAmount),
     );
 
-    // 材料成本快照：已锁定订单沿用原单价 × 新方量；待补订单尝试补一次当前成本。
+    // 材料成本快照：已锁定订单沿用原单价 × 新方量；待补订单尝试补一次当前批次层成本。
     let snapshotUnitCost = existing.materialUnitCost?.toString() ?? null;
     let snapshotStatus: 'PENDING' | 'FINAL' = existing.materialCostStatus;
     let snapshotAt = existing.materialCostSnapshottedAt;
+    let snapshotAmount: string;
+    // null = 保留现有层明细；数组 = 重写（空数组即清空）
+    let costLayers: Array<{
+      batchRef: string;
+      spec: { lengthMm: number; widthMm: number; heightMm: number };
+      volume: string;
+      unitCost: string;
+      amount: string;
+    }> | null = null;
     if (snapshotStatus !== 'FINAL' || !snapshotUnitCost) {
-      const current = await this.production.currentTimberUnitCost();
-      if (current !== '0.000000') {
-        snapshotUnitCost = current;
+      const current = await this.production.calcSaleMaterialCost(computed, existing.code);
+      if (current.status === 'final') {
+        snapshotUnitCost = current.unitCost;
         snapshotStatus = 'FINAL';
         snapshotAt = new Date();
+        snapshotAmount = current.amount;
+        costLayers = current.layers;
       } else {
         snapshotUnitCost = null;
         snapshotStatus = 'PENDING';
         snapshotAt = null;
+        snapshotAmount = '0.00';
+        costLayers = [];
+      }
+    } else {
+      snapshotAmount = calcMaterialCostAmount(totals.totalVolume, snapshotUnitCost);
+      const itemsChanged =
+        existing.items.length !== computed.length ||
+        existing.items.some((item, index) => {
+          const next = computed[index];
+          return (
+            !next ||
+            item.lengthMm !== next.lengthMm ||
+            item.widthMm !== next.widthMm ||
+            item.heightMm !== next.heightMm ||
+            item.pieces !== next.pieces ||
+            toScaled(item.volumeM3.toString(), 4) !== toScaled(next.volumeM3, 4)
+          );
+        });
+      if (itemsChanged) {
+        // 明细或方量变化后原层明细不再对应，清空；成本仍按原单价快照重算
+        costLayers = [];
       }
     }
-    const snapshotAmount = snapshotUnitCost
-      ? calcMaterialCostAmount(totals.totalVolume, snapshotUnitCost)
-      : '0.00';
 
     const itemData = (item: ComputedItem) => ({
       productType: item.productType,
@@ -503,6 +556,26 @@ export class OrderService {
         });
       }
 
+      if (costLayers !== null) {
+        await tx.saleOrderCostLayer.deleteMany({ where: { orderId: id } });
+        if (costLayers.length > 0) {
+          await tx.saleOrderCostLayer.createMany({
+            data: costLayers.map((layer, index) => ({
+              tenantId: currentTenantId(),
+              orderId: id,
+              seq: index + 1,
+              batchCode: layer.batchRef,
+              lengthMm: layer.spec.lengthMm,
+              widthMm: layer.spec.widthMm,
+              heightMm: layer.spec.heightMm,
+              volumeM3: layer.volume,
+              unitCost: layer.unitCost,
+              amount: layer.amount,
+            })),
+          });
+        }
+      }
+
       // 财务联动（design/finance.md §6）：现结同步收款流水，改为赊销则软删
       if (settled && input.settleAccountId) {
         await this.finance.syncSourceCashEntry(tx, {
@@ -542,6 +615,19 @@ export class OrderService {
         materialCostAmount: true,
         materialCostStatus: true,
         materialCostSnapshottedAt: true,
+        costLayers: {
+          where: { deletedAt: null },
+          orderBy: { seq: 'asc' },
+          select: {
+            batchCode: true,
+            lengthMm: true,
+            widthMm: true,
+            heightMm: true,
+            volumeM3: true,
+            unitCost: true,
+            amount: true,
+          },
+        },
       },
     });
     if (!order || order.deletedAt !== null) {
@@ -552,8 +638,17 @@ export class OrderService {
     );
     const materialCostAmount = money(order.materialCostAmount.toString());
     const unitCost = order.materialUnitCost
-      ? fromScaled(toScaled(order.materialUnitCost.toString(), 6), 6)
+      ? cost6(order.materialUnitCost.toString())
       : null;
+    const costLayers = order.costLayers.map((layer) => ({
+      batchCode: layer.batchCode,
+      lengthMm: layer.lengthMm,
+      widthMm: layer.widthMm,
+      heightMm: layer.heightMm,
+      volumeM3: volume(layer.volumeM3.toString()),
+      unitCost: cost6(layer.unitCost.toString()),
+      amount: money(layer.amount.toString()),
+    }));
     if (order.materialCostStatus !== 'FINAL') {
       return {
         orderId: order.id,
@@ -565,6 +660,7 @@ export class OrderService {
         materialProfit: null,
         materialMargin: null,
         snapshottedAt: order.materialCostSnapshottedAt?.toISOString() ?? null,
+        costLayers,
       };
     }
     const materialProfit = calcMaterialProfit(revenue, materialCostAmount);
@@ -578,41 +674,8 @@ export class OrderService {
       materialProfit,
       materialMargin: calcMaterialMargin(materialProfit, revenue),
       snapshottedAt: order.materialCostSnapshottedAt?.toISOString() ?? null,
+      costLayers,
     };
-  }
-
-  // 成本待补订单重算一次（design/order.md §5）：仅 PENDING 可重算；成功后锁定 FINAL。
-  async recalculateCost(id: string): Promise<SaleOrderProfitDto> {
-    const order = await this.prisma.client.saleOrder.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        deletedAt: true,
-        tenantId: true,
-        totalVolume: true,
-        materialCostStatus: true,
-      },
-    });
-    if (!order || order.deletedAt !== null) {
-      throw problem(404, 'NOT_FOUND', '销售单不存在');
-    }
-    if (order.materialCostStatus === 'FINAL') {
-      throw problem(409, 'COST_FINAL', '材料成本已锁定，不能重算');
-    }
-    const unitCost = await this.production.currentTimberUnitCost();
-    if (unitCost === '0.000000') {
-      throw problem(400, 'COST_UNAVAILABLE', '当前没有有效方木成本，无法重算');
-    }
-    await this.prisma.client.saleOrder.updateMany({
-      where: { id },
-      data: {
-        materialUnitCost: unitCost,
-        materialCostAmount: calcMaterialCostAmount(order.totalVolume.toString(), unitCost),
-        materialCostStatus: 'FINAL',
-        materialCostSnapshottedAt: new Date(),
-      },
-    });
-    return this.profit(id);
   }
 
   // 客户维度累计方量（product/customer.md 累计下单方量；design/order.md §5）：

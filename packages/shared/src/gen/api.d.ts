@@ -857,6 +857,76 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/production-batches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 生产批次列表：批次日期区间 + 状态 + 分页 */
+        get: operations["ProductionController_listBatches"];
+        put?: never;
+        /** 新建生产批次；重复提交防抖：请求头 Idempotency-Key */
+        post: operations["ProductionController_createBatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/production-batches/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 生产批次详情：成本池 + 领用 / 产出 / 方木明细 */
+        get: operations["ProductionController_batchDetail"];
+        /** 编辑生产批次（仅进行中批次） */
+        put: operations["ProductionController_updateBatch"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/production-batches/batch-close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 批量关闭生产批次：已关闭 / 不存在跳过；任一批次待结转无库存则整批拒绝 */
+        post: operations["ProductionController_closeBatches"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/production-batches/{id}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 关闭生产批次：剩余待结转一次性转入本批次方木池 */
+        post: operations["ProductionController_closeBatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/material-issues": {
         parameters: {
             query?: never;
@@ -1097,23 +1167,6 @@ export interface paths {
         get: operations["OrderController_profit"];
         put?: never;
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/sale-orders/{id}/recalculate-cost": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** 重算成本待补订单的材料成本；仅 PENDING 可重算，成功后锁定 */
-        post: operations["OrderController_recalculateCost"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2017,6 +2070,114 @@ export interface components {
              */
             note: string;
         };
+        ProductionBatchDto: {
+            id: string;
+            /** @description 批次编号 BT-##### */
+            code: string;
+            /** @description 批次日期 */
+            batchDate: string;
+            /** @enum {string} */
+            status: "open" | "closed";
+            /** @enum {string} */
+            kind: "opening" | "production";
+            note: string;
+            closedAt: string | null;
+            createdAt: string;
+            /** @description 批次方木数量（m³，4 位小数） */
+            timberVolume: string;
+            /** @description 批次方木金额（2 位小数） */
+            timberAmount: string;
+            /** @description 批次方木成本（元/m³，6 位小数） */
+            timberUnitCost: string;
+            /** @description 批次待结转金额（2 位小数） */
+            pendingAmount: string;
+            /** @description 关闭时一次性结转金额（2 位小数） */
+            closedSettledAmount: string;
+            /** @description 领用单数 */
+            issueCount: number;
+            /** @description 产出单数 */
+            outputCount: number;
+        };
+        ProductionBatchListDto: {
+            total: number;
+            items: components["schemas"]["ProductionBatchDto"][];
+        };
+        ProductionBatchIssueDto: {
+            id: string;
+            code: string;
+            issueDate: string;
+            tons: string;
+            settledAmount: string;
+            pendingAmount: string;
+        };
+        ProductionBatchOutputDto: {
+            id: string;
+            code: string;
+            outputDate: string;
+            totalVolume: string;
+            settledAmount: string;
+        };
+        ProductionBatchTimberLineDto: {
+            lengthMm: number;
+            widthMm: number;
+            heightMm: number;
+            quantity: string;
+            unitCost: string;
+            amount: string;
+        };
+        ProductionBatchDetailDto: {
+            id: string;
+            /** @description 批次编号 BT-##### */
+            code: string;
+            /** @description 批次日期 */
+            batchDate: string;
+            /** @enum {string} */
+            status: "open" | "closed";
+            /** @enum {string} */
+            kind: "opening" | "production";
+            note: string;
+            closedAt: string | null;
+            createdAt: string;
+            /** @description 批次方木数量（m³，4 位小数） */
+            timberVolume: string;
+            /** @description 批次方木金额（2 位小数） */
+            timberAmount: string;
+            /** @description 批次方木成本（元/m³，6 位小数） */
+            timberUnitCost: string;
+            /** @description 批次待结转金额（2 位小数） */
+            pendingAmount: string;
+            /** @description 关闭时一次性结转金额（2 位小数） */
+            closedSettledAmount: string;
+            /** @description 领用单数 */
+            issueCount: number;
+            /** @description 产出单数 */
+            outputCount: number;
+            issues: components["schemas"]["ProductionBatchIssueDto"][];
+            outputs: components["schemas"]["ProductionBatchOutputDto"][];
+            timberLines: components["schemas"]["ProductionBatchTimberLineDto"][];
+        };
+        ProductionBatchBodyDto: {
+            /**
+             * @description 批次日期
+             * @example 2026-11-15
+             */
+            batchDate: string;
+            /**
+             * @description 备注
+             * @default
+             */
+            note: string;
+        };
+        ProductionBatchBatchCloseBodyDto: {
+            /** @description 生产批次 id 列表（1~200） */
+            ids: string[];
+        };
+        ProductionBatchBatchCloseResponseDto: {
+            /** @description 实际关闭条数 */
+            closed: number;
+            /** @description 跳过条数（已关闭 / 不存在） */
+            skipped: number;
+        };
         MaterialIssueSummaryDto: {
             /** @description 领用吨数合计（3 位小数） */
             tons: string;
@@ -2038,6 +2199,12 @@ export interface components {
             pendingAmount: string;
             /** @description 结转过本单的产出单编号（按事件顺序） */
             settledByCodes: string[];
+            /** @description 所属生产批次 id */
+            batchId: string;
+            /** @description 所属生产批次编号 BT-##### */
+            batchCode: string;
+            /** @description 批次状态：open 进行中 / closed 已关闭 */
+            batchStatus: string;
             createdAt: string;
         };
         MaterialIssueListDto: {
@@ -2061,6 +2228,8 @@ export interface components {
              * @default
              */
             note: string;
+            /** @description 所属生产批次 id */
+            batchId: string;
         };
         MaterialIssueBatchDeleteBodyDto: {
             /** @description 原木领用单 id 列表（1~200） */
@@ -2086,6 +2255,12 @@ export interface components {
             totalVolume: string;
             /** @description 本次结转金额（2 位小数） */
             settledAmount: string;
+            /** @description 所属生产批次 id */
+            batchId: string;
+            /** @description 所属生产批次编号 BT-##### */
+            batchCode: string;
+            /** @description 批次状态：open 进行中 / closed 已关闭 */
+            batchStatus: string;
             note: string;
             createdAt: string;
         };
@@ -2117,6 +2292,12 @@ export interface components {
             totalVolume: string;
             /** @description 本次结转金额（2 位小数） */
             settledAmount: string;
+            /** @description 所属生产批次 id */
+            batchId: string;
+            /** @description 所属生产批次编号 BT-##### */
+            batchCode: string;
+            /** @description 批次状态：open 进行中 / closed 已关闭 */
+            batchStatus: string;
             note: string;
             createdAt: string;
             /** @description 来源领用单编号（按最早未结转先结转推导） */
@@ -2161,6 +2342,8 @@ export interface components {
              * @default
              */
             note: string;
+            /** @description 所属生产批次 id（须为进行中批次） */
+            batchId: string;
             /** @description 产出明细（至少一行） */
             outputs: components["schemas"]["ProductionOutputLineBodyDto"][];
         };
@@ -2204,6 +2387,8 @@ export interface components {
              * @default
              */
             note: string;
+            /** @description 所属生产批次 id（须为进行中批次） */
+            batchId: string;
             /** @description 产出明细（至少一行；已有行带 id） */
             outputs: components["schemas"]["ProductionOutputLineUpdateBodyDto"][];
         };
@@ -2235,6 +2420,20 @@ export interface components {
             amount: string;
             negative: boolean;
         };
+        InventoryBatchDto: {
+            id: string;
+            /** @description 批次编号 BT-##### */
+            code: string;
+            batchDate: string;
+            /** @enum {string} */
+            status: "open" | "closed";
+            /** @enum {string} */
+            kind: "opening" | "production";
+            timberVolume: string;
+            timberAmount: string;
+            timberUnitCost: string;
+            pendingAmount: string;
+        };
         InventorySummaryDto: {
             /** @description 是否尚未设置期初库存 */
             needsOpening: boolean;
@@ -2243,6 +2442,12 @@ export interface components {
             raw: components["schemas"]["InventoryPoolDto"];
             timber: components["schemas"]["InventoryPoolDto"];
             timberLines: components["schemas"]["InventoryTimberLineDto"][];
+            /** @description 批次库存明细（不含负库存缺口） */
+            batches: components["schemas"]["InventoryBatchDto"][];
+            /** @description 负库存缺口方数（不计入任何批次） */
+            shortfallVolume: string;
+            /** @description 负库存缺口金额（不计入任何批次） */
+            shortfallAmount: string;
             totalAmount: string;
             /** @description 待结转成本（不计入库存总值） */
             pendingAmount: string;
@@ -2453,6 +2658,19 @@ export interface components {
             /** @description 按请求的客户 id 顺序返回 */
             items: components["schemas"]["CustomerVolumeSummaryItemDto"][];
         };
+        SaleOrderCostLayerDto: {
+            /** @description 成本来源批次编号；负库存层为空字符串 */
+            batchCode: string;
+            lengthMm: number;
+            widthMm: number;
+            heightMm: number;
+            /** @description 扣层方数 */
+            volumeM3: string;
+            /** @description 批次单位成本（元/m³） */
+            unitCost: string;
+            /** @description 扣层金额 */
+            amount: string;
+        };
         SaleOrderProfitDto: {
             orderId: string;
             code: string;
@@ -2473,6 +2691,8 @@ export interface components {
             materialMargin: string | null;
             /** @description 快照时间 */
             snapshottedAt: string | null;
+            /** @description 材料成本来源批次层 */
+            costLayers: components["schemas"]["SaleOrderCostLayerDto"][];
         };
         SaleOrderItemResponseDto: {
             /** @description 明细行 id */
@@ -4363,6 +4583,149 @@ export interface operations {
             };
         };
     };
+    ProductionController_listBatches: {
+        parameters: {
+            query?: {
+                /** @description 每页条数，默认 20（最大 100） */
+                pageSize?: number;
+                /** @description 页码，默认 1 */
+                page?: number;
+                /** @description 批次状态 */
+                status?: "open" | "closed";
+                /** @description 批次日期止（YYYY-MM-DD） */
+                dateTo?: string;
+                /** @description 批次日期起（YYYY-MM-DD） */
+                dateFrom?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductionBatchListDto"];
+                };
+            };
+        };
+    };
+    ProductionController_createBatch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProductionBatchBodyDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductionBatchDetailDto"];
+                };
+            };
+        };
+    };
+    ProductionController_batchDetail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductionBatchDetailDto"];
+                };
+            };
+        };
+    };
+    ProductionController_updateBatch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProductionBatchBodyDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductionBatchDetailDto"];
+                };
+            };
+        };
+    };
+    ProductionController_closeBatches: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProductionBatchBatchCloseBodyDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductionBatchBatchCloseResponseDto"];
+                };
+            };
+        };
+    };
+    ProductionController_closeBatch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductionBatchDetailDto"];
+                };
+            };
+        };
+    };
     ProductionController_listIssues: {
         parameters: {
             query?: {
@@ -4858,27 +5221,6 @@ export interface operations {
         };
     };
     OrderController_profit: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SaleOrderProfitDto"];
-                };
-            };
-        };
-    };
-    OrderController_recalculateCost: {
         parameters: {
             query?: never;
             header?: never;

@@ -42,6 +42,35 @@ export class InventoryTimberLineDto {
   negative!: boolean;
 }
 
+export class InventoryBatchDto {
+  @ApiProperty({ type: String })
+  id!: string;
+
+  @ApiProperty({ type: String, description: '批次编号 BT-#####' })
+  code!: string;
+
+  @ApiProperty({ type: String })
+  batchDate!: string;
+
+  @ApiProperty({ type: String, enum: ['open', 'closed'] })
+  status!: 'open' | 'closed';
+
+  @ApiProperty({ type: String, enum: ['opening', 'production'] })
+  kind!: 'opening' | 'production';
+
+  @ApiProperty({ type: String })
+  timberVolume!: string;
+
+  @ApiProperty({ type: String })
+  timberAmount!: string;
+
+  @ApiProperty({ type: String })
+  timberUnitCost!: string;
+
+  @ApiProperty({ type: String })
+  pendingAmount!: string;
+}
+
 export class InventorySummaryDto {
   @ApiProperty({ type: Boolean, description: '是否尚未设置期初库存' })
   needsOpening!: boolean;
@@ -57,6 +86,15 @@ export class InventorySummaryDto {
 
   @ApiProperty({ type: () => [InventoryTimberLineDto] })
   timberLines!: InventoryTimberLineDto[];
+
+  @ApiProperty({ type: () => [InventoryBatchDto], description: '批次库存明细（不含负库存缺口）' })
+  batches!: InventoryBatchDto[];
+
+  @ApiProperty({ type: String, description: '负库存缺口方数（不计入任何批次）' })
+  shortfallVolume!: string;
+
+  @ApiProperty({ type: String, description: '负库存缺口金额（不计入任何批次）' })
+  shortfallAmount!: string;
 
   @ApiProperty({ type: String })
   totalAmount!: string;

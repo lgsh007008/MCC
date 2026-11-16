@@ -27,9 +27,30 @@ export async function isMaterialCostPending(orderId: string): Promise<boolean> {
   }
 }
 
-// 新建方木产出前的提示：待结转为 0、或产出日期早于最近一笔领用。
-export async function outputCostWarnings(outputDate: string): Promise<string[]> {
+// 新建方木产出前的提示：所选批次待结转为 0、或产出日期早于本批次最近一笔领用。
+export async function outputCostWarnings(outputDate: string, batchId?: string): Promise<string[]> {
   const warnings: string[] = [];
+  if (batchId) {
+    try {
+      const { data, response } = await api.GET('/api/v1/production-batches/{id}', {
+        params: { path: { id: batchId } },
+      });
+      if (response.ok && data) {
+        if (data.pendingAmount === '0.00') {
+          warnings.push('当前批次没有待结转成本，产出将按 0 成本入库；请先在本批次录原木领用');
+        }
+        const latest = data.issues[data.issues.length - 1]?.issueDate;
+        if (latest && outputDate < latest) {
+          warnings.push(
+            `产出日期早于本批次最近一笔原木领用（${latest}），成本不会结转到本单；建议把产出日期改到领用之后`,
+          );
+        }
+      }
+    } catch {
+      // 批次查询失败时不提示，避免阻断正常录入
+    }
+    return warnings;
+  }
   try {
     const { data, response } = await api.GET('/api/v1/inventory/summary');
     if (response.ok && data && data.pendingAmount === '0.00') {

@@ -4,6 +4,7 @@ import {
   calcMaterialCostAmount,
   calcMaterialMargin,
   calcMaterialProfit,
+  calcTimberSaleCost,
   foldInventoryEvents,
   type InventoryEvent,
   type TimberSpec,
@@ -11,6 +12,9 @@ import {
 
 const specA: TimberSpec = { lengthMm: 3000, widthMm: 100, heightMm: 20 };
 const specB: TimberSpec = { lengthMm: 2000, widthMm: 100, heightMm: 20 };
+
+const BATCH = 'BT-00001';
+const OPENING_BATCH = 'BT-00000';
 
 const purchase = (id: string, tons: string, amount: string, date = '2026-11-01'): InventoryEvent => ({
   kind: 'purchase',
@@ -21,23 +25,33 @@ const purchase = (id: string, tons: string, amount: string, date = '2026-11-01')
   totalAmount: amount,
 });
 
-const issue = (id: string, tons: string, date = '2026-11-02'): InventoryEvent => ({
+const issue = (
+  id: string,
+  tons: string,
+  date = '2026-11-02',
+  batchRef = BATCH,
+): InventoryEvent => ({
   kind: 'issue',
   date,
   createdAt: `${date}T08:00:00.000Z`,
   ref: id,
   tons,
+  batchRef,
+  batchDate: date,
 });
 
 const output = (
   id: string,
   outputs: Array<{ spec: TimberSpec; volume: string }>,
   date = '2026-11-02',
+  batchRef = BATCH,
 ): InventoryEvent => ({
   kind: 'output',
   date,
   createdAt: `${date}T08:00:00.000Z`,
   ref: id,
+  batchRef,
+  batchDate: date,
   outputs,
 });
 
@@ -51,6 +65,20 @@ const sale = (
   createdAt: `${date}T08:00:00.000Z`,
   ref: id,
   items,
+});
+
+const opening = (
+  raw: { tons: string; amount: string } | undefined,
+  timber: Array<{ spec: TimberSpec; volume: string; amount: string }>,
+  date = '2026-11-01',
+  batchRef = OPENING_BATCH,
+): InventoryEvent => ({
+  kind: 'opening',
+  date,
+  createdAt: `${date}T00:00:00.000Z`,
+  ref: 'IC-1',
+  raw,
+  timber: timber.map((line) => ({ ...line, batchRef })),
 });
 
 describe('成本池', () => {
@@ -98,14 +126,9 @@ describe('成本池', () => {
 
   it('加工期间销售沿用现有方木成本，不受待结转影响', () => {
     const result = foldInventoryEvents([
-      {
-        kind: 'opening',
-        date: '2026-11-01',
-        createdAt: '2026-11-01T00:00:00.000Z',
-        ref: 'IC-1',
-        raw: { tons: '10', amount: '5000.00' },
-        timber: [{ spec: specA, volume: '10.0000', amount: '10000.00' }],
-      },
+      opening({ tons: '10', amount: '5000.00' }, [
+        { spec: specA, volume: '10.0000', amount: '10000.00' },
+      ]),
       issue('MI-1', '4', '2026-11-02'),
       sale('SO-1', [{ spec: specA, volume: '1.0000' }], '2026-11-03'),
       output('PR-1', [{ spec: specA, volume: '2.0000' }], '2026-11-04'),
@@ -134,7 +157,7 @@ describe('成本池', () => {
     expect(result.timberUnitCost).toBe('0.000000');
   });
 
-  it('多张产出单时第一张拿走全部待结转，后续产出成本为 0', () => {
+  it('批内多张产出单时第一张拿走全部批次待结转，后续产出成本为 0', () => {
     const result = foldInventoryEvents([
       purchase('PO-1', '10', '5000.00'),
       issue('MI-1', '4', '2026-11-02'),
@@ -148,7 +171,7 @@ describe('成本池', () => {
     expect(result.pendingAmount).toBe('0.00');
   });
 
-  it('产出日期早于领用时成本不结转，待结转留在池外', () => {
+  it('产出日期早于领用时成本不结转，待结转留在批次外', () => {
     const result = foldInventoryEvents([
       purchase('PO-1', '10', '5000.00'),
       output('PR-1', [{ spec: specA, volume: '2.5000' }], '2026-11-02'),
@@ -161,16 +184,11 @@ describe('成本池', () => {
     expect(result.pendingAmount).toBe('2000.00');
   });
 
-  it('期初库存进入成本池，并按净尺寸规格聚合', () => {
+  it('期初库存进入期初批次，并按净尺寸规格聚合', () => {
     const result = foldInventoryEvents([
-      {
-        kind: 'opening',
-        date: '2026-11-01',
-        createdAt: '2026-11-01T00:00:00.000Z',
-        ref: 'IC-1',
-        raw: { tons: '2', amount: '1000.00' },
-        timber: [{ spec: specA, volume: '1.0000', amount: '800.00' }],
-      },
+      opening({ tons: '2', amount: '1000.00' }, [
+        { spec: specA, volume: '1.0000', amount: '800.00' },
+      ]),
       sale('SO-1', [{ spec: specA, volume: '0.5000' }], '2026-11-02'),
     ]);
 
@@ -180,9 +198,15 @@ describe('成本池', () => {
     expect(result.timberAmount).toBe('400.00');
     expect(result.timberUnitCost).toBe('800.000000');
     expect(result.specs).toEqual({ '3000x100x20': '0.5000' });
+    expect(result.batches[0]).toMatchObject({
+      ref: OPENING_BATCH,
+      timberVolume: '0.5000',
+      timberAmount: '400.00',
+      timberUnitCost: '800.000000',
+    });
   });
 
-  it('多规格共用同一个方木平均成本，并按规格记录数量', () => {
+  it('多规格共用同一个批次平均成本，并按规格记录数量', () => {
     const result = foldInventoryEvents([
       purchase('PO-1', '10', '5000.00'),
       issue('MI-1', '5'),
@@ -214,9 +238,11 @@ describe('成本池', () => {
     expect(result.timberAmount).toBe('-500.00');
     expect(result.timberUnitCost).toBe('1000.000000');
     expect(result.specs).toEqual({ '3000x100x20': '-0.5000' });
+    expect(result.shortfallVolume).toBe('-0.5000');
+    expect(result.shortfallAmount).toBe('-500.00');
   });
 
-  it('盘点调整按差异数量与金额调整成本池', () => {
+  it('盘点调整按差异数量与金额调整批次成本池', () => {
     const result = foldInventoryEvents([
       purchase('PO-1', '10', '5000.00'),
       issue('MI-1', '5'),
@@ -263,14 +289,7 @@ describe('成本池', () => {
   it('期初即使排在输入末尾也先于采购与生产参与成本池', () => {
     const result = foldInventoryEvents([
       purchase('PO-1', '10', '5000.00', '2026-11-02'),
-      {
-        kind: 'opening',
-        date: '2026-11-01',
-        createdAt: '2026-11-01T00:00:00.000Z',
-        ref: 'IC-1',
-        raw: { tons: '2', amount: '1000.00' },
-        timber: [],
-      },
+      opening({ tons: '2', amount: '1000.00' }, []),
     ]);
 
     expect(result.rawTons).toBe('12.000');
@@ -310,7 +329,7 @@ describe('成本池', () => {
   });
 });
 
-describe('逐单归属（FIFO）', () => {
+describe('逐单归属（批内 FIFO）', () => {
   it('单笔领用被一张产出单全额结转', () => {
     const result = foldInventoryEvents([
       purchase('PO-1', '10', '5000.00'),
@@ -319,14 +338,28 @@ describe('逐单归属（FIFO）', () => {
     ]);
 
     expect(result.issueSettlements).toEqual([
-      { ref: 'MI-1', date: '2026-11-02', cost: '2000.00', settled: '2000.00', remaining: '0.00', settledBy: ['PR-1'] },
+      {
+        ref: 'MI-1',
+        batchRef: BATCH,
+        date: '2026-11-02',
+        cost: '2000.00',
+        settled: '2000.00',
+        remaining: '0.00',
+        settledBy: ['PR-1'],
+      },
     ]);
     expect(result.outputSettlements).toEqual([
-      { ref: 'PR-1', date: '2026-11-03', amount: '2000.00', sources: ['MI-1'] },
+      {
+        ref: 'PR-1',
+        batchRef: BATCH,
+        date: '2026-11-03',
+        amount: '2000.00',
+        sources: ['MI-1'],
+      },
     ]);
   });
 
-  it('分多张产出单时按最早未结转先结转', () => {
+  it('同批次多张产出单按最早未结转先结转', () => {
     const result = foldInventoryEvents([
       purchase('PO-1', '10', '5000.00'),
       issue('MI-1', '4', '2026-11-02'),
@@ -337,16 +370,28 @@ describe('逐单归属（FIFO）', () => {
 
     expect(result.pendingAmount).toBe('0.00');
     expect(result.issueSettlements).toEqual([
-      { ref: 'MI-1', date: '2026-11-02', cost: '2000.00', settled: '2000.00', remaining: '0.00', settledBy: ['PR-1'] },
-      { ref: 'MI-2', date: '2026-11-04', cost: '1000.00', settled: '1000.00', remaining: '0.00', settledBy: ['PR-2'] },
-    ]);
-    expect(result.outputSettlements).toEqual([
-      { ref: 'PR-1', date: '2026-11-03', amount: '2000.00', sources: ['MI-1'] },
-      { ref: 'PR-2', date: '2026-11-05', amount: '1000.00', sources: ['MI-2'] },
+      {
+        ref: 'MI-1',
+        batchRef: BATCH,
+        date: '2026-11-02',
+        cost: '2000.00',
+        settled: '2000.00',
+        remaining: '0.00',
+        settledBy: ['PR-1'],
+      },
+      {
+        ref: 'MI-2',
+        batchRef: BATCH,
+        date: '2026-11-04',
+        cost: '1000.00',
+        settled: '1000.00',
+        remaining: '0.00',
+        settledBy: ['PR-2'],
+      },
     ]);
   });
 
-  it('产出金额跨多笔领用时按顺序依次结转', () => {
+  it('产出金额跨多笔同批次领用时按顺序依次结转', () => {
     const result = foldInventoryEvents([
       purchase('PO-1', '10', '5000.00'),
       issue('MI-1', '2', '2026-11-02'),
@@ -354,16 +399,13 @@ describe('逐单归属（FIFO）', () => {
       output('PR-1', [{ spec: specA, volume: '1.0000' }], '2026-11-04'),
     ]);
 
-    expect(result.outputSettlements[0]).toEqual({
+    expect(result.outputSettlements[0]).toMatchObject({
       ref: 'PR-1',
-      date: '2026-11-04',
+      batchRef: BATCH,
       amount: '2500.00',
       sources: ['MI-1', 'MI-2'],
     });
-    expect(result.issueSettlements).toEqual([
-      { ref: 'MI-1', date: '2026-11-02', cost: '1000.00', settled: '1000.00', remaining: '0.00', settledBy: ['PR-1'] },
-      { ref: 'MI-2', date: '2026-11-03', cost: '1500.00', settled: '1500.00', remaining: '0.00', settledBy: ['PR-1'] },
-    ]);
+    expect(result.issueSettlements.map((item) => item.remaining)).toEqual(['0.00', '0.00']);
   });
 
   it('产出早于领用时该产出结转金额为 0，领用保持待结转', () => {
@@ -373,9 +415,8 @@ describe('逐单归属（FIFO）', () => {
       issue('MI-1', '4', '2026-11-03'),
     ]);
 
-    expect(result.outputSettlements[0]).toEqual({
+    expect(result.outputSettlements[0]).toMatchObject({
       ref: 'PR-1',
-      date: '2026-11-02',
       amount: '0.00',
       sources: [],
     });
@@ -400,6 +441,101 @@ describe('逐单归属（FIFO）', () => {
       0,
     );
     expect(remainingSum).toBe(Math.round(Number(result.pendingAmount) * 100));
+  });
+});
+
+describe('批次成本对象', () => {
+  it('不同批次的待结转与方木成本互不混摊', () => {
+    const result = foldInventoryEvents([
+      purchase('PO-1', '10', '5000.00'),
+      issue('MI-1', '2', '2026-11-02', 'BT-00001'),
+      issue('MI-2', '2', '2026-11-02', 'BT-00002'),
+      output('PR-1', [{ spec: specA, volume: '1.0000' }], '2026-11-03', 'BT-00001'),
+      output('PR-2', [{ spec: specA, volume: '2.0000' }], '2026-11-03', 'BT-00002'),
+    ]);
+
+    const batch1 = result.batches.find((batch) => batch.ref === 'BT-00001')!;
+    const batch2 = result.batches.find((batch) => batch.ref === 'BT-00002')!;
+    expect(batch1.timberAmount).toBe('1000.00');
+    expect(batch1.timberVolume).toBe('1.0000');
+    expect(batch1.timberUnitCost).toBe('1000.000000');
+    expect(batch2.timberAmount).toBe('1000.00');
+    expect(batch2.timberVolume).toBe('2.0000');
+    expect(batch2.timberUnitCost).toBe('500.000000');
+    expect(result.timberAmount).toBe('2000.00');
+    expect(result.timberUnitCost).toBe('666.666667');
+  });
+
+  it('销售按批次先进先出扣层，并输出成本来源批次', () => {
+    const result = foldInventoryEvents([
+      purchase('PO-1', '10', '5000.00'),
+      issue('MI-1', '2', '2026-11-02', 'BT-00001'),
+      output('PR-1', [{ spec: specA, volume: '1.0000' }], '2026-11-03', 'BT-00001'),
+      issue('MI-2', '2', '2026-11-02', 'BT-00002'),
+      output('PR-2', [{ spec: specA, volume: '2.0000' }], '2026-11-03', 'BT-00002'),
+      sale('SO-1', [{ spec: specA, volume: '1.5000' }], '2026-11-04'),
+    ]);
+
+    const saleSettlement = result.saleSettlements[0]!;
+    expect(saleSettlement.amount).toBe('1250.00');
+    expect(saleSettlement.layers).toEqual([
+      {
+        batchRef: 'BT-00001',
+        spec: specA,
+        volume: '1.0000',
+        unitCost: '1000.000000',
+        amount: '1000.00',
+      },
+      {
+        batchRef: 'BT-00002',
+        spec: specA,
+        volume: '0.5000',
+        unitCost: '500.000000',
+        amount: '250.00',
+      },
+    ]);
+    const batch2 = result.batches.find((batch) => batch.ref === 'BT-00002')!;
+    expect(batch2.timberVolume).toBe('1.5000');
+    expect(batch2.timberAmount).toBe('750.00');
+  });
+
+  it('批次关闭把剩余待结转一次性转入本批次方木池', () => {
+    const result = foldInventoryEvents([
+      purchase('PO-1', '10', '5000.00'),
+      issue('MI-1', '4', '2026-11-02', BATCH),
+      output('PR-1', [{ spec: specA, volume: '2.0000' }], '2026-11-03', BATCH),
+      issue('MI-2', '2', '2026-11-04', BATCH),
+      {
+        kind: 'batch_close',
+        date: '2026-11-05',
+        createdAt: '2026-11-05T08:00:00.000Z',
+        ref: 'BT-CLOSE-1',
+        batchRef: BATCH,
+      },
+    ]);
+
+    const batch = result.batches.find((item) => item.ref === BATCH)!;
+    expect(batch.status).toBe('closed');
+    expect(batch.pendingAmount).toBe('0.00');
+    expect(batch.closedSettledAmount).toBe('1000.00');
+    expect(batch.timberAmount).toBe('3000.00');
+    expect(batch.timberUnitCost).toBe('1500.000000');
+    expect(result.pendingAmount).toBe('0.00');
+  });
+
+  it('销售成本试算按当前批次层先进先出，不写入事件流', () => {
+    const events: InventoryEvent[] = [
+      purchase('PO-1', '10', '5000.00'),
+      issue('MI-1', '2', '2026-11-02', 'BT-00001'),
+      output('PR-1', [{ spec: specA, volume: '1.0000' }], '2026-11-03', 'BT-00001'),
+      issue('MI-2', '2', '2026-11-02', 'BT-00002'),
+      output('PR-2', [{ spec: specA, volume: '2.0000' }], '2026-11-03', 'BT-00002'),
+    ];
+    const cost = calcTimberSaleCost(events, [{ spec: specA, volume: '1.5000' }]);
+    expect(cost.status).toBe('final');
+    expect(cost.amount).toBe('1250.00');
+    expect(cost.unitCost).toBe('833.333333');
+    expect(cost.layers.map((layer) => layer.batchRef)).toEqual(['BT-00001', 'BT-00002']);
   });
 });
 

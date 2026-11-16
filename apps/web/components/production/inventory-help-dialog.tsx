@@ -24,12 +24,12 @@ export function InventoryHelpDialog({
       <HelpSection title="成本怎么走">
         <HelpRow label="采购进货">原木池加吨数、加金额；金额取采购单合计，含运费与折价</HelpRow>
         <HelpRow label="原木领用">
-          原木池减吨数、减成本；成本先记「待结转」，不计入库存总值。成本 = 领用吨数 × 当时原木平均成本
+          原木池减吨数、减成本；成本记入所选生产批次的「待结转」，不计入库存总值。成本 = 领用吨数 × 当时原木平均成本
         </HelpRow>
-        <HelpRow label="方木产出">方木池加方数，并把当前待结转成本全额转入</HelpRow>
-        <HelpRow label="销售出库">方木池减方数，同时减这些方数的材料成本</HelpRow>
-        <HelpRow label="盘点">差异按当前平均成本计入原木或方木池；待结转不参与盘点</HelpRow>
-        <HelpRow label="平均成本">池金额 ÷ 池数量；方木平均成本在领用后到产出前保持不变</HelpRow>
+        <HelpRow label="方木产出">本批次方木加方数，并把本批次待结转成本全额转入</HelpRow>
+        <HelpRow label="销售出库">按批次日期先进先出扣方数，同时扣各批次对应的材料成本</HelpRow>
+        <HelpRow label="盘点">差异按当前成本计价，并按批次日期先进先出分摊到各批次；待结转不参与盘点</HelpRow>
+        <HelpRow label="平均成本">批次金额 ÷ 批次方数；每个批次一个平均成本，批次之间不混摊</HelpRow>
       </HelpSection>
 
       <HelpSection title="为什么这样、和收支什么关系">
@@ -41,7 +41,7 @@ export function InventoryHelpDialog({
       </HelpSection>
 
       <p className="text-muted-foreground">
-        领用后、产出前，待结转成本不计入库存总值，所以总值会短暂减少，产出后恢复；这不影响方木平均成本，也不影响赚钱与否。这一页回答「仓里还有多少、值多少钱」，赚没赚看收支汇总。
+        领用后、产出前，本批次待结转成本不计入库存总值，所以总值会短暂减少，产出后恢复；批次关闭时剩余待结转一次性结清。这一页回答「仓里还有多少、值多少钱」，赚没赚看收支汇总。
       </p>
     </HelpDialogShell>
   );

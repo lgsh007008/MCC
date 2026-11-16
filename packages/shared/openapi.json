@@ -2551,6 +2551,241 @@
         ]
       }
     },
+    "/api/v1/production-batches": {
+      "get": {
+        "operationId": "ProductionController_listBatches",
+        "parameters": [
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "description": "每页条数，默认 20（最大 100）",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "页码，默认 1",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "批次状态",
+            "schema": {
+              "enum": [
+                "open",
+                "closed"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateTo",
+            "required": false,
+            "in": "query",
+            "description": "批次日期止（YYYY-MM-DD）",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateFrom",
+            "required": false,
+            "in": "query",
+            "description": "批次日期起（YYYY-MM-DD）",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductionBatchListDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "生产批次列表：批次日期区间 + 状态 + 分页",
+        "tags": [
+          "production"
+        ]
+      },
+      "post": {
+        "operationId": "ProductionController_createBatch",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductionBatchBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductionBatchDetailDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "新建生产批次；重复提交防抖：请求头 Idempotency-Key",
+        "tags": [
+          "production"
+        ]
+      }
+    },
+    "/api/v1/production-batches/{id}": {
+      "get": {
+        "operationId": "ProductionController_batchDetail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductionBatchDetailDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "生产批次详情：成本池 + 领用 / 产出 / 方木明细",
+        "tags": [
+          "production"
+        ]
+      },
+      "put": {
+        "operationId": "ProductionController_updateBatch",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductionBatchBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductionBatchDetailDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "编辑生产批次（仅进行中批次）",
+        "tags": [
+          "production"
+        ]
+      }
+    },
+    "/api/v1/production-batches/batch-close": {
+      "post": {
+        "operationId": "ProductionController_closeBatches",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductionBatchBatchCloseBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductionBatchBatchCloseResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "批量关闭生产批次：已关闭 / 不存在跳过；任一批次待结转无库存则整批拒绝",
+        "tags": [
+          "production"
+        ]
+      }
+    },
+    "/api/v1/production-batches/{id}/close": {
+      "post": {
+        "operationId": "ProductionController_closeBatch",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductionBatchDetailDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "关闭生产批次：剩余待结转一次性转入本批次方木池",
+        "tags": [
+          "production"
+        ]
+      }
+    },
     "/api/v1/material-issues": {
       "get": {
         "operationId": "ProductionController_listIssues",
@@ -3378,37 +3613,6 @@
           }
         },
         "summary": "销售单材料毛利快照（成本待补时毛利为 null）",
-        "tags": [
-          "sale-orders"
-        ]
-      }
-    },
-    "/api/v1/sale-orders/{id}/recalculate-cost": {
-      "post": {
-        "operationId": "OrderController_recalculateCost",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SaleOrderProfitDto"
-                }
-              }
-            }
-          }
-        },
-        "summary": "重算成本待补订单的材料成本；仅 PENDING 可重算，成功后锁定",
         "tags": [
           "sale-orders"
         ]
@@ -5977,6 +6181,354 @@
           "accountId"
         ]
       },
+      "ProductionBatchDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "description": "批次编号 BT-#####"
+          },
+          "batchDate": {
+            "type": "string",
+            "description": "批次日期"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "closed"
+            ]
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "opening",
+              "production"
+            ]
+          },
+          "note": {
+            "type": "string"
+          },
+          "closedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "timberVolume": {
+            "type": "string",
+            "description": "批次方木数量（m³，4 位小数）"
+          },
+          "timberAmount": {
+            "type": "string",
+            "description": "批次方木金额（2 位小数）"
+          },
+          "timberUnitCost": {
+            "type": "string",
+            "description": "批次方木成本（元/m³，6 位小数）"
+          },
+          "pendingAmount": {
+            "type": "string",
+            "description": "批次待结转金额（2 位小数）"
+          },
+          "closedSettledAmount": {
+            "type": "string",
+            "description": "关闭时一次性结转金额（2 位小数）"
+          },
+          "issueCount": {
+            "type": "number",
+            "description": "领用单数"
+          },
+          "outputCount": {
+            "type": "number",
+            "description": "产出单数"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "batchDate",
+          "status",
+          "kind",
+          "note",
+          "closedAt",
+          "createdAt",
+          "timberVolume",
+          "timberAmount",
+          "timberUnitCost",
+          "pendingAmount",
+          "closedSettledAmount",
+          "issueCount",
+          "outputCount"
+        ]
+      },
+      "ProductionBatchListDto": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "number"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductionBatchDto"
+            }
+          }
+        },
+        "required": [
+          "total",
+          "items"
+        ]
+      },
+      "ProductionBatchIssueDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "issueDate": {
+            "type": "string"
+          },
+          "tons": {
+            "type": "string"
+          },
+          "settledAmount": {
+            "type": "string"
+          },
+          "pendingAmount": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "issueDate",
+          "tons",
+          "settledAmount",
+          "pendingAmount"
+        ]
+      },
+      "ProductionBatchOutputDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "outputDate": {
+            "type": "string"
+          },
+          "totalVolume": {
+            "type": "string"
+          },
+          "settledAmount": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "outputDate",
+          "totalVolume",
+          "settledAmount"
+        ]
+      },
+      "ProductionBatchTimberLineDto": {
+        "type": "object",
+        "properties": {
+          "lengthMm": {
+            "type": "number"
+          },
+          "widthMm": {
+            "type": "number"
+          },
+          "heightMm": {
+            "type": "number"
+          },
+          "quantity": {
+            "type": "string"
+          },
+          "unitCost": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "lengthMm",
+          "widthMm",
+          "heightMm",
+          "quantity",
+          "unitCost",
+          "amount"
+        ]
+      },
+      "ProductionBatchDetailDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "description": "批次编号 BT-#####"
+          },
+          "batchDate": {
+            "type": "string",
+            "description": "批次日期"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "closed"
+            ]
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "opening",
+              "production"
+            ]
+          },
+          "note": {
+            "type": "string"
+          },
+          "closedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "timberVolume": {
+            "type": "string",
+            "description": "批次方木数量（m³，4 位小数）"
+          },
+          "timberAmount": {
+            "type": "string",
+            "description": "批次方木金额（2 位小数）"
+          },
+          "timberUnitCost": {
+            "type": "string",
+            "description": "批次方木成本（元/m³，6 位小数）"
+          },
+          "pendingAmount": {
+            "type": "string",
+            "description": "批次待结转金额（2 位小数）"
+          },
+          "closedSettledAmount": {
+            "type": "string",
+            "description": "关闭时一次性结转金额（2 位小数）"
+          },
+          "issueCount": {
+            "type": "number",
+            "description": "领用单数"
+          },
+          "outputCount": {
+            "type": "number",
+            "description": "产出单数"
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductionBatchIssueDto"
+            }
+          },
+          "outputs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductionBatchOutputDto"
+            }
+          },
+          "timberLines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductionBatchTimberLineDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "batchDate",
+          "status",
+          "kind",
+          "note",
+          "closedAt",
+          "createdAt",
+          "timberVolume",
+          "timberAmount",
+          "timberUnitCost",
+          "pendingAmount",
+          "closedSettledAmount",
+          "issueCount",
+          "outputCount",
+          "issues",
+          "outputs",
+          "timberLines"
+        ]
+      },
+      "ProductionBatchBodyDto": {
+        "type": "object",
+        "properties": {
+          "batchDate": {
+            "type": "string",
+            "description": "批次日期",
+            "example": "2026-11-15"
+          },
+          "note": {
+            "type": "string",
+            "description": "备注",
+            "default": ""
+          }
+        },
+        "required": [
+          "batchDate"
+        ]
+      },
+      "ProductionBatchBatchCloseBodyDto": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "description": "生产批次 id 列表（1~200）",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "ids"
+        ]
+      },
+      "ProductionBatchBatchCloseResponseDto": {
+        "type": "object",
+        "properties": {
+          "closed": {
+            "type": "number",
+            "description": "实际关闭条数"
+          },
+          "skipped": {
+            "type": "number",
+            "description": "跳过条数（已关闭 / 不存在）"
+          }
+        },
+        "required": [
+          "closed",
+          "skipped"
+        ]
+      },
       "MaterialIssueSummaryDto": {
         "type": "object",
         "properties": {
@@ -6029,6 +6581,18 @@
               "type": "string"
             }
           },
+          "batchId": {
+            "type": "string",
+            "description": "所属生产批次 id"
+          },
+          "batchCode": {
+            "type": "string",
+            "description": "所属生产批次编号 BT-#####"
+          },
+          "batchStatus": {
+            "type": "string",
+            "description": "批次状态：open 进行中 / closed 已关闭"
+          },
           "createdAt": {
             "type": "string"
           }
@@ -6043,6 +6607,9 @@
           "settledAmount",
           "pendingAmount",
           "settledByCodes",
+          "batchId",
+          "batchCode",
+          "batchStatus",
           "createdAt"
         ]
       },
@@ -6085,11 +6652,16 @@
             "type": "string",
             "description": "备注",
             "default": ""
+          },
+          "batchId": {
+            "type": "string",
+            "description": "所属生产批次 id"
           }
         },
         "required": [
           "issueDate",
-          "tons"
+          "tons",
+          "batchId"
         ]
       },
       "MaterialIssueBatchDeleteBodyDto": {
@@ -6157,6 +6729,18 @@
             "type": "string",
             "description": "本次结转金额（2 位小数）"
           },
+          "batchId": {
+            "type": "string",
+            "description": "所属生产批次 id"
+          },
+          "batchCode": {
+            "type": "string",
+            "description": "所属生产批次编号 BT-#####"
+          },
+          "batchStatus": {
+            "type": "string",
+            "description": "批次状态：open 进行中 / closed 已关闭"
+          },
           "note": {
             "type": "string"
           },
@@ -6171,6 +6755,9 @@
           "lineCount",
           "totalVolume",
           "settledAmount",
+          "batchId",
+          "batchCode",
+          "batchStatus",
           "note",
           "createdAt"
         ]
@@ -6263,6 +6850,18 @@
             "type": "string",
             "description": "本次结转金额（2 位小数）"
           },
+          "batchId": {
+            "type": "string",
+            "description": "所属生产批次 id"
+          },
+          "batchCode": {
+            "type": "string",
+            "description": "所属生产批次编号 BT-#####"
+          },
+          "batchStatus": {
+            "type": "string",
+            "description": "批次状态：open 进行中 / closed 已关闭"
+          },
           "note": {
             "type": "string"
           },
@@ -6290,6 +6889,9 @@
           "lineCount",
           "totalVolume",
           "settledAmount",
+          "batchId",
+          "batchCode",
+          "batchStatus",
           "note",
           "createdAt",
           "sourceIssueCodes",
@@ -6345,6 +6947,10 @@
             "description": "备注",
             "default": ""
           },
+          "batchId": {
+            "type": "string",
+            "description": "所属生产批次 id（须为进行中批次）"
+          },
           "outputs": {
             "description": "产出明细（至少一行）",
             "type": "array",
@@ -6355,6 +6961,7 @@
         },
         "required": [
           "outputDate",
+          "batchId",
           "outputs"
         ]
       },
@@ -6411,6 +7018,10 @@
             "description": "备注",
             "default": ""
           },
+          "batchId": {
+            "type": "string",
+            "description": "所属生产批次 id（须为进行中批次）"
+          },
           "outputs": {
             "description": "产出明细（至少一行；已有行带 id）",
             "type": "array",
@@ -6421,6 +7032,7 @@
         },
         "required": [
           "outputDate",
+          "batchId",
           "outputs"
         ]
       },
@@ -6517,6 +7129,58 @@
           "negative"
         ]
       },
+      "InventoryBatchDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "description": "批次编号 BT-#####"
+          },
+          "batchDate": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "closed"
+            ]
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "opening",
+              "production"
+            ]
+          },
+          "timberVolume": {
+            "type": "string"
+          },
+          "timberAmount": {
+            "type": "string"
+          },
+          "timberUnitCost": {
+            "type": "string"
+          },
+          "pendingAmount": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "batchDate",
+          "status",
+          "kind",
+          "timberVolume",
+          "timberAmount",
+          "timberUnitCost",
+          "pendingAmount"
+        ]
+      },
       "InventorySummaryDto": {
         "type": "object",
         "properties": {
@@ -6540,6 +7204,21 @@
             "items": {
               "$ref": "#/components/schemas/InventoryTimberLineDto"
             }
+          },
+          "batches": {
+            "description": "批次库存明细（不含负库存缺口）",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InventoryBatchDto"
+            }
+          },
+          "shortfallVolume": {
+            "type": "string",
+            "description": "负库存缺口方数（不计入任何批次）"
+          },
+          "shortfallAmount": {
+            "type": "string",
+            "description": "负库存缺口金额（不计入任何批次）"
           },
           "totalAmount": {
             "type": "string"
@@ -6572,6 +7251,9 @@
           "raw",
           "timber",
           "timberLines",
+          "batches",
+          "shortfallVolume",
+          "shortfallAmount",
           "totalAmount",
           "pendingAmount",
           "pendingIssueCount",
@@ -7180,6 +7862,45 @@
           "items"
         ]
       },
+      "SaleOrderCostLayerDto": {
+        "type": "object",
+        "properties": {
+          "batchCode": {
+            "type": "string",
+            "description": "成本来源批次编号；负库存层为空字符串"
+          },
+          "lengthMm": {
+            "type": "number"
+          },
+          "widthMm": {
+            "type": "number"
+          },
+          "heightMm": {
+            "type": "number"
+          },
+          "volumeM3": {
+            "type": "string",
+            "description": "扣层方数"
+          },
+          "unitCost": {
+            "type": "string",
+            "description": "批次单位成本（元/m³）"
+          },
+          "amount": {
+            "type": "string",
+            "description": "扣层金额"
+          }
+        },
+        "required": [
+          "batchCode",
+          "lengthMm",
+          "widthMm",
+          "heightMm",
+          "volumeM3",
+          "unitCost",
+          "amount"
+        ]
+      },
       "SaleOrderProfitDto": {
         "type": "object",
         "properties": {
@@ -7224,6 +7945,13 @@
             "type": "string",
             "nullable": true,
             "description": "快照时间"
+          },
+          "costLayers": {
+            "description": "材料成本来源批次层",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SaleOrderCostLayerDto"
+            }
           }
         },
         "required": [
@@ -7235,7 +7963,8 @@
           "materialCostStatus",
           "materialProfit",
           "materialMargin",
-          "snapshottedAt"
+          "snapshottedAt",
+          "costLayers"
         ]
       },
       "SaleOrderItemResponseDto": {

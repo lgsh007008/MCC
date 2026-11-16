@@ -47,6 +47,9 @@ export default function MobileEditProductionOutputPage(): React.ReactElement {
         code: query.data.code,
         outputDate: query.data.outputDate,
         note: query.data.note,
+        batchId: query.data.batchId,
+        batchCode: query.data.batchCode,
+        batchStatus: query.data.batchStatus,
         outputs: query.data.outputs.map((line) => ({
           id: line.id,
           lengthMm: line.lengthMm,

@@ -88,7 +88,7 @@ export default function MobileProductionOutputsPage(): React.ReactElement {
           topLeft={row.outputDate}
           title={row.code}
           amount={`${formatQuantity(row.totalVolume)} m³`}
-          subtitle={`${row.lineCount} 行产出 · 本次结转 ${formatAmount(row.settledAmount)} 元`}
+          subtitle={`批次 ${row.batchCode} · ${row.lineCount} 行产出 · 本次结转 ${formatAmount(row.settledAmount)} 元`}
           note={row.note || undefined}
         />
       ))}

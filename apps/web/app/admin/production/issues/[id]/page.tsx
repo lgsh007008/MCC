@@ -60,6 +60,12 @@ export default function MaterialIssueDetailPage(): React.ReactElement {
       <section className="rounded-lg border border-border bg-card p-4">
         <div className="grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-3">
           <div><span className="text-muted-foreground">领用日期：</span>{issue.issueDate}</div>
+          <div>
+            <span className="text-muted-foreground">生产批次：</span>
+            <Link href={`/admin/production/batches/${issue.batchId}`} className="text-primary hover:underline">
+              {issue.batchCode}
+            </Link>
+          </div>
           <div><span className="text-muted-foreground">领用吨数：</span>{formatQuantity(issue.tons)}</div>
           <div>
             <span className="text-muted-foreground">结转状态：</span>

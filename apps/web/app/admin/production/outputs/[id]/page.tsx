@@ -62,6 +62,12 @@ export default function ProductionOutputDetailPage(): React.ReactElement {
         <section className="rounded-lg border border-border bg-card p-4">
           <div className="grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-3">
             <div><span className="text-muted-foreground">产出日期：</span>{output.outputDate}</div>
+            <div>
+              <span className="text-muted-foreground">生产批次：</span>
+              <Link href={`/admin/production/batches/${output.batchId}`} className="text-primary hover:underline">
+                {output.batchCode}
+              </Link>
+            </div>
             <div><span className="text-muted-foreground">产出总方数：</span>{formatQuantity(output.totalVolume)}</div>
             <div><span className="text-muted-foreground">本次结转金额：</span>{formatAmount(output.settledAmount)} 元</div>
             <div><span className="text-muted-foreground">创建时间：</span>{output.createdAt.slice(0, 19).replace('T', ' ')}</div>

@@ -39,6 +39,9 @@ export default function EditProductionOutputPage(): React.ReactElement {
         code: query.data.code,
         outputDate: query.data.outputDate,
         note: query.data.note,
+        batchId: query.data.batchId,
+        batchCode: query.data.batchCode,
+        batchStatus: query.data.batchStatus,
         outputs: query.data.outputs.map((output) => ({
           id: output.id,
           lengthMm: output.lengthMm,

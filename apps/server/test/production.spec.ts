@@ -10,7 +10,7 @@ import { PrismaService } from '../src/common/prisma.service.js';
 import { scopedClient, TEST_TENANT_CODE, TEST_TENANT_ID } from './helpers.js';
 
 // 生产与库存接口关键路径（契约/集成层，技术方案 §10）：
-// 原木领用 / 方木产出 / 库存汇总 / 成本快照 / 重算 / 盘点 / 负库存 / 权限 / 幂等。
+// 原木领用 / 方木产出 / 库存汇总 / 成本快照 / 编辑保存补录 / 盘点 / 负库存 / 权限 / 幂等。
 // 使用一次性账号、客户与编号前缀，测试结束清理。
 
 describe('生产与库存接口（契约/集成）', () => {
@@ -29,7 +29,9 @@ describe('生产与库存接口（契约/集成）', () => {
   const customerName = `it-production-customer-${stamp}`;
   const issueIds: string[] = [];
   const outputIds: string[] = [];
+  const batchIds: string[] = [];
   const adjustmentIds: string[] = [];
+  let batchId = '';
 
   const http = () => request(app.getHttpServer());
   const auth = (t: string): { Authorization: string } => ({ Authorization: `Bearer ${t}` });
@@ -64,11 +66,13 @@ describe('生产与库存接口（契约/集成）', () => {
     issueDate: date,
     tons: '5.000',
     note: '集成测试领用',
+    batchId,
   });
 
   const outputBody = (date = '2099-01-02'): Record<string, unknown> => ({
     outputDate: date,
     note: '集成测试产出',
+    batchId,
     outputs: [{ lengthMm: 2500, widthMm: 100, heightMm: 20, pieces: 500, note: '' }],
   });
 
@@ -101,6 +105,12 @@ describe('生产与库存接口（契约/集成）', () => {
     token = await login(username);
     workerToken = await login(workerName);
     financeToken = await login(financeName);
+    const batch = await http()
+      .post(`/${API_PREFIX}/production-batches`)
+      .set(auth(token))
+      .set('Idempotency-Key', `it-batch-${stamp}`)
+      .send({ batchDate: '2099-01-01', note: '集成测试批次' });
+    batchId = batch.body.id as string;
     const customer = await http()
       .post(`/${API_PREFIX}/customers`)
       .set(auth(token))
@@ -119,6 +129,9 @@ describe('生产与库存接口（契约/集成）', () => {
     await db.saleOrder.deleteMany({ where: { customerId } });
     await db.materialIssue.deleteMany({ where: { id: { in: issueIds } } });
     await db.productionOutput.deleteMany({ where: { id: { in: outputIds } } });
+    if (batchId) {
+      await db.productionBatch.deleteMany({ where: { id: { in: [batchId, ...batchIds] } } });
+    }
     await db.inventoryAdjustment.deleteMany({ where: { id: { in: adjustmentIds } } });
     await db.customer.deleteMany({ where: { name: { startsWith: 'it-production-' } } });
     await db.user.deleteMany({
@@ -299,25 +312,45 @@ describe('生产与库存接口（契约/集成）', () => {
     ]);
   });
 
-  it('重算成本待补订单：写入快照并锁定；已锁定再重算 409', async () => {
+  it('编辑保存成本待补订单：补录当前批次成本并锁定', async () => {
     const list = await http()
       .get(`/${API_PREFIX}/sale-orders`)
       .set(auth(token))
       .query({ customerId, page: 1, pageSize: 20 });
     const pending = (list.body.items as Array<{ id: string }>)[0];
-    const recalculated = await http()
-      .post(`/${API_PREFIX}/sale-orders/${pending?.id}/recalculate-cost`)
-      .set(auth(token));
-    expect(recalculated.status).toBe(200);
-    expect(recalculated.body.materialCostStatus).toBe('final');
-    expect(recalculated.body.materialUnitCost).toBe('1000.000000');
-    expect(recalculated.body.materialCostAmount).toBe('2500.00');
-    expect(recalculated.body.materialProfit).toBe('2000.00');
+    const updated = await http()
+      .put(`/${API_PREFIX}/sale-orders/${pending?.id}`)
+      .set(auth(token))
+      .send({
+        saleDate: '2025-12-31',
+        customerId,
+        otherAmount: '0',
+        note: '期初前订单',
+        settlementMode: 'credit',
+        items: [
+          {
+            lengthMm: 2500,
+            widthMm: 100,
+            heightMm: 20,
+            pieces: 500,
+            pricingMode: 'volume',
+            price: '1800.00',
+            otherAmount: '0',
+            note: '',
+          },
+        ],
+      });
+    expect(updated.status).toBe(200);
 
-    const again = await http()
-      .post(`/${API_PREFIX}/sale-orders/${pending?.id}/recalculate-cost`)
+    const profit = await http()
+      .get(`/${API_PREFIX}/sale-orders/${pending?.id}/profit`)
       .set(auth(token));
-    expect(again.status).toBe(409);
+    expect(profit.status).toBe(200);
+    expect(profit.body.materialCostStatus).toBe('final');
+    expect(profit.body.materialUnitCost).toBe('1000.000000');
+    expect(profit.body.materialCostAmount).toBe('2500.00');
+    expect(profit.body.materialProfit).toBe('2000.00');
+    expect(profit.body.costLayers).toHaveLength(1);
   });
 
   it('开单后库存扣减；库存不足仍可开单并产生负库存', async () => {
@@ -534,6 +567,140 @@ describe('生产与库存接口（契约/集成）', () => {
       });
     expect(empty.status).toBe(400);
     expect(empty.body.code).toBe('COUNT_NO_LINES');
+  });
+
+  it('生产批次：关闭时结清剩余待结转，并锁定领用与产出', async () => {
+    const batch = await http()
+      .post(`/${API_PREFIX}/production-batches`)
+      .set(auth(token))
+      .set('Idempotency-Key', `it-batch-close-${stamp}`)
+      .send({ batchDate: '2099-02-01', note: '关闭测试批次' });
+    expect(batch.status).toBe(201);
+    const closeBatchId = batch.body.id as string;
+    batchIds.push(closeBatchId);
+
+    const firstIssue = await createIssue(`it-close-issue-1-${stamp}`, {
+      issueDate: '2099-02-02',
+      tons: '2.000',
+      note: '',
+      batchId: closeBatchId,
+    });
+    expect(firstIssue.status).toBe(201);
+    issueIds.push(firstIssue.body.id);
+
+    const output = await createOutput(`it-close-output-${stamp}`, {
+      outputDate: '2099-02-02',
+      note: '',
+      batchId: closeBatchId,
+      outputs: [{ lengthMm: 2500, widthMm: 100, heightMm: 20, pieces: 200, note: '' }],
+    });
+    expect(output.status).toBe(201);
+    outputIds.push(output.body.id);
+
+    const secondIssue = await createIssue(`it-close-issue-2-${stamp}`, {
+      issueDate: '2099-02-03',
+      tons: '2.000',
+      note: '',
+      batchId: closeBatchId,
+    });
+    expect(secondIssue.status).toBe(201);
+    issueIds.push(secondIssue.body.id);
+
+    const closed = await http()
+      .post(`/${API_PREFIX}/production-batches/${closeBatchId}/close`)
+      .set(auth(token));
+    expect(closed.status).toBe(200);
+    expect(closed.body.status).toBe('closed');
+    expect(closed.body.pendingAmount).toBe('0.00');
+    expect(closed.body.closedSettledAmount).toBe('1000.00');
+    expect(closed.body.timberVolume).toBe('1.0000');
+    expect(closed.body.timberAmount).toBe('2000.00');
+
+    const list = await http()
+      .get(`/${API_PREFIX}/production-batches`)
+      .set(auth(token))
+      .query({ status: 'closed', page: 1, pageSize: 100 });
+    expect(list.status).toBe(200);
+    expect(list.body.items.map((item: { code: string }) => item.code)).toContain(batch.body.code);
+
+    const createLocked = await createIssue(`it-close-issue-3-${stamp}`, {
+      issueDate: '2099-02-04',
+      tons: '1.000',
+      note: '',
+      batchId: closeBatchId,
+    });
+    expect(createLocked.status).toBe(409);
+    expect(createLocked.body.code).toBe('BATCH_CLOSED');
+
+    const updateLocked = await http()
+      .put(`/${API_PREFIX}/material-issues/${secondIssue.body.id}`)
+      .set(auth(token))
+      .send({ issueDate: '2099-02-04', tons: '1.000', note: '', batchId: closeBatchId });
+    expect(updateLocked.status).toBe(409);
+    expect(updateLocked.body.code).toBe('BATCH_CLOSED');
+
+    const deleteLocked = await http()
+      .delete(`/${API_PREFIX}/material-issues/${secondIssue.body.id}`)
+      .set(auth(token));
+    expect(deleteLocked.status).toBe(409);
+    expect(deleteLocked.body.code).toBe('BATCH_CLOSED');
+  });
+
+  it('生产批次批量关闭：跳过已关闭；任一批次待结转无库存则整批拒绝', async () => {
+    async function makeBatch(key: string, withOutput: boolean): Promise<string> {
+      const batch = await http()
+        .post(`/${API_PREFIX}/production-batches`)
+        .set(auth(token))
+        .set('Idempotency-Key', `it-batch-${key}-${stamp}`)
+        .send({ batchDate: '2099-03-01', note: `批量关闭测试 ${key}` });
+      expect(batch.status).toBe(201);
+      const id = batch.body.id as string;
+      batchIds.push(id);
+      const issue = await createIssue(`it-batch-${key}-issue-${stamp}`, {
+        issueDate: '2099-03-02',
+        tons: '2.000',
+        note: '',
+        batchId: id,
+      });
+      expect(issue.status).toBe(201);
+      issueIds.push(issue.body.id);
+      if (withOutput) {
+        const output = await createOutput(`it-batch-${key}-output-${stamp}`, {
+          outputDate: '2099-03-02',
+          note: '',
+          batchId: id,
+          outputs: [{ lengthMm: 2500, widthMm: 100, heightMm: 20, pieces: 200, note: '' }],
+        });
+        expect(output.status).toBe(201);
+        outputIds.push(output.body.id);
+      }
+      return id;
+    }
+
+    const openId = await makeBatch('open', true);
+    const closedId = await makeBatch('closed', true);
+    const closed = await http()
+      .post(`/${API_PREFIX}/production-batches/${closedId}/close`)
+      .set(auth(token));
+    expect(closed.status).toBe(200);
+
+    const result = await http()
+      .post(`/${API_PREFIX}/production-batches/batch-close`)
+      .set(auth(token))
+      .send({ ids: [openId, closedId] });
+    expect(result.status).toBe(200);
+    expect(result.body).toEqual({ closed: 1, skipped: 1 });
+    expect((await db.productionBatch.findUnique({ where: { id: openId } }))?.status).toBe('CLOSED');
+
+    const blockedId = await makeBatch('blocked', false);
+    const validId = await makeBatch('valid', true);
+    const rejected = await http()
+      .post(`/${API_PREFIX}/production-batches/batch-close`)
+      .set(auth(token))
+      .send({ ids: [blockedId, validId] });
+    expect(rejected.status).toBe(409);
+    expect(rejected.body.code).toBe('BATCH_PENDING_NO_STOCK');
+    expect((await db.productionBatch.findUnique({ where: { id: validId } }))?.status).toBe('OPEN');
   });
 
   it('权限：工人无领用 / 产出 / 库存权限；财务可看库存、盘点与两张单据但不能新建', async () => {

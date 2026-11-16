@@ -48,6 +48,9 @@ export default function MobileEditMaterialIssuePage(): React.ReactElement {
         issueDate: query.data.issueDate,
         tons: query.data.tons,
         note: query.data.note,
+        batchId: query.data.batchId,
+        batchCode: query.data.batchCode,
+        batchStatus: query.data.batchStatus,
       }}
     />
   );

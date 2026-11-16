@@ -27,6 +27,10 @@ import {
   materialIssueInputSchema,
   materialIssueListQuerySchema,
   materialIssueUpdateSchema,
+  productionBatchInputSchema,
+  productionBatchListQuerySchema,
+  productionBatchBatchCloseSchema,
+  productionBatchUpdateSchema,
   productionOutputBatchDeleteSchema,
   productionOutputInputSchema,
   productionOutputListQuerySchema,
@@ -38,6 +42,10 @@ import {
   type MaterialIssueInput,
   type MaterialIssueListQuery,
   type MaterialIssueUpdateInput,
+  type ProductionBatchInput,
+  type ProductionBatchListQuery,
+  type ProductionBatchBatchCloseInput,
+  type ProductionBatchUpdateInput,
   type ProductionOutputBatchDeleteInput,
   type ProductionOutputInput,
   type ProductionOutputListQuery,
@@ -65,6 +73,11 @@ import {
   MaterialIssueBodyDto,
   MaterialIssueDto,
   MaterialIssueListDto,
+  ProductionBatchBodyDto,
+  ProductionBatchBatchCloseBodyDto,
+  ProductionBatchBatchCloseResponseDto,
+  ProductionBatchDetailDto,
+  ProductionBatchListDto,
   ProductionOutputBatchDeleteBodyDto,
   ProductionOutputBatchDeleteResponseDto,
   ProductionOutputBodyDto,
@@ -84,6 +97,105 @@ export class ProductionController {
     private readonly productionService: ProductionService,
     private readonly redis: RedisService,
   ) {}
+
+  // ── 生产批次 ──────────────────────────────────────────
+
+  @Get('production-batches')
+  @RequireScopes('production:view')
+  @ApiOperation({ summary: '生产批次列表：批次日期区间 + 状态 + 分页' })
+  @ApiQuery({ name: 'dateFrom', required: false, type: String, description: '批次日期起（YYYY-MM-DD）' })
+  @ApiQuery({ name: 'dateTo', required: false, type: String, description: '批次日期止（YYYY-MM-DD）' })
+  @ApiQuery({ name: 'status', required: false, enum: ['open', 'closed'], description: '批次状态' })
+  @ApiQuery({ name: 'page', required: false, type: Number, description: '页码，默认 1' })
+  @ApiQuery({ name: 'pageSize', required: false, type: Number, description: '每页条数，默认 20（最大 100）' })
+  @ApiOkResponse({ type: ProductionBatchListDto })
+  listBatches(
+    @Query(new ZodValidationPipe(productionBatchListQuerySchema)) query: ProductionBatchListQuery,
+  ): Promise<ProductionBatchListDto> {
+    return this.productionService.listBatches(query);
+  }
+
+  @Get('production-batches/:id')
+  @RequireScopes('production:view')
+  @ApiOperation({ summary: '生产批次详情：成本池 + 领用 / 产出 / 方木明细' })
+  @ApiOkResponse({ type: ProductionBatchDetailDto })
+  batchDetail(@Param('id', ParseUUIDPipe) id: string): Promise<ProductionBatchDetailDto> {
+    return this.productionService.batchDetail(id);
+  }
+
+  @Post('production-batches')
+  @RequireScopes('production:manage')
+  @AuditAction({
+    domain: 'production',
+    action: 'create-batch',
+    label: '新建生产批次',
+    objectType: 'production_batch',
+  })
+  @HttpCode(201)
+  @ApiOperation({ summary: '新建生产批次；重复提交防抖：请求头 Idempotency-Key' })
+  @ApiBody({ type: ProductionBatchBodyDto })
+  @ApiCreatedResponse({ type: ProductionBatchDetailDto })
+  async createBatch(
+    @CurrentUser() user: AuthUser,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body(new ZodValidationPipe(productionBatchInputSchema)) body: ProductionBatchInput,
+  ): Promise<ProductionBatchDetailDto> {
+    return withIdempotency(this.redis, user.userId, 'production-batches', idempotencyKey, () =>
+      this.productionService.createBatch(body),
+    );
+  }
+
+  @Post('production-batches/batch-close')
+  @RequireScopes('production:manage')
+  @AuditAction({
+    domain: 'production',
+    action: 'batch-close-batches',
+    label: '批量关闭生产批次',
+    objectType: 'production_batch',
+  })
+  @HttpCode(200)
+  @ApiOperation({ summary: '批量关闭生产批次：已关闭 / 不存在跳过；任一批次待结转无库存则整批拒绝' })
+  @ApiBody({ type: ProductionBatchBatchCloseBodyDto })
+  @ApiOkResponse({ type: ProductionBatchBatchCloseResponseDto })
+  closeBatches(
+    @Body(new ZodValidationPipe(productionBatchBatchCloseSchema))
+    body: ProductionBatchBatchCloseInput,
+  ): Promise<{ closed: number; skipped: number }> {
+    return this.productionService.closeBatches(body.ids);
+  }
+
+  @Put('production-batches/:id')
+  @RequireScopes('production:manage')
+  @AuditAction({
+    domain: 'production',
+    action: 'update-batch',
+    label: '编辑生产批次',
+    objectType: 'production_batch',
+  })
+  @ApiOperation({ summary: '编辑生产批次（仅进行中批次）' })
+  @ApiBody({ type: ProductionBatchBodyDto })
+  @ApiOkResponse({ type: ProductionBatchDetailDto })
+  updateBatch(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(productionBatchUpdateSchema)) body: ProductionBatchUpdateInput,
+  ): Promise<ProductionBatchDetailDto> {
+    return this.productionService.updateBatch(id, body);
+  }
+
+  @Post('production-batches/:id/close')
+  @RequireScopes('production:manage')
+  @AuditAction({
+    domain: 'production',
+    action: 'close-batch',
+    label: '关闭生产批次',
+    objectType: 'production_batch',
+  })
+  @HttpCode(200)
+  @ApiOperation({ summary: '关闭生产批次：剩余待结转一次性转入本批次方木池' })
+  @ApiOkResponse({ type: ProductionBatchDetailDto })
+  closeBatch(@Param('id', ParseUUIDPipe) id: string): Promise<ProductionBatchDetailDto> {
+    return this.productionService.closeBatch(id);
+  }
 
   // ── 原木领用 ──────────────────────────────────────────
 

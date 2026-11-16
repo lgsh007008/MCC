@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { MobileField } from '@/components/mobile/field';
 import { MobileActionBar, MobileHeader } from '@/components/mobile/mobile-shell';
@@ -44,6 +45,9 @@ export interface MobileProductionOutputFormInitial {
   code: string;
   outputDate: string;
   note: string;
+  batchId: string;
+  batchCode: string;
+  batchStatus: string;
   outputs: Array<{
     id: string;
     lengthMm: number;
@@ -64,6 +68,7 @@ export function MobileProductionOutputForm({
   const confirm = useConfirm();
   const [outputDate, setOutputDate] = useState(initial?.outputDate ?? localToday());
   const [note, setNote] = useState(initial?.note ?? '');
+  const [batchId, setBatchId] = useState(initial?.batchId ?? '');
   const [rows, setRows] = useState<Row[]>(
     initial
       ? initial.outputs.map((output) => ({
@@ -79,18 +84,28 @@ export function MobileProductionOutputForm({
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  // 待结转来源提示（product/生产与库存.md R-生产-005）
-  const summaryQuery = useQuery({
-    queryKey: ['inventory-summary'],
-    queryFn: async (): Promise<ApiSchemas['InventorySummaryDto']> => {
-      const { data, response } = await api.GET('/api/v1/inventory/summary');
-      if (!response.ok || !data) {
-        throw new Error('库存加载失败');
-      }
-      return data;
+  // 生产批次待结转提示（product/生产与库存.md R-生产-005）
+  const batchQuery = useQuery({
+    queryKey: ['production-batches', 'open'],
+    queryFn: async (): Promise<ApiSchemas['ProductionBatchDto'][]> => {
+      const { data, response } = await api.GET('/api/v1/production-batches', {
+        params: { query: { status: 'open', page: 1, pageSize: 100 } },
+      });
+      return response.ok && data ? data.items : [];
     },
   });
-  const summary = summaryQuery.data;
+  const batchOptions: Array<{ value: string; label: string; disabled?: boolean }> = (batchQuery.data ?? []).map((batch) => ({
+    value: batch.id,
+    label: `${batch.code} · ${batch.batchDate}`,
+  }));
+  if (initial && !batchOptions.some((option) => option.value === initial.batchId)) {
+    batchOptions.push({
+      value: initial.batchId,
+      label: `${initial.batchCode}（已关闭）`,
+      disabled: true,
+    });
+  }
+  const selectedBatch = (batchQuery.data ?? []).find((batch) => batch.id === batchId);
 
   const totalVolume = sumVolumes(
     rows.map((row) =>
@@ -110,6 +125,10 @@ export function MobileProductionOutputForm({
       setError('请选择产出日期');
       return;
     }
+    if (!batchId) {
+      setError('请选择生产批次');
+      return;
+    }
     for (const [index, row] of rows.entries()) {
       if (!intOk(row.lengthMm) || !intOk(row.widthMm) || !intOk(row.heightMm)) {
         setError(`第 ${index + 1} 行：长宽高须为大于 0 的整数毫米`);
@@ -123,6 +142,7 @@ export function MobileProductionOutputForm({
     const body = {
       outputDate,
       note,
+      batchId,
       outputs: rows.map((row) => ({
         ...(row.id ? { id: row.id } : {}),
         lengthMm: Number(row.lengthMm),
@@ -135,7 +155,7 @@ export function MobileProductionOutputForm({
     setSaving(true);
     try {
       if (!initial) {
-        const warnings = await outputCostWarnings(outputDate);
+        const warnings = await outputCostWarnings(outputDate, batchId);
         if (warnings.length > 0) {
           const proceed = await confirm({
             title: '产出成本提示',
@@ -161,6 +181,7 @@ export function MobileProductionOutputForm({
       }
       await queryClient.invalidateQueries({ queryKey: ['production-outputs'] });
       await queryClient.invalidateQueries({ queryKey: ['inventory-summary'] });
+      await queryClient.invalidateQueries({ queryKey: ['production-batches'] });
       router.push(`/m/production/outputs/${data.id}`);
     } catch {
       setError('保存失败，请稍后重试');
@@ -180,6 +201,16 @@ export function MobileProductionOutputForm({
           <MobileField label="产出日期">
             <DatePicker value={outputDate} onChange={setOutputDate} size="touch" />
           </MobileField>
+          <MobileField label="生产批次">
+            <Select
+              ariaLabel="生产批次"
+              value={batchId}
+              onChange={setBatchId}
+              options={batchOptions}
+              placeholder={batchQuery.isPending ? '加载中…' : '请选择进行中的批次'}
+              className="h-12 w-full text-mobile-body"
+            />
+          </MobileField>
           <MobileField label="备注">
             <Textarea
               value={note}
@@ -190,22 +221,23 @@ export function MobileProductionOutputForm({
             />
           </MobileField>
           <p className="text-mobile-label text-muted-foreground">
-            每次产出会把当时整个待结转池一次性全额转入方木池，不做部分结转；同一批领用请在一张产出单内录完。
+            每次产出把所选批次的待结转一次性全额转入本批次方木池，不做部分结转；同一批领用请在一张产出单内录完。
           </p>
-          {summary && !summary.needsOpening ? (
-            summary.pendingAmount === '0.00' ? (
+          {selectedBatch ? (
+            selectedBatch.pendingAmount === '0.00' ? (
               <p className="text-mobile-label text-destructive">
-                当前没有待结转成本，产出将按 0 成本入库；请先录原木领用。
+                当前批次没有待结转成本，产出将按 0 成本入库；请先在本批次录原木领用。
               </p>
             ) : (
               <p className="text-mobile-label text-muted-foreground">
-                当前待结转 {formatAmount(summary.pendingAmount)} 元，来自{' '}
-                {summary.earliestPendingIssueCode}
-                {summary.pendingIssueCount > 1 ? ` 等 ${summary.pendingIssueCount} 笔领用` : ' 这笔领用'}
-                ；保存后全部转入方木池。
+                当前批次待结转 {formatAmount(selectedBatch.pendingAmount)} 元；保存后全额转入本批次方木池。
               </p>
             )
-          ) : null}
+          ) : (
+            <p className="text-mobile-label text-muted-foreground">
+              请选择生产批次；没有进行中的批次时，先到「生产 → 生产批次」新建。
+            </p>
+          )}
         </section>
 
         <section className="space-y-3">

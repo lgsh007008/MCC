@@ -3,6 +3,7 @@ import { Prisma } from '@mcc/db';
 import {
   calcInventoryTotalAmount,
   calcMaterialCostAmount,
+  calcTimberSaleCost,
   calcVolumeM3,
   divRoundHalfUp,
   foldInventoryEvents,
@@ -18,9 +19,13 @@ import {
   type MaterialIssueListQuery,
   type MaterialIssueUpdateInput,
   type OutputSettlement,
+  type ProductionBatchInput,
+  type ProductionBatchListQuery,
+  type ProductionBatchUpdateInput,
   type ProductionOutputInput,
   type ProductionOutputListQuery,
   type ProductionOutputUpdateInput,
+  type SaleCostLayer,
 } from '@mcc/shared';
 import { problem } from '../../common/http-problem.js';
 import { PrismaService } from '../../common/prisma.service.js';
@@ -28,6 +33,7 @@ import { currentTenantId } from '../../common/prisma-tenant.extension.js';
 import type {
   InventoryAdjustmentItemDto,
   InventoryAdjustmentResultDto,
+  InventoryBatchDto,
   InventoryCountDetailDto,
   InventoryCountListDto,
   InventoryOpeningDetailDto,
@@ -37,6 +43,12 @@ import type {
 import type {
   MaterialIssueDto,
   MaterialIssueListDto,
+  ProductionBatchDetailDto,
+  ProductionBatchDto,
+  ProductionBatchIssueDto,
+  ProductionBatchListDto,
+  ProductionBatchOutputDto,
+  ProductionBatchTimberLineDto,
   ProductionOutputDto,
   ProductionOutputLineDto,
   ProductionOutputListItemDto,
@@ -47,11 +59,16 @@ const CODE_RETRY_LIMIT = 3;
 const ISSUE_PREFIX = 'MI-';
 const OUTPUT_PREFIX = 'PR-';
 const ADJUSTMENT_PREFIX = 'IC-';
+const BATCH_PREFIX = 'BT-';
 const CODE_PAD = 5;
 
-type OutputWithLines = Prisma.ProductionOutputGetPayload<{ include: { lines: true } }>;
+type BatchRow = Prisma.ProductionBatchGetPayload<Record<string, never>>;
+type IssueRow = Prisma.MaterialIssueGetPayload<{ include: { batch: true } }>;
+type OutputWithLines = Prisma.ProductionOutputGetPayload<{
+  include: { lines: true; batch: true };
+}>;
 type OutputListRow = Prisma.ProductionOutputGetPayload<{
-  include: { lines: { select: { volumeM3: true } } };
+  include: { lines: { select: { volumeM3: true } }; batch: true };
 }>;
 type OpeningRow = Prisma.InventoryAdjustmentGetPayload<{ include: { items: true } }>;
 
@@ -69,6 +86,7 @@ const timberKey = (lengthMm: number, widthMm: number, heightMm: number): string 
   `${lengthMm}x${widthMm}x${heightMm}`;
 
 const isNegative = (value: string): boolean => value.startsWith('-');
+const isNegativeOrZero = (value: string): boolean => toScaled(value, 4) <= 0n;
 
 function diffQuantity(actual: string, book: string, scale: 3 | 4): string {
   return fromScaled(toScaled(actual, scale) - toScaled(book, scale), scale);
@@ -99,6 +117,9 @@ const EMPTY_SUMMARY: InventorySummaryDto = {
   raw: { quantity: '0.000', unitCost: '0.000000', amount: '0.00', negative: false },
   timber: { quantity: '0.0000', unitCost: '0.000000', amount: '0.00', negative: false },
   timberLines: [],
+  batches: [],
+  shortfallVolume: '0.0000',
+  shortfallAmount: '0.00',
   totalAmount: '0.00',
   pendingAmount: '0.00',
   pendingIssueCount: 0,
@@ -118,14 +139,7 @@ export class ProductionService {
   }
 
   private toIssueDto(
-    row: {
-      id: string;
-      code: string;
-      issueDate: Date;
-      tons: Prisma.Decimal;
-      note: string;
-      createdAt: Date;
-    },
+    row: IssueRow,
     settlement?: IssueSettlement,
   ): MaterialIssueDto {
     const settled = settlement?.settled ?? '0.00';
@@ -141,6 +155,9 @@ export class ProductionService {
       settledAmount: settled,
       pendingAmount: remaining,
       settledByCodes: settlement?.settledBy ?? [],
+      batchId: row.batchId,
+      batchCode: row.batch.code,
+      batchStatus: row.batch.status === 'OPEN' ? 'open' : 'closed',
       createdAt: row.createdAt.toISOString(),
     };
   }
@@ -176,6 +193,9 @@ export class ProductionService {
     if (dateFilter) {
       where.issueDate = dateFilter;
     }
+    if (query.batchId) {
+      where.batchId = query.batchId;
+    }
     const maps = await this.settlementMaps();
     if (query.settlementStatus) {
       const wantPending = query.settlementStatus === 'pending';
@@ -192,6 +212,7 @@ export class ProductionService {
         orderBy: [{ issueDate: 'desc' }, { createdAt: 'desc' }],
         skip: (query.page - 1) * query.pageSize,
         take: query.pageSize,
+        include: { batch: true },
       }),
       this.prisma.client.materialIssue.aggregate({ where, _sum: { tons: true } }),
     ]);
@@ -203,7 +224,10 @@ export class ProductionService {
   }
 
   async issueDetail(id: string): Promise<MaterialIssueDto> {
-    const row = await this.prisma.client.materialIssue.findUnique({ where: { id } });
+    const row = await this.prisma.client.materialIssue.findUnique({
+      where: { id },
+      include: { batch: true },
+    });
     if (!row || row.deletedAt !== null) {
       throw problem(404, 'NOT_FOUND', '原木领用单不存在');
     }
@@ -212,6 +236,7 @@ export class ProductionService {
   }
 
   async createIssue(input: MaterialIssueInput): Promise<MaterialIssueDto> {
+    await this.assertOpenBatch(input.batchId);
     for (let attempt = 0; attempt < CODE_RETRY_LIMIT; attempt++) {
       try {
         const created = await this.prisma.client.$transaction(async (tx) => {
@@ -223,6 +248,7 @@ export class ProductionService {
               issueDate: toDate(input.issueDate),
               tons: input.tons,
               note: input.note,
+              batchId: input.batchId,
             },
           });
         });
@@ -244,33 +270,48 @@ export class ProductionService {
   async updateIssue(id: string, input: MaterialIssueUpdateInput): Promise<MaterialIssueDto> {
     const existing = await this.prisma.client.materialIssue.findUnique({
       where: { id },
-      select: { id: true, deletedAt: true },
+      select: { id: true, tenantId: true, deletedAt: true, batch: { select: { status: true } } },
     });
     if (!existing || existing.deletedAt !== null) {
       throw problem(404, 'NOT_FOUND', '原木领用单不存在');
     }
+    this.assertBatchEditable(existing.batch.status, '原木领用单');
+    await this.assertOpenBatch(input.batchId);
     await this.prisma.client.materialIssue.updateMany({
       where: { id },
       data: {
         issueDate: toDate(input.issueDate),
         tons: input.tons,
         note: input.note,
+        batchId: input.batchId,
       },
     });
     return this.issueDetail(id);
   }
 
   async removeIssue(id: string): Promise<void> {
-    const updated = await this.prisma.client.materialIssue.updateMany({
+    const existing = await this.prisma.client.materialIssue.findUnique({
+      where: { id },
+      select: { id: true, tenantId: true, deletedAt: true, batch: { select: { status: true } } },
+    });
+    if (!existing || existing.deletedAt !== null) {
+      throw problem(404, 'NOT_FOUND', '原木领用单不存在');
+    }
+    this.assertBatchEditable(existing.batch.status, '原木领用单');
+    await this.prisma.client.materialIssue.updateMany({
       where: { id, deletedAt: null },
       data: { deletedAt: new Date() },
     });
-    if (updated.count === 0) {
-      throw problem(404, 'NOT_FOUND', '原木领用单不存在');
-    }
   }
 
   async removeIssues(ids: string[]): Promise<{ deleted: number }> {
+    const rows = await this.prisma.client.materialIssue.findMany({
+      where: { id: { in: ids }, deletedAt: null },
+      select: { batch: { select: { status: true } } },
+    });
+    if (rows.some((row) => row.batch.status === 'CLOSED')) {
+      throw problem(409, 'BATCH_CLOSED', '已关闭批次的领用单不能删除');
+    }
     const updated = await this.prisma.client.materialIssue.updateMany({
       where: { id: { in: ids }, deletedAt: null },
       data: { deletedAt: new Date() },
@@ -313,6 +354,9 @@ export class ProductionService {
       lineCount: row.lines.length,
       totalVolume: sumVolumes(row.lines.map((line) => line.volumeM3.toString())),
       settledAmount,
+      batchId: row.batchId,
+      batchCode: row.batch.code,
+      batchStatus: row.batch.status === 'OPEN' ? 'open' : 'closed',
       note: row.note,
       createdAt: row.createdAt.toISOString(),
     };
@@ -328,6 +372,9 @@ export class ProductionService {
       totalVolume: sumVolumes(active.map((line) => line.volumeM3.toString())),
       settledAmount: settlement?.amount ?? '0.00',
       sourceIssueCodes: settlement?.sources ?? [],
+      batchId: row.batchId,
+      batchCode: row.batch.code,
+      batchStatus: row.batch.status === 'OPEN' ? 'open' : 'closed',
       note: row.note,
       createdAt: row.createdAt.toISOString(),
       outputs: active
@@ -352,6 +399,9 @@ export class ProductionService {
     if (dateFilter) {
       where.outputDate = dateFilter;
     }
+    if (query.batchId) {
+      where.batchId = query.batchId;
+    }
     const [total, rows, sum] = await Promise.all([
       this.prisma.client.productionOutput.count({ where }),
       this.prisma.client.productionOutput.findMany({
@@ -359,12 +409,19 @@ export class ProductionService {
         orderBy: [{ outputDate: 'desc' }, { createdAt: 'desc' }],
         skip: (query.page - 1) * query.pageSize,
         take: query.pageSize,
-        include: { lines: { where: { deletedAt: null }, select: { volumeM3: true } } },
+        include: {
+          lines: { where: { deletedAt: null }, select: { volumeM3: true } },
+          batch: true,
+        },
       }),
       this.prisma.client.productionOutputLine.aggregate({
         where: {
           deletedAt: null,
-          output: { deletedAt: null, ...(dateFilter ? { outputDate: dateFilter } : {}) },
+          output: {
+            deletedAt: null,
+            ...(dateFilter ? { outputDate: dateFilter } : {}),
+            ...(query.batchId ? { batchId: query.batchId } : {}),
+          },
         },
         _sum: { volumeM3: true },
       }),
@@ -382,7 +439,10 @@ export class ProductionService {
   async outputDetail(id: string): Promise<ProductionOutputDto> {
     const row = await this.prisma.client.productionOutput.findUnique({
       where: { id },
-      include: { lines: { where: { deletedAt: null }, orderBy: { seq: 'asc' } } },
+      include: {
+        lines: { where: { deletedAt: null }, orderBy: { seq: 'asc' } },
+        batch: true,
+      },
     });
     if (!row || row.deletedAt !== null) {
       throw problem(404, 'NOT_FOUND', '方木产出单不存在');
@@ -412,6 +472,7 @@ export class ProductionService {
   }
 
   async createOutput(input: ProductionOutputInput): Promise<ProductionOutputDto> {
+    await this.assertOpenBatch(input.batchId);
     const lines = this.computeLines(input.outputs);
     for (let attempt = 0; attempt < CODE_RETRY_LIMIT; attempt++) {
       try {
@@ -423,6 +484,7 @@ export class ProductionService {
               code,
               outputDate: toDate(input.outputDate),
               note: input.note,
+              batchId: input.batchId,
             },
           });
           await tx.productionOutputLine.createMany({
@@ -453,11 +515,13 @@ export class ProductionService {
   async updateOutput(id: string, input: ProductionOutputUpdateInput): Promise<ProductionOutputDto> {
     const existing = await this.prisma.client.productionOutput.findUnique({
       where: { id },
-      select: { id: true, deletedAt: true },
+      select: { id: true, tenantId: true, deletedAt: true, batch: { select: { status: true } } },
     });
     if (!existing || existing.deletedAt !== null) {
       throw problem(404, 'NOT_FOUND', '方木产出单不存在');
     }
+    this.assertBatchEditable(existing.batch.status, '方木产出单');
+    await this.assertOpenBatch(input.batchId);
 
     await this.prisma.client.$transaction(async (tx) => {
       await tx.productionOutput.updateMany({
@@ -465,6 +529,7 @@ export class ProductionService {
         data: {
           outputDate: toDate(input.outputDate),
           note: input.note,
+          batchId: input.batchId,
         },
       });
       const existingRows = await tx.productionOutputLine.findMany({
@@ -501,30 +566,35 @@ export class ProductionService {
   }
 
   async removeOutput(id: string): Promise<void> {
-    const result = await this.prisma.client.$transaction(async (tx) => {
-      const updated = await tx.productionOutput.updateMany({
+    const existing = await this.prisma.client.productionOutput.findUnique({
+      where: { id },
+      select: { id: true, tenantId: true, deletedAt: true, batch: { select: { status: true } } },
+    });
+    if (!existing || existing.deletedAt !== null) {
+      throw problem(404, 'NOT_FOUND', '方木产出单不存在');
+    }
+    this.assertBatchEditable(existing.batch.status, '方木产出单');
+    await this.prisma.client.$transaction(async (tx) => {
+      await tx.productionOutput.updateMany({
         where: { id, deletedAt: null },
         data: { deletedAt: new Date() },
       });
-      if (updated.count > 0) {
-        await tx.productionOutputLine.updateMany({
-          where: { outputId: id, deletedAt: null },
-          data: { deletedAt: new Date() },
-        });
-      }
-      return updated;
+      await tx.productionOutputLine.updateMany({
+        where: { outputId: id, deletedAt: null },
+        data: { deletedAt: new Date() },
+      });
     });
-    if (result.count === 0) {
-      throw problem(404, 'NOT_FOUND', '方木产出单不存在');
-    }
   }
 
   async removeOutputs(ids: string[]): Promise<{ deleted: number }> {
     return this.prisma.client.$transaction(async (tx) => {
       const rows = await tx.productionOutput.findMany({
         where: { id: { in: ids }, deletedAt: null },
-        select: { id: true },
+        select: { id: true, batch: { select: { status: true } } },
       });
+      if (rows.some((row) => row.batch.status === 'CLOSED')) {
+        throw problem(409, 'BATCH_CLOSED', '已关闭批次的方木产出单不能删除');
+      }
       if (rows.length === 0) {
         return { deleted: 0 };
       }
@@ -541,6 +611,321 @@ export class ProductionService {
     });
   }
 
+  // ── 生产批次（轻量成本对象）─────────────────────────────
+
+  private async nextBatchCode(tx: Prisma.TransactionClient): Promise<string> {
+    const last = await tx.productionBatch.findFirst({
+      where: { code: { startsWith: BATCH_PREFIX } },
+      orderBy: { code: 'desc' },
+      select: { code: true },
+    });
+    const seq = last ? Number(last.code.slice(BATCH_PREFIX.length)) + 1 : 1;
+    return `${BATCH_PREFIX}${String(seq).padStart(CODE_PAD, '0')}`;
+  }
+
+  private async assertOpenBatch(batchId: string): Promise<BatchRow> {
+    const batch = await this.prisma.client.productionBatch.findUnique({ where: { id: batchId } });
+    if (!batch || batch.deletedAt !== null) {
+      throw problem(404, 'BATCH_NOT_FOUND', '生产批次不存在');
+    }
+    if (batch.status === 'CLOSED') {
+      throw problem(409, 'BATCH_CLOSED', '批次已关闭，不能新增或调整单据');
+    }
+    return batch;
+  }
+
+  private assertBatchEditable(status: string, label: string): void {
+    if (status === 'CLOSED') {
+      throw problem(409, 'BATCH_CLOSED', `${label}所属批次已关闭，不能修改或删除`);
+    }
+  }
+
+  // 期初方木归属「期初库存批次」；首次需要时自动创建，之后只读复用
+  private async ensureOpeningBatch(): Promise<BatchRow | null> {
+    const opening = await this.findOpening();
+    if (!opening) {
+      return null;
+    }
+    const timberItems = opening.items.filter(
+      (item) => item.targetType === 'TIMBER' && item.deletedAt === null,
+    );
+    if (timberItems.length === 0) {
+      return null;
+    }
+    const existing = await this.prisma.client.productionBatch.findFirst({
+      where: { kind: 'OPENING', deletedAt: null },
+      orderBy: { createdAt: 'asc' },
+    });
+    if (existing) {
+      if (isoDate(existing.batchDate) !== isoDate(opening.adjustmentDate)) {
+        return this.prisma.client.productionBatch.update({
+          where: { id: existing.id },
+          data: { batchDate: opening.adjustmentDate },
+        });
+      }
+      return existing;
+    }
+    for (let attempt = 0; attempt < CODE_RETRY_LIMIT; attempt++) {
+      try {
+        return await this.prisma.client.$transaction(async (tx) => {
+          const code = await this.nextBatchCode(tx);
+          return tx.productionBatch.create({
+            data: {
+              tenantId: currentTenantId(),
+              code,
+              batchDate: opening.adjustmentDate,
+              status: 'CLOSED',
+              kind: 'OPENING',
+              note: '期初库存批次',
+              closedAt: new Date(),
+            },
+          });
+        });
+      } catch (error) {
+        if (
+          attempt < CODE_RETRY_LIMIT - 1 &&
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === 'P2002'
+        ) {
+          continue;
+        }
+        throw error;
+      }
+    }
+    throw new Error('unreachable');
+  }
+
+  private toBatchDto(
+    row: BatchRow,
+    pool?: {
+      timberVolume: string;
+      timberAmount: string;
+      timberUnitCost: string;
+      pendingAmount: string;
+      closedSettledAmount: string;
+    },
+    issueCount = 0,
+    outputCount = 0,
+  ): ProductionBatchDto {
+    return {
+      id: row.id,
+      code: row.code,
+      batchDate: isoDate(row.batchDate),
+      status: row.status === 'OPEN' ? 'open' : 'closed',
+      kind: row.kind === 'OPENING' ? 'opening' : 'production',
+      note: row.note,
+      closedAt: row.closedAt?.toISOString() ?? null,
+      createdAt: row.createdAt.toISOString(),
+      timberVolume: pool?.timberVolume ?? '0.0000',
+      timberAmount: pool?.timberAmount ?? '0.00',
+      timberUnitCost: pool?.timberUnitCost ?? '0.000000',
+      pendingAmount: pool?.pendingAmount ?? '0.00',
+      closedSettledAmount: pool?.closedSettledAmount ?? '0.00',
+      issueCount,
+      outputCount,
+    };
+  }
+
+  private async batchPoolMap(): Promise<Map<string, ReturnType<typeof foldInventoryEvents>['batches'][number]>> {
+    const { events } = await this.buildInventoryEvents();
+    return new Map(foldInventoryEvents(events).batches.map((batch) => [batch.ref, batch]));
+  }
+
+  async listBatches(query: ProductionBatchListQuery): Promise<ProductionBatchListDto> {
+    const where: Prisma.ProductionBatchWhereInput = { deletedAt: null };
+    const dateFilter = dateFilterFrom(query);
+    if (dateFilter) {
+      where.batchDate = dateFilter;
+    }
+    if (query.status) {
+      where.status = query.status === 'open' ? 'OPEN' : 'CLOSED';
+    }
+    const [total, rows, poolMap] = await Promise.all([
+      this.prisma.client.productionBatch.count({ where }),
+      this.prisma.client.productionBatch.findMany({
+        where,
+        orderBy: [{ batchDate: 'desc' }, { code: 'desc' }],
+        skip: (query.page - 1) * query.pageSize,
+        take: query.pageSize,
+        include: {
+          _count: {
+            select: {
+              issues: { where: { deletedAt: null } },
+              outputs: { where: { deletedAt: null } },
+            },
+          },
+        },
+      }),
+      this.batchPoolMap(),
+    ]);
+    return {
+      total,
+      items: rows.map((row) =>
+        this.toBatchDto(row, poolMap.get(row.code), row._count.issues, row._count.outputs),
+      ),
+    };
+  }
+
+  async batchDetail(id: string): Promise<ProductionBatchDetailDto> {
+    const row = await this.prisma.client.productionBatch.findUnique({
+      where: { id },
+      include: {
+        issues: { where: { deletedAt: null }, orderBy: { issueDate: 'asc' } },
+        outputs: {
+          where: { deletedAt: null },
+          orderBy: { outputDate: 'asc' },
+          include: { lines: { where: { deletedAt: null } } },
+        },
+      },
+    });
+    if (!row || row.deletedAt !== null) {
+      throw problem(404, 'NOT_FOUND', '生产批次不存在');
+    }
+    const maps = await this.settlementMaps();
+    const pool = (await this.batchPoolMap()).get(row.code);
+    const timberLines: ProductionBatchTimberLineDto[] = Object.entries(pool?.specs ?? {})
+      .map(([key, quantity]) => {
+        const [lengthMm = 0, widthMm = 0, heightMm = 0] = key.split('x').map(Number);
+        const unitCost = pool?.timberUnitCost ?? '0.000000';
+        return {
+          lengthMm,
+          widthMm,
+          heightMm,
+          quantity,
+          unitCost,
+          amount: calcMaterialCostAmount(quantity, unitCost),
+        };
+      })
+      .sort(
+        (left, right) =>
+          left.lengthMm - right.lengthMm ||
+          left.widthMm - right.widthMm ||
+          left.heightMm - right.heightMm,
+      );
+    const issues: ProductionBatchIssueDto[] = row.issues.map((issue) => {
+      const settlement = maps.issues.get(issue.code);
+      return {
+        id: issue.id,
+        code: issue.code,
+        issueDate: isoDate(issue.issueDate),
+        tons: tons(issue.tons),
+        settledAmount: settlement?.settled ?? '0.00',
+        pendingAmount: settlement?.remaining ?? '0.00',
+      };
+    });
+    const outputs: ProductionBatchOutputDto[] = row.outputs.map((output) => ({
+      id: output.id,
+      code: output.code,
+      outputDate: isoDate(output.outputDate),
+      totalVolume: sumVolumes(output.lines.map((line) => line.volumeM3.toString())),
+      settledAmount: maps.outputs.get(output.code)?.amount ?? '0.00',
+    }));
+    return {
+      ...this.toBatchDto(row, pool, issues.length, outputs.length),
+      issues,
+      outputs,
+      timberLines,
+    };
+  }
+
+  async createBatch(input: ProductionBatchInput): Promise<ProductionBatchDetailDto> {
+    for (let attempt = 0; attempt < CODE_RETRY_LIMIT; attempt++) {
+      try {
+        const created = await this.prisma.client.$transaction(async (tx) => {
+          const code = await this.nextBatchCode(tx);
+          return tx.productionBatch.create({
+            data: {
+              tenantId: currentTenantId(),
+              code,
+              batchDate: toDate(input.batchDate),
+              note: input.note,
+              kind: 'PRODUCTION',
+              status: 'OPEN',
+            },
+          });
+        });
+        return this.batchDetail(created.id);
+      } catch (error) {
+        if (
+          attempt < CODE_RETRY_LIMIT - 1 &&
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === 'P2002'
+        ) {
+          continue;
+        }
+        throw error;
+      }
+    }
+    throw new Error('unreachable');
+  }
+
+  async updateBatch(id: string, input: ProductionBatchUpdateInput): Promise<ProductionBatchDetailDto> {
+    const existing = await this.prisma.client.productionBatch.findUnique({ where: { id } });
+    if (!existing || existing.deletedAt !== null) {
+      throw problem(404, 'NOT_FOUND', '生产批次不存在');
+    }
+    if (existing.status === 'CLOSED') {
+      throw problem(409, 'BATCH_CLOSED', '批次已关闭，不能修改');
+    }
+    await this.prisma.client.productionBatch.updateMany({
+      where: { id },
+      data: { batchDate: toDate(input.batchDate), note: input.note },
+    });
+    return this.batchDetail(id);
+  }
+
+  async closeBatch(id: string): Promise<ProductionBatchDetailDto> {
+    const existing = await this.prisma.client.productionBatch.findUnique({ where: { id } });
+    if (!existing || existing.deletedAt !== null) {
+      throw problem(404, 'NOT_FOUND', '生产批次不存在');
+    }
+    if (existing.status === 'CLOSED') {
+      throw problem(409, 'BATCH_ALREADY_CLOSED', '批次已关闭');
+    }
+    const pool = (await this.batchPoolMap()).get(existing.code);
+    if (pool && pool.pendingAmount !== '0.00' && isNegativeOrZero(pool.timberVolume)) {
+      throw problem(
+        409,
+        'BATCH_PENDING_NO_STOCK',
+        '批次还有待结转成本但没有方木库存，请先录产出或删除领用后再关闭',
+      );
+    }
+    await this.prisma.client.productionBatch.updateMany({
+      where: { id },
+      data: { status: 'CLOSED', closedAt: new Date() },
+    });
+    return this.batchDetail(id);
+  }
+
+  async closeBatches(ids: string[]): Promise<{ closed: number; skipped: number }> {
+    const uniqueIds = [...new Set(ids)];
+    const rows = await this.prisma.client.productionBatch.findMany({
+      where: { id: { in: uniqueIds }, deletedAt: null },
+      select: { id: true, code: true, status: true },
+    });
+    const openRows = rows.filter((row) => row.status === 'OPEN');
+    if (openRows.length === 0) {
+      return { closed: 0, skipped: uniqueIds.length };
+    }
+    const poolMap = await this.batchPoolMap();
+    const blocked = openRows.filter((row) => {
+      const pool = poolMap.get(row.code);
+      return pool && pool.pendingAmount !== '0.00' && isNegativeOrZero(pool.timberVolume);
+    });
+    if (blocked.length > 0) {
+      throw problem(
+        409,
+        'BATCH_PENDING_NO_STOCK',
+        `批次 ${blocked.map((row) => row.code).join('、')} 还有待结转成本但没有方木库存，请先录产出或删除领用后再关闭`,
+      );
+    }
+    const updated = await this.prisma.client.productionBatch.updateMany({
+      where: { id: { in: openRows.map((row) => row.id) }, status: 'OPEN', deletedAt: null },
+      data: { status: 'CLOSED', closedAt: new Date() },
+    });
+    return { closed: updated.count, skipped: uniqueIds.length - updated.count };
+  }
+
   // ── 库存汇总 ─────────────────────────────────────────────
 
   private async findOpening(): Promise<OpeningRow | null> {
@@ -551,17 +936,19 @@ export class ProductionService {
     });
   }
 
-  // 库存事件流（期初 + 采购 + 领用 + 产出 + 销售 + 盘点）：汇总与逐单归属共用同一套构造
-  private async buildInventoryEvents(): Promise<{
+  // 库存事件流（期初 + 采购 + 领用 + 产出 + 销售 + 盘点 + 批次关闭）：汇总与归属共用同一套构造
+  private async buildInventoryEvents(excludeSaleCode?: string): Promise<{
     opening: Awaited<ReturnType<ProductionService['findOpening']>>;
+    openingBatch: BatchRow | null;
     events: InventoryEvent[];
   }> {
     const opening = await this.findOpening();
     if (!opening) {
-      return { opening: null, events: [] };
+      return { opening: null, openingBatch: null, events: [] };
     }
+    const openingBatch = await this.ensureOpeningBatch();
     const openingDate = opening.adjustmentDate;
-    const [purchases, issues, outputs, sales, counts] = await Promise.all([
+    const [purchases, issues, outputs, sales, counts, closedBatches] = await Promise.all([
       this.prisma.client.purchaseOrder.findMany({
         where: { deletedAt: null, purchaseDate: { gte: openingDate } },
         select: {
@@ -574,7 +961,13 @@ export class ProductionService {
       }),
       this.prisma.client.materialIssue.findMany({
         where: { deletedAt: null, issueDate: { gte: openingDate } },
-        select: { code: true, issueDate: true, tons: true, createdAt: true },
+        select: {
+          code: true,
+          issueDate: true,
+          tons: true,
+          createdAt: true,
+          batch: { select: { code: true, batchDate: true } },
+        },
       }),
       this.prisma.client.productionOutput.findMany({
         where: { deletedAt: null, outputDate: { gte: openingDate } },
@@ -582,6 +975,7 @@ export class ProductionService {
           code: true,
           outputDate: true,
           createdAt: true,
+          batch: { select: { code: true, batchDate: true } },
           lines: {
             where: { deletedAt: null },
             select: { lengthMm: true, widthMm: true, heightMm: true, volumeM3: true },
@@ -589,7 +983,11 @@ export class ProductionService {
         },
       }),
       this.prisma.client.saleOrder.findMany({
-        where: { deletedAt: null, saleDate: { gte: openingDate } },
+        where: {
+          deletedAt: null,
+          saleDate: { gte: openingDate },
+          ...(excludeSaleCode ? { code: { not: excludeSaleCode } } : {}),
+        },
         select: {
           code: true,
           saleDate: true,
@@ -619,11 +1017,23 @@ export class ProductionService {
           },
         },
       }),
+      this.prisma.client.productionBatch.findMany({
+        where: {
+          deletedAt: null,
+          kind: 'PRODUCTION',
+          status: 'CLOSED',
+          closedAt: { not: null },
+        },
+        select: { code: true, closedAt: true },
+      }),
     ]);
 
     const events: InventoryEvent[] = [];
     const rawOpening = opening.items.find((item) => item.targetType === 'RAW_LOG');
     const timberOpening = opening.items.filter((item) => item.targetType === 'TIMBER');
+    if (timberOpening.length > 0 && !openingBatch) {
+      throw new Error('期初方木存在但期初库存批次缺失');
+    }
     events.push({
       kind: 'opening',
       date: isoDate(opening.adjustmentDate),
@@ -643,6 +1053,7 @@ export class ProductionService {
         },
         volume: volume(item.actualQuantity),
         amount: money(item.amount),
+        batchRef: openingBatch!.code,
       })),
     });
 
@@ -656,21 +1067,36 @@ export class ProductionService {
         totalAmount: money(purchase.totalAmount),
       });
     }
+    const batchMaxDate = new Map<string, string>();
     for (const issue of issues) {
+      const date = isoDate(issue.issueDate);
+      const current = batchMaxDate.get(issue.batch.code);
+      if (!current || date > current) {
+        batchMaxDate.set(issue.batch.code, date);
+      }
       events.push({
         kind: 'issue',
-        date: isoDate(issue.issueDate),
+        date,
         createdAt: issue.createdAt.toISOString(),
         ref: issue.code,
         tons: tons(issue.tons),
+        batchRef: issue.batch.code,
+        batchDate: isoDate(issue.batch.batchDate),
       });
     }
     for (const output of outputs) {
+      const date = isoDate(output.outputDate);
+      const current = batchMaxDate.get(output.batch.code);
+      if (!current || date > current) {
+        batchMaxDate.set(output.batch.code, date);
+      }
       events.push({
         kind: 'output',
-        date: isoDate(output.outputDate),
+        date,
         createdAt: output.createdAt.toISOString(),
         ref: output.code,
+        batchRef: output.batch.code,
+        batchDate: isoDate(output.batch.batchDate),
         outputs: output.lines.map((line) => ({
           spec: {
             lengthMm: line.lengthMm,
@@ -721,8 +1147,24 @@ export class ProductionService {
         });
       });
     }
+    for (const batch of closedBatches) {
+      if (!batch.closedAt) {
+        continue;
+      }
+      // 关闭事件排在批次全部单据之后：即使单据日期晚于关闭时间也不会漏结转
+      const closeDate = [isoDate(batch.closedAt), batchMaxDate.get(batch.code) ?? '']
+        .sort()
+        .at(-1)!;
+      events.push({
+        kind: 'batch_close',
+        date: closeDate,
+        createdAt: batch.closedAt.toISOString(),
+        ref: batch.code,
+        batchRef: batch.code,
+      });
+    }
 
-    return { opening, events };
+    return { opening, openingBatch, events };
   }
 
   async getInventorySummary(): Promise<InventorySummaryDto> {
@@ -756,6 +1198,31 @@ export class ProductionService {
       (left, right) => left.date.localeCompare(right.date) || left.ref.localeCompare(right.ref),
     )[0];
 
+    const batchRows = await this.prisma.client.productionBatch.findMany({
+      where: { deletedAt: null },
+      select: { id: true, code: true, batchDate: true, status: true, kind: true },
+    });
+    const batchMeta = new Map(batchRows.map((row) => [row.code, row]));
+    const batches: InventoryBatchDto[] = pool.batches
+      .map((batch) => {
+        const meta = batchMeta.get(batch.ref);
+        if (!meta) {
+          return null;
+        }
+        return {
+          id: meta.id,
+          code: batch.ref,
+          batchDate: isoDate(meta.batchDate),
+          status: meta.status === 'OPEN' ? ('open' as const) : ('closed' as const),
+          kind: meta.kind === 'OPENING' ? ('opening' as const) : ('production' as const),
+          timberVolume: batch.timberVolume,
+          timberAmount: batch.timberAmount,
+          timberUnitCost: batch.timberUnitCost,
+          pendingAmount: batch.pendingAmount,
+        };
+      })
+      .filter((batch): batch is InventoryBatchDto => batch !== null);
+
     return {
       needsOpening: false,
       openingDate: isoDate(opening.adjustmentDate),
@@ -772,6 +1239,9 @@ export class ProductionService {
         negative: isNegative(pool.timberVolume),
       },
       timberLines,
+      batches,
+      shortfallVolume: pool.shortfallVolume,
+      shortfallAmount: pool.shortfallAmount,
       totalAmount: calcInventoryTotalAmount(pool.rawAmount, pool.timberAmount),
       pendingAmount: pool.pendingAmount,
       pendingIssueCount: pendingIssues.length,
@@ -783,9 +1253,26 @@ export class ProductionService {
     };
   }
 
-  async currentTimberUnitCost(): Promise<string> {
-    const summary = await this.getInventorySummary();
-    return summary.needsOpening ? '0.000000' : summary.timber.unitCost;
+  // 销售下单材料成本：按保存时当前批次层先进先出试算（product/生产与库存.md R-生产-004）
+  async calcSaleMaterialCost(
+    items: Array<{ lengthMm: number; widthMm: number; heightMm: number; volumeM3: string }>,
+    excludeSaleCode?: string,
+  ): Promise<{ amount: string; unitCost: string; status: 'final' | 'pending'; layers: SaleCostLayer[] }> {
+    const { opening, events } = await this.buildInventoryEvents(excludeSaleCode);
+    if (!opening) {
+      return { amount: '0.00', unitCost: '0.000000', status: 'pending', layers: [] };
+    }
+    return calcTimberSaleCost(
+      events,
+      items.map((item) => ({
+        spec: {
+          lengthMm: item.lengthMm,
+          widthMm: item.widthMm,
+          heightMm: item.heightMm,
+        },
+        volume: volume(item.volumeM3),
+      })),
+    );
   }
 
   // ── 库存调整单只读（期初 / 盘点记录）────────────────────
@@ -1070,6 +1557,8 @@ export class ProductionService {
       items,
       operator,
     );
+    // 期初方木归属期初库存批次：保存时即创建，避免首次查询库存时写入
+    await this.ensureOpeningBatch();
     return { ...created, type: 'opening' };
   }
 

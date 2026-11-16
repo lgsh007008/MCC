@@ -2,19 +2,21 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import type { ApiSchemas } from '@mcc/shared';
 import { Button } from '@/components/ui/button';
 import { PageFrame } from '@/components/admin/page-frame';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { api } from '@/lib/api';
 import { randomUuid } from '@/lib/uuid';
 import { cn } from '@/lib/utils';
 
 // 原木领用表单（product/生产与库存.md R-生产-001）：
-// 单头无明细；领用日期、领用吨数、备注；领用成本由服务端按当前原木平均成本自动结转。
+// 单头无明细；领用日期、生产批次、领用吨数、备注；领用成本由服务端按当前原木平均成本记入本批次待结转。
 
 export interface MaterialIssueFormInitial {
   id: string;
@@ -22,6 +24,9 @@ export interface MaterialIssueFormInitial {
   issueDate: string;
   tons: string;
   note: string;
+  batchId: string;
+  batchCode: string;
+  batchStatus: string;
 }
 
 const pad = (value: number): string => String(value).padStart(2, '0');
@@ -58,12 +63,41 @@ export function MaterialIssueForm({
   const [issueDate, setIssueDate] = useState(initial?.issueDate ?? localToday());
   const [tons, setTons] = useState(initial?.tons ?? '');
   const [note, setNote] = useState(initial?.note ?? '');
+  const [batchId, setBatchId] = useState(initial?.batchId ?? '');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  const batchQuery = useQuery({
+    queryKey: ['production-batches', 'open'],
+    queryFn: async (): Promise<ApiSchemas['ProductionBatchDto'][]> => {
+      const { data, response } = await api.GET('/api/v1/production-batches', {
+        params: { query: { status: 'open', page: 1, pageSize: 100 } },
+      });
+      if (!response.ok || !data) {
+        return [];
+      }
+      return data.items;
+    },
+  });
+  const batchOptions: Array<{ value: string; label: string; disabled?: boolean }> = (batchQuery.data ?? []).map((batch) => ({
+    value: batch.id,
+    label: `${batch.code} · ${batch.batchDate}`,
+  }));
+  if (initial && !batchOptions.some((option) => option.value === initial.batchId)) {
+    batchOptions.push({
+      value: initial.batchId,
+      label: `${initial.batchCode}（已关闭）`,
+      disabled: true,
+    });
+  }
 
   async function submit(event: React.FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     setError(null);
+    if (!batchId) {
+      setError('请选择生产批次');
+      return;
+    }
     if (!issueDate) {
       setError('请选择领用日期');
       return;
@@ -72,7 +106,7 @@ export function MaterialIssueForm({
       setError('领用吨数须为大于 0 的数字，最多 3 位小数');
       return;
     }
-    const body = { issueDate, tons, note };
+    const body = { issueDate, tons, note, batchId };
     setSaving(true);
     try {
       const { data, response } = initial
@@ -89,6 +123,7 @@ export function MaterialIssueForm({
       }
       await queryClient.invalidateQueries({ queryKey: ['material-issues'] });
       await queryClient.invalidateQueries({ queryKey: ['inventory-summary'] });
+      await queryClient.invalidateQueries({ queryKey: ['production-batches'] });
       router.push(`/admin/production/issues/${data.id}`);
     } catch {
       setError('保存失败，请稍后重试');
@@ -125,6 +160,16 @@ export function MaterialIssueForm({
             <Field label="领用日期">
               <DatePicker value={issueDate} onChange={setIssueDate} className="w-40" />
             </Field>
+            <Field label="生产批次">
+              <Select
+                ariaLabel="生产批次"
+                value={batchId}
+                onChange={setBatchId}
+                options={batchOptions}
+                placeholder={batchQuery.isPending ? '加载中…' : '请选择进行中的批次'}
+                className="h-8 w-64"
+              />
+            </Field>
             <Field label="领用吨数">
               <Input
                 value={tons}
@@ -145,7 +190,7 @@ export function MaterialIssueForm({
             </Field>
           </div>
           <p className="mt-3 text-xs text-muted-foreground">
-            领用成本按领用日当时原木平均成本先记待结转，方木产出时转入方木池；库存不足不阻断保存，由库存页提示。
+            领用成本按领用日当时原木平均成本先记入本批次待结转，方木产出时全额转入本批次方木池；库存不足不阻断保存，由库存页提示。
           </p>
         </section>
 

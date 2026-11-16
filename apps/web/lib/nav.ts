@@ -9,6 +9,7 @@ import {
   FactoryIcon,
   FileTextIcon,
   HomeIcon,
+  LayersIcon,
   ListChecksIcon,
   ScrollTextIcon,
   ShoppingCartIcon,
@@ -74,6 +75,7 @@ export const navGroups: NavGroup[] = [
     domain: 'production',
     icon: FactoryIcon,
     items: [
+      { title: '生产批次', icon: LayersIcon, href: '/admin/production/batches', scope: 'production:view', feature: 'production' },
       { title: '原木领用', icon: ArrowDownToLineIcon, href: '/admin/production/issues', scope: 'production:view', feature: 'production' },
       { title: '方木产出', icon: ArrowUpFromLineIcon, href: '/admin/production/outputs', scope: 'production:view', feature: 'production' },
       { title: '库存', icon: BoxesIcon, href: '/admin/production/inventory', scope: 'inventory:view', feature: 'production' },
@@ -214,6 +216,9 @@ export function scopeForMobilePath(pathname: string): Scope | null {
   if (pathname === '/m/production') {
     return null;
   }
+  if (pathname.startsWith('/m/production/batches')) {
+    return 'production:view';
+  }
   if (pathname.startsWith('/m/production/issues')) {
     return 'production:view';
   }
@@ -256,6 +261,9 @@ export function scopeForPath(pathname: string): Scope | null {
     return /^\/admin\/customers\/(new|[^/]+\/edit)$/.test(pathname)
       ? 'customer:manage'
       : 'customer:view';
+  }
+  if (pathname.startsWith('/admin/production/batches')) {
+    return 'production:view';
   }
   if (pathname.startsWith('/admin/production/issues')) {
     return /^\/admin\/production\/issues\/(new|[^/]+\/edit)$/.test(pathname)

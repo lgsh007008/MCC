@@ -14,6 +14,9 @@ export class MaterialIssueBodyDto {
 
   @ApiPropertyOptional({ type: String, description: '备注', default: '' })
   note?: string;
+
+  @ApiProperty({ type: String, description: '所属生产批次 id' })
+  batchId!: string;
 }
 
 export class MaterialIssueBatchDeleteBodyDto {
@@ -53,6 +56,15 @@ export class MaterialIssueDto {
 
   @ApiProperty({ type: [String], description: '结转过本单的产出单编号（按事件顺序）' })
   settledByCodes!: string[];
+
+  @ApiProperty({ type: String, description: '所属生产批次 id' })
+  batchId!: string;
+
+  @ApiProperty({ type: String, description: '所属生产批次编号 BT-#####' })
+  batchCode!: string;
+
+  @ApiProperty({ type: String, description: '批次状态：open 进行中 / closed 已关闭' })
+  batchStatus!: string;
 
   @ApiProperty({ type: String })
   createdAt!: string;
@@ -105,6 +117,9 @@ export class ProductionOutputBodyDto {
   @ApiPropertyOptional({ type: String, description: '备注', default: '' })
   note?: string;
 
+  @ApiProperty({ type: String, description: '所属生产批次 id（须为进行中批次）' })
+  batchId!: string;
+
   @ApiProperty({ type: () => [ProductionOutputLineBodyDto], description: '产出明细（至少一行）' })
   outputs!: ProductionOutputLineBodyDto[];
 }
@@ -115,6 +130,9 @@ export class ProductionOutputUpdateBodyDto {
 
   @ApiPropertyOptional({ type: String, description: '备注', default: '' })
   note?: string;
+
+  @ApiProperty({ type: String, description: '所属生产批次 id（须为进行中批次）' })
+  batchId!: string;
 
   @ApiProperty({
     type: () => [ProductionOutputLineUpdateBodyDto],
@@ -178,6 +196,15 @@ export class ProductionOutputListItemDto {
   @ApiProperty({ type: String, description: '本次结转金额（2 位小数）' })
   settledAmount!: string;
 
+  @ApiProperty({ type: String, description: '所属生产批次 id' })
+  batchId!: string;
+
+  @ApiProperty({ type: String, description: '所属生产批次编号 BT-#####' })
+  batchCode!: string;
+
+  @ApiProperty({ type: String, description: '批次状态：open 进行中 / closed 已关闭' })
+  batchStatus!: string;
+
   @ApiProperty({ type: String })
   note!: string;
 
@@ -207,4 +234,150 @@ export class ProductionOutputListDto {
 
   @ApiProperty({ type: () => [ProductionOutputListItemDto] })
   items!: ProductionOutputListItemDto[];
+}
+
+// ── 生产批次 ──────────────────────────────────────────
+
+export class ProductionBatchBodyDto {
+  @ApiProperty({ type: String, description: '批次日期', example: '2026-11-15' })
+  batchDate!: string;
+
+  @ApiPropertyOptional({ type: String, description: '备注', default: '' })
+  note?: string;
+}
+
+export class ProductionBatchDto {
+  @ApiProperty({ type: String })
+  id!: string;
+
+  @ApiProperty({ type: String, description: '批次编号 BT-#####' })
+  code!: string;
+
+  @ApiProperty({ type: String, description: '批次日期' })
+  batchDate!: string;
+
+  @ApiProperty({ type: String, enum: ['open', 'closed'] })
+  status!: 'open' | 'closed';
+
+  @ApiProperty({ type: String, enum: ['opening', 'production'] })
+  kind!: 'opening' | 'production';
+
+  @ApiProperty({ type: String })
+  note!: string;
+
+  @ApiProperty({ type: String, nullable: true })
+  closedAt!: string | null;
+
+  @ApiProperty({ type: String })
+  createdAt!: string;
+
+  @ApiProperty({ type: String, description: '批次方木数量（m³，4 位小数）' })
+  timberVolume!: string;
+
+  @ApiProperty({ type: String, description: '批次方木金额（2 位小数）' })
+  timberAmount!: string;
+
+  @ApiProperty({ type: String, description: '批次方木成本（元/m³，6 位小数）' })
+  timberUnitCost!: string;
+
+  @ApiProperty({ type: String, description: '批次待结转金额（2 位小数）' })
+  pendingAmount!: string;
+
+  @ApiProperty({ type: String, description: '关闭时一次性结转金额（2 位小数）' })
+  closedSettledAmount!: string;
+
+  @ApiProperty({ type: Number, description: '领用单数' })
+  issueCount!: number;
+
+  @ApiProperty({ type: Number, description: '产出单数' })
+  outputCount!: number;
+}
+
+export class ProductionBatchListDto {
+  @ApiProperty({ type: Number })
+  total!: number;
+
+  @ApiProperty({ type: () => [ProductionBatchDto] })
+  items!: ProductionBatchDto[];
+}
+
+export class ProductionBatchBatchCloseBodyDto {
+  @ApiProperty({ type: [String], description: '生产批次 id 列表（1~200）' })
+  ids!: string[];
+}
+
+export class ProductionBatchBatchCloseResponseDto {
+  @ApiProperty({ type: Number, description: '实际关闭条数' })
+  closed!: number;
+
+  @ApiProperty({ type: Number, description: '跳过条数（已关闭 / 不存在）' })
+  skipped!: number;
+}
+
+export class ProductionBatchIssueDto {
+  @ApiProperty({ type: String })
+  id!: string;
+
+  @ApiProperty({ type: String })
+  code!: string;
+
+  @ApiProperty({ type: String })
+  issueDate!: string;
+
+  @ApiProperty({ type: String })
+  tons!: string;
+
+  @ApiProperty({ type: String })
+  settledAmount!: string;
+
+  @ApiProperty({ type: String })
+  pendingAmount!: string;
+}
+
+export class ProductionBatchOutputDto {
+  @ApiProperty({ type: String })
+  id!: string;
+
+  @ApiProperty({ type: String })
+  code!: string;
+
+  @ApiProperty({ type: String })
+  outputDate!: string;
+
+  @ApiProperty({ type: String })
+  totalVolume!: string;
+
+  @ApiProperty({ type: String })
+  settledAmount!: string;
+}
+
+export class ProductionBatchTimberLineDto {
+  @ApiProperty({ type: Number })
+  lengthMm!: number;
+
+  @ApiProperty({ type: Number })
+  widthMm!: number;
+
+  @ApiProperty({ type: Number })
+  heightMm!: number;
+
+  @ApiProperty({ type: String })
+  quantity!: string;
+
+  @ApiProperty({ type: String })
+  unitCost!: string;
+
+  @ApiProperty({ type: String })
+  amount!: string;
+}
+
+export class ProductionBatchDetailDto extends ProductionBatchDto {
+  @ApiProperty({ type: () => [ProductionBatchIssueDto] })
+  issues!: ProductionBatchIssueDto[];
+
+  @ApiProperty({ type: () => [ProductionBatchOutputDto] })
+  outputs!: ProductionBatchOutputDto[];
+
+  @ApiProperty({ type: () => [ProductionBatchTimberLineDto] })
+  timberLines!: ProductionBatchTimberLineDto[];
 }

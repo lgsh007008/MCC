@@ -25,7 +25,7 @@ describe('导航图标', () => {
 // 菜单按角色 scope 裁剪（product/账号与权限.md R-账号与权限-003）
 describe('菜单可见性', () => {
   it('管理员可见全部业务分组', () => {
-    expect(visibleNavGroups('ADMIN').flatMap((group) => group.items)).toHaveLength(10);
+    expect(visibleNavGroups('ADMIN').flatMap((group) => group.items)).toHaveLength(11);
   });
 
   it('工人只看到销售单', () => {
@@ -89,6 +89,8 @@ describe('路由 scope', () => {
     expect(scopeForPath('/admin/suppliers/abc/edit')).toBe('supplier:manage');
     expect(scopeForPath('/admin/users')).toBe('account:manage');
     expect(scopeForPath('/admin/audit-logs')).toBe('audit:view');
+    expect(scopeForPath('/admin/production/batches')).toBe('production:view');
+    expect(scopeForPath('/admin/production/batches/abc')).toBe('production:view');
     expect(scopeForPath('/admin/production/issues')).toBe('production:view');
     expect(scopeForPath('/admin/production/issues/new')).toBe('production:manage');
     expect(scopeForPath('/admin/production/issues/abc/edit')).toBe('production:manage');
@@ -121,6 +123,8 @@ describe('移动路由 scope', () => {
     expect(scopeForMobilePath('/m/finance/cash/abc/edit')).toBe('finance:manage');
     expect(scopeForMobilePath('/m/finance/summary')).toBe('finance:view');
     expect(scopeForMobilePath('/m/production')).toBeNull();
+    expect(scopeForMobilePath('/m/production/batches')).toBe('production:view');
+    expect(scopeForMobilePath('/m/production/batches/abc')).toBe('production:view');
     expect(scopeForMobilePath('/m/production/issues')).toBe('production:view');
     expect(scopeForMobilePath('/m/production/issues/new')).toBe('production:manage');
     expect(scopeForMobilePath('/m/production/issues/abc/edit')).toBe('production:manage');

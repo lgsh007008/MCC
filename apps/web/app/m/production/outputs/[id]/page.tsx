@@ -93,6 +93,14 @@ export default function MobileProductionOutputDetailPage(): React.ReactElement {
       <div className="space-y-4 p-4">
         <section className="space-y-2 rounded-xl border border-border bg-card p-4">
           <MobileInfoRow label="产出日期" value={output.outputDate} />
+          <MobileInfoRow
+            label="生产批次"
+            value={
+              <Link href={`/m/production/batches/${output.batchId}`} className="text-primary">
+                {output.batchCode}
+              </Link>
+            }
+          />
           <MobileInfoRow label="产出总方数" value={`${formatQuantity(output.totalVolume)} m³`} />
           <MobileInfoRow label="本次结转金额" value={`${formatAmount(output.settledAmount)} 元`} />
           <MobileInfoRow

@@ -41,15 +41,38 @@ const SETTLEMENT_LABELS: Record<string, string> = {
 export default function MaterialIssuesPage(): React.ReactElement {
   const canManage = useCan('production:manage');
   const confirm = useConfirm();
-  const [filters, setFilters] = useState<{ dateFrom: string; dateTo: string; settlementStatus: SettlementFilter }>({
+  const [filters, setFilters] = useState<{
+    dateFrom: string;
+    dateTo: string;
+    settlementStatus: SettlementFilter;
+    batchId: string;
+  }>({
     dateFrom: '',
     dateTo: '',
     settlementStatus: '',
+    batchId: '',
   });
   const [applied, setApplied] = useState(filters);
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [actionError, setActionError] = useState<string | null>(null);
+
+  const batchQuery = useQuery({
+    queryKey: ['production-batches', 'options'],
+    queryFn: async (): Promise<ApiSchemas['ProductionBatchDto'][]> => {
+      const { data, response } = await api.GET('/api/v1/production-batches', {
+        params: { query: { page: 1, pageSize: 100 } },
+      });
+      return response.ok && data ? data.items : [];
+    },
+  });
+  const batchOptions = [
+    { value: '', label: '全部批次' },
+    ...(batchQuery.data ?? []).map((batch) => ({
+      value: batch.id,
+      label: `${batch.code} · ${batch.batchDate}`,
+    })),
+  ];
 
   const listQuery = useQuery({
     queryKey: ['material-issues', page, applied],
@@ -62,6 +85,7 @@ export default function MaterialIssuesPage(): React.ReactElement {
             dateFrom: applied.dateFrom || undefined,
             dateTo: applied.dateTo || undefined,
             settlementStatus: applied.settlementStatus || undefined,
+            batchId: applied.batchId || undefined,
           },
         },
       });
@@ -201,6 +225,16 @@ export default function MaterialIssuesPage(): React.ReactElement {
             className="h-8 w-28"
           />
         </div>
+        <div className="flex items-center gap-2">
+          <span className="shrink-0 whitespace-nowrap text-xs text-muted-foreground">生产批次</span>
+          <Select
+            ariaLabel="生产批次"
+            value={filters.batchId}
+            onChange={(value) => setFilters({ ...filters, batchId: value })}
+            options={batchOptions}
+            className="h-8 w-44"
+          />
+        </div>
         <Button type="submit" variant="secondary">
           查询
         </Button>
@@ -208,7 +242,12 @@ export default function MaterialIssuesPage(): React.ReactElement {
           type="button"
           variant="outline"
           onClick={() => {
-            const empty = { dateFrom: '', dateTo: '', settlementStatus: '' as SettlementFilter };
+            const empty = {
+              dateFrom: '',
+              dateTo: '',
+              settlementStatus: '' as SettlementFilter,
+              batchId: '',
+            };
             setFilters(empty);
             setApplied(empty);
             setPage(1);
@@ -243,6 +282,7 @@ export default function MaterialIssuesPage(): React.ReactElement {
                 </TableHead>
               ) : null}
               <TableHead>编号</TableHead>
+              <TableHead>生产批次</TableHead>
               <TableHead>领用日期</TableHead>
               <TableHead className="text-right">领用吨数</TableHead>
               <TableHead>结转状态</TableHead>
@@ -254,11 +294,11 @@ export default function MaterialIssuesPage(): React.ReactElement {
           <TableBody>
             {listQuery.isPending ? (
               <TableRow>
-                <TableCell colSpan={canManage ? 8 : 7} className="text-muted-foreground">加载中…</TableCell>
+                <TableCell colSpan={canManage ? 9 : 8} className="text-muted-foreground">加载中…</TableCell>
               </TableRow>
             ) : rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={canManage ? 8 : 7} className="text-muted-foreground">暂无原木领用单</TableCell>
+                <TableCell colSpan={canManage ? 9 : 8} className="text-muted-foreground">暂无原木领用单</TableCell>
               </TableRow>
             ) : (
               rows.map((row) => (
@@ -271,6 +311,14 @@ export default function MaterialIssuesPage(): React.ReactElement {
                   <TableCell>
                     <Link href={`/admin/production/issues/${row.id}`} className="text-primary hover:underline">
                       {row.code}
+                    </Link>
+                  </TableCell>
+                  <TableCell>
+                    <Link
+                      href={`/admin/production/batches/${row.batchId}`}
+                      className="text-primary hover:underline"
+                    >
+                      {row.batchCode}
                     </Link>
                   </TableCell>
                   <TableCell>{row.issueDate}</TableCell>
@@ -303,7 +351,7 @@ export default function MaterialIssuesPage(): React.ReactElement {
           </TableBody>
           <TableFooter className="sticky bottom-0 [&_td]:bg-muted">
             <TableRow>
-              <TableCell colSpan={canManage ? 3 : 2} className="text-right font-medium">合计</TableCell>
+              <TableCell colSpan={canManage ? 4 : 3} className="text-right font-medium">合计</TableCell>
               <TableCell className="text-right tabular-nums">{formatQuantity(data.summary.tons)}</TableCell>
               <TableCell colSpan={4} />
             </TableRow>

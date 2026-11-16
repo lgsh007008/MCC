@@ -22,6 +22,8 @@ export const materialIssueInputSchema = z.object({
     .regex(positiveTonsRe, '领用吨数须为非负数、最多 3 位小数')
     .refine((value) => !/^0+(\.0{1,3})?$/.test(value), { message: '领用吨数必须大于 0' }),
   note: z.string().trim().max(500).default(''),
+  // 所属生产批次：成本对象，必须选择进行中的生产批次（R-生产-006）
+  batchId: z.string().uuid('请选择生产批次'),
 });
 export type MaterialIssueInput = z.infer<typeof materialIssueInputSchema>;
 
@@ -32,6 +34,7 @@ export const materialIssueListQuerySchema = paginationQuerySchema.extend({
   dateFrom: dateStringSchema('领用日期起').optional(),
   dateTo: dateStringSchema('领用日期止').optional(),
   settlementStatus: z.enum(['pending', 'settled']).optional(),
+  batchId: z.string().uuid().optional(),
 });
 export type MaterialIssueListQuery = z.infer<typeof materialIssueListQuerySchema>;
 
@@ -59,6 +62,8 @@ export type ProductionOutputLineUpdateInput = z.infer<typeof productionOutputLin
 const outputBaseFields = {
   outputDate: dateStringSchema('产出日期'),
   note: z.string().trim().max(500).default(''),
+  // 所属生产批次：产出把本批次待结转全额转入本批次方木池（R-生产-006）
+  batchId: z.string().uuid('请选择生产批次'),
 };
 
 export const productionOutputInputSchema = z.object({
@@ -76,6 +81,7 @@ export type ProductionOutputUpdateInput = z.infer<typeof productionOutputUpdateS
 export const productionOutputListQuerySchema = paginationQuerySchema.extend({
   dateFrom: dateStringSchema('产出日期起').optional(),
   dateTo: dateStringSchema('产出日期止').optional(),
+  batchId: z.string().uuid().optional(),
 });
 export type ProductionOutputListQuery = z.infer<typeof productionOutputListQuerySchema>;
 
@@ -85,3 +91,26 @@ export const productionOutputBatchDeleteSchema = z.object({
 export type ProductionOutputBatchDeleteInput = z.infer<
   typeof productionOutputBatchDeleteSchema
 >;
+
+// ── 生产批次 ──────────────────────────────────────────
+
+export const productionBatchInputSchema = z.object({
+  batchDate: dateStringSchema('批次日期'),
+  note: z.string().trim().max(500).default(''),
+});
+export type ProductionBatchInput = z.infer<typeof productionBatchInputSchema>;
+
+export const productionBatchUpdateSchema = productionBatchInputSchema;
+export type ProductionBatchUpdateInput = z.infer<typeof productionBatchUpdateSchema>;
+
+export const productionBatchListQuerySchema = paginationQuerySchema.extend({
+  dateFrom: dateStringSchema('批次日期起').optional(),
+  dateTo: dateStringSchema('批次日期止').optional(),
+  status: z.enum(['open', 'closed']).optional(),
+});
+export type ProductionBatchListQuery = z.infer<typeof productionBatchListQuerySchema>;
+
+export const productionBatchBatchCloseSchema = z.object({
+  ids: z.array(z.string().uuid()).min(1, '请选择要关闭的生产批次').max(200),
+});
+export type ProductionBatchBatchCloseInput = z.infer<typeof productionBatchBatchCloseSchema>;

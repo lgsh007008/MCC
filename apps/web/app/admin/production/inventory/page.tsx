@@ -24,6 +24,9 @@ const EMPTY: InventorySummary = {
   raw: { quantity: '0.000', unitCost: '0.000000', amount: '0.00', negative: false },
   timber: { quantity: '0.0000', unitCost: '0.000000', amount: '0.00', negative: false },
   timberLines: [],
+  batches: [],
+  shortfallVolume: '0.0000',
+  shortfallAmount: '0.00',
   totalAmount: '0.00',
   pendingAmount: '0.00',
   pendingIssueCount: 0,
@@ -208,6 +211,56 @@ export default function InventoryPage(): React.ReactElement {
                         </TableRow>
                       ))
                     )}
+                  </TableBody>
+                </Table>
+              </div>
+              <div className="rounded-lg border border-border bg-card">
+                <div className="border-b border-border px-4 py-3 text-sm font-medium">批次库存</div>
+                <Table containerClassName="max-h-[360px] overflow-y-auto">
+                  <TableHeader className="sticky top-0 z-10 [&_th]:bg-muted">
+                    <TableRow>
+                      <TableHead>批次</TableHead>
+                      <TableHead>批次日期</TableHead>
+                      <TableHead>状态</TableHead>
+                      <TableHead className="text-right">方数（m³）</TableHead>
+                      <TableHead className="text-right">金额（元）</TableHead>
+                      <TableHead className="text-right">平均成本（元/m³）</TableHead>
+                      <TableHead className="text-right">待结转（元）</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {data.batches.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-muted-foreground">暂无批次库存</TableCell>
+                      </TableRow>
+                    ) : (
+                      data.batches.map((batch) => (
+                        <TableRow key={batch.id}>
+                          <TableCell>
+                            <Link href={`/admin/production/batches/${batch.id}`} className="text-primary hover:underline">
+                              {batch.code}
+                            </Link>
+                          </TableCell>
+                          <TableCell>{batch.batchDate}</TableCell>
+                          <TableCell>{batch.status === 'open' ? '进行中' : batch.kind === 'opening' ? '期初' : '已关闭'}</TableCell>
+                          <TableCell className="text-right tabular-nums">{formatQuantity(batch.timberVolume)}</TableCell>
+                          <TableCell className="text-right tabular-nums">{formatAmount(batch.timberAmount)}</TableCell>
+                          <TableCell className="text-right tabular-nums">{formatQuantity(batch.timberUnitCost)}</TableCell>
+                          <TableCell className="text-right tabular-nums">{formatAmount(batch.pendingAmount)}</TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                    {data.shortfallVolume !== '0.0000' ? (
+                      <TableRow>
+                        <TableCell>负库存缺口</TableCell>
+                        <TableCell>—</TableCell>
+                        <TableCell>不计入批次</TableCell>
+                        <TableCell className="text-right tabular-nums text-destructive">{formatQuantity(data.shortfallVolume)}</TableCell>
+                        <TableCell className="text-right tabular-nums text-destructive">{formatAmount(data.shortfallAmount)}</TableCell>
+                        <TableCell className="text-right">—</TableCell>
+                        <TableCell className="text-right">—</TableCell>
+                      </TableRow>
+                    ) : null}
                   </TableBody>
                 </Table>
               </div>

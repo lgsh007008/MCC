@@ -499,6 +499,7 @@ model SaleOrder {
   materialCostSnapshottedAt DateTime?                   @map("material_cost_snapshotted_at") @db.Timestamptz(3)
 
   items SaleOrderItem[]
+  costLayers SaleOrderCostLayer[]
 
   @@unique([tenantId, code])
   @@index([tenantId, saleDate])
@@ -538,6 +539,33 @@ model SaleOrderItem {
   @@unique([orderId, seq])
   @@index([orderId])
   @@map("sale_order_items")
+}
+
+// 销售单材料成本来源批次（product/订单.md R-订单-003；product/生产与库存.md R-生产-004）：
+// 下单时按批次先进先出扣层，快照记录每层批次、规格、方数与成本；改单后层明细失效则清空。
+model SaleOrderCostLayer {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @map("tenant_id")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at")
+
+  orderId String    @map("order_id") @db.Uuid
+  order   SaleOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  seq     Int       @map("seq")
+
+  // 批次编号快照；负库存层为空字符串
+  batchCode String  @map("batch_code")
+  lengthMm  Int     @map("length_mm")
+  widthMm   Int     @map("width_mm")
+  heightMm  Int     @map("height_mm")
+  volumeM3  Decimal @map("volume_m3") @db.Decimal(18, 4)
+  unitCost  Decimal @map("unit_cost") @db.Decimal(18, 6)
+  amount    Decimal @map("amount") @db.Decimal(18, 2)
+
+  @@unique([orderId, seq])
+  @@index([orderId])
+  @@map("sale_order_cost_layers")
 }
 
 // ── 财务领域（finance，design/finance.md §2）────────────────
@@ -697,6 +725,49 @@ enum InventoryAdjustmentReason {
   @@map("inventory_adjustment_reason")
 }
 
+// 生产批次（轻量成本对象，product/生产与库存.md R-生产-006）：
+// 一个批次可含多张领用与多张产出；批次独立持有待结转与方木成本池，关闭后锁定单据。
+enum ProductionBatchStatus {
+  OPEN
+  CLOSED
+
+  @@map("production_batch_status")
+}
+
+enum ProductionBatchKind {
+  // 期初库存批次：系统自动创建，承载期初方木，不可挂领用 / 产出
+  OPENING
+  // 生产批次：手工创建，领用与产出必须选择进行中的生产批次
+  PRODUCTION
+
+  @@map("production_batch_kind")
+}
+
+model ProductionBatch {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @map("tenant_id")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at")
+
+  // 批次编号：BT + 连字符 + 5 位全局流水（1-产品文档.md 五）
+  code      String               @map("code")
+  batchDate DateTime             @map("batch_date") @db.Date
+  status    ProductionBatchStatus @default(OPEN) @map("status")
+  kind      ProductionBatchKind   @default(PRODUCTION) @map("kind")
+  note      String               @default("") @map("note")
+  closedAt  DateTime?            @map("closed_at") @db.Timestamptz(3)
+
+  issues  MaterialIssue[]
+  outputs ProductionOutput[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, batchDate])
+  @@index([tenantId, status])
+  @@index([batchDate])
+  @@map("production_batches")
+}
+
 model MaterialIssue {
   id        String    @id @default(uuid()) @db.Uuid
   tenantId  String    @map("tenant_id")
@@ -710,10 +781,14 @@ model MaterialIssue {
   // 领用原木吨数：实际领用，3 位小数
   tons      Decimal  @map("tons") @db.Decimal(12, 3)
   note      String   @default("") @map("note")
+  // 所属生产批次：成本对象，待结转与产出结转都按批次隔离
+  batchId   String   @map("batch_id") @db.Uuid
+  batch     ProductionBatch @relation(fields: [batchId], references: [id])
 
   @@unique([tenantId, code])
   @@index([tenantId, issueDate])
   @@index([issueDate])
+  @@index([batchId])
   @@map("material_issues")
 }
 
@@ -728,12 +803,16 @@ model ProductionOutput {
   code       String   @map("code")
   outputDate DateTime @map("output_date") @db.Date
   note       String   @default("") @map("note")
+  // 所属生产批次：产出把本批次待结转全额转入本批次方木池
+  batchId    String   @map("batch_id") @db.Uuid
+  batch      ProductionBatch @relation(fields: [batchId], references: [id])
 
   lines ProductionOutputLine[]
 
   @@unique([tenantId, code])
   @@index([tenantId, outputDate])
   @@index([outputDate])
+  @@index([batchId])
   @@map("production_outputs")
 }
 

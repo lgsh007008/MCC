@@ -93,21 +93,6 @@ export class OrderController {
     return this.orderService.profit(id);
   }
 
-  @Post(':id/recalculate-cost')
-  @RequireScopes('profit:manage')
-  @AuditAction({
-    domain: 'order',
-    action: 'recalculate-cost',
-    label: '重算销售单材料成本',
-    objectType: 'sale_order',
-  })
-  @HttpCode(200)
-  @ApiOperation({ summary: '重算成本待补订单的材料成本；仅 PENDING 可重算，成功后锁定' })
-  @ApiOkResponse({ type: SaleOrderProfitDto })
-  recalculateCost(@Param('id', ParseUUIDPipe) id: string): Promise<SaleOrderProfitDto> {
-    return this.orderService.recalculateCost(id);
-  }
-
   @Get(':id')
   @RequireScopes('order:view')
   @ApiOperation({ summary: '销售单详情（含明细）' })

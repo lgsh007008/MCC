@@ -77,6 +77,7 @@ export default function MobileMaterialIssuesPage(): React.ReactElement {
           topRight={row.settlementStatus === 'pending' ? '待结转' : '已结转'}
           title={row.code}
           amount={`${formatQuantity(row.tons)} 吨`}
+          subtitle={`批次 ${row.batchCode}`}
           note={row.note || undefined}
         />
       ))}

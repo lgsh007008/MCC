@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowDownToLineIcon, ArrowUpFromLineIcon, BoxesIcon, ListChecksIcon } from 'lucide-react';
+import { ArrowDownToLineIcon, ArrowUpFromLineIcon, BoxesIcon, LayersIcon, ListChecksIcon } from 'lucide-react';
 import { useCan } from '@/components/auth/permission-context';
 import { MobileEntryCard } from '@/components/mobile/entry-card';
 import { MobileHeader } from '@/components/mobile/mobile-shell';
@@ -16,6 +16,12 @@ export default function MobileProductionHomePage(): React.ReactElement {
       <div className="space-y-4 p-4">
         {canProduction ? (
           <>
+            <MobileEntryCard
+              href="/m/production/batches"
+              icon={LayersIcon}
+              title="生产批次"
+              description="批次成本 / 关闭批次"
+            />
             <MobileEntryCard
               href="/m/production/issues"
               icon={ArrowDownToLineIcon}
