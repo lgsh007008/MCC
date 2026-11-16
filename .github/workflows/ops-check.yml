@@ -1,0 +1,29 @@
+# 临时排障：只读检查生产容器状态与服务端日志（用完删除）
+name: OpsCheck
+
+on:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 采集生产状态
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set +e
+            cd /opt/mcc
+            echo '=== compose ps ==='
+            docker compose --env-file .env.prod -f docker-compose.prod.yml ps
+            echo '=== server state ==='
+            docker inspect -f 'status={{.State.Status}} health={{if .State.Health}}{{.State.Health.Status}}{{end}} restarts={{.RestartCount}} exit={{.State.ExitCode}}' mcc-server-1
+            echo '=== web state ==='
+            docker inspect -f 'status={{.State.Status}} health={{if .State.Health}}{{.State.Health.Status}}{{end}} restarts={{.RestartCount}}' mcc-web-1
+            echo '=== server logs (tail 200) ==='
+            docker logs mcc-server-1 --tail 200 2>&1
+            echo '=== deploy log ==='
+            tail -40 deploy/last-deploy.log
