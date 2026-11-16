@@ -35,6 +35,7 @@ const MODULES: Array<{
 }> = [
   { label: '订单', view: 'order:view', manage: 'order:manage' },
   { label: '客户', view: 'customer:view', manage: 'customer:manage' },
+  { label: '托盘设计', view: 'pallet:view', manage: 'pallet:manage' },
   { label: '采购', view: 'purchase:view', manage: 'purchase:manage' },
   { label: '供应商', view: 'supplier:view', manage: 'supplier:manage' },
   { label: '生产单据', view: 'production:view', manage: 'production:manage' },
