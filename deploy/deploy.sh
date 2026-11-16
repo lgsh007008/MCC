@@ -61,6 +61,7 @@ mark "迁移完成"
 compose up -d --remove-orphans
 mark "容器重建完成"
 
-# 清掉 7 天前的未使用镜像，避免 40G 系统盘被历史版本占满
-docker image prune -af --filter "until=168h" >/dev/null
+# 清掉全部未使用镜像（运行中容器的镜像不会被删）：40G 系统盘按 7 天累积历史版本会打满，
+# redis 因磁盘满无法落盘（MISCONF）会拒绝写入，限流计数失败导致全站接口 500（2026-11-16 事故）
+docker image prune -af >/dev/null
 compose ps
