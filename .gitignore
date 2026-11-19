@@ -32,3 +32,4 @@ coverage/
 # 本地临时产物（截图、导出包等，不入库）
 tmp-shots/
 .trae-html-share-packages/
+apps/server/.e2e-db-script-*

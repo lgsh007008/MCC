@@ -1,5 +1,5 @@
 import { execSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test } from '@playwright/test';
 
@@ -48,11 +48,19 @@ const runPackagingDbScript = (script: string): void => {
   if (!databaseUrl) {
     throw new Error('DATABASE_URL 未配置，无法清理包装测试数据');
   }
-  execSync(`pnpm --filter @mcc/server exec tsx -e "${script}"`, {
-    cwd: join(__dirname, '../..'),
-    env: { ...process.env, DATABASE_URL: databaseUrl },
-    stdio: 'pipe',
-  });
+  // 脚本落盘再执行：-e 走命令行时，bash 会把反引号当命令替换、把 ${} 当变量展开，Linux CI 上必挂。
+  // 落盘放在 server 目录下，才能按该包的 node_modules 解析 @mcc/db。
+  const file = join(__dirname, '../../server', `.e2e-db-script-${Date.now()}-${Math.random().toString(16).slice(2)}.mts`);
+  writeFileSync(file, script, 'utf8');
+  try {
+    execSync(`pnpm --filter @mcc/server exec tsx "${file}"`, {
+      cwd: join(__dirname, '../..'),
+      env: { ...process.env, DATABASE_URL: databaseUrl },
+      stdio: 'pipe',
+    });
+  } finally {
+    rmSync(file, { force: true });
+  }
 };
 
 const archiveProject = (id: string): void => {
