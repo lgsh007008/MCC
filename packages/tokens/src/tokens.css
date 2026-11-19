@@ -18,6 +18,27 @@
   --mcc-text-numeric: 18px;
   --mcc-text-numeric-strong: 20px;
   --mcc-control-h: 36px;
+
+  /* 工作台专用字阶（design/包装设计.md §9.2）：只允许 body / meta 两档 */
+  --mcc-text-workbench-body: 13px;
+  --mcc-text-workbench-meta: 12px;
+
+  /* 提示语义色：替代业务代码里的 amber / emerald 色板 */
+  --mcc-color-warning: #b45309;
+  --mcc-color-warning-bg: #fffbeb;
+  --mcc-color-warning-border: #fcd34d;
+  --mcc-color-success: #047857;
+  --mcc-color-success-bg: #ecfdf5;
+  --mcc-color-success-border: #6ee7b7;
+}
+
+.dark {
+  --mcc-color-warning: #fbbf24;
+  --mcc-color-warning-bg: #3a2a0a;
+  --mcc-color-warning-border: #78500f;
+  --mcc-color-success: #6ee7b7;
+  --mcc-color-success-bg: #0b2f22;
+  --mcc-color-success-border: #166534;
 }
 
 /* 移动 Web 适老化基线（ADR-011）：按端生效，不是用户可切换的模式 */

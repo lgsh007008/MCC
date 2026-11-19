@@ -19,6 +19,13 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [{ source: '/api/v1/:path*', destination: `${API_INTERNAL_URL}/api/v1/:path*` }];
   },
+  // 旧托盘设计路由保留一跳，避免内部书签 404（design/包装设计.md §10）
+  async redirects() {
+    return [
+      { source: '/admin/pallet-design', destination: '/admin/packaging-design', permanent: false },
+      { source: '/admin/pallet-design/:path*', destination: '/admin/packaging-design/:path*', permanent: false },
+    ];
+  },
 };
 
 export default nextConfig;

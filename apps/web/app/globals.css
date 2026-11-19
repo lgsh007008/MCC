@@ -2,21 +2,64 @@
 @import '@mcc/tokens/tokens.css';
 @import '@mcc/tokens/shadcn.css';
 @import '@mcc/config/tailwind/theme.css';
-@import "tw-animate-css";
-@import "shadcn/tailwind.css";
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
 
 @custom-variant dark (&:is(.dark *));
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
-    }
+  }
   body {
     @apply bg-background text-foreground;
-    }
+  }
   html {
     @apply font-sans;
-    }
+  }
+}
+
+/*
+ * 工作台字阶（design/包装设计.md §9.2 / 技术方案 §7.1）：
+ * 共享 Input 默认带 text-base / md:text-sm，会覆盖调用方的 text-wb-body，
+ * 使工作台输入在 md 以上回落到 14px。在 data-workbench 作用域内统一回 13px；
+ * 未分层的规则优先于 Tailwind utilities，无需依赖类顺序。
+ */
+[data-workbench] [data-slot='input'],
+[data-workbench] [data-slot='textarea'] {
+  font-size: var(--mcc-text-workbench-body);
+}
+
+/*
+ * 表格密集变体（design/包装设计.md §9.2 工作台紧凑表 / design/平台布局.md §1.4）：
+ * 只对被显式标记 data-density="dense" 的表格生效，不改共享表格的默认字号与行高。
+ */
+[data-density='dense'] [data-slot='table'] {
+  font-size: 13px;
+}
+
+[data-density='dense'] [data-slot='table-head'] {
+  height: 34px;
+  padding-left: 8px;
+  padding-right: 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+[data-density='dense'] [data-slot='table-row'] {
+  height: 36px;
+}
+
+[data-density='dense'] [data-slot='table-cell'] {
+  padding: 3px 8px;
+  font-size: 13px;
+}
+
+[data-density='dense'] [data-slot='table-cell'] input {
+  height: 28px;
+  padding-left: 6px;
+  padding-right: 6px;
+  font-size: 13px;
 }
 
 /*

@@ -1,0 +1,1651 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>包装设计工作台 · 布局演示</title>
+<style>
+/*
+ * 独立演示页，视觉基线参考 Trae：
+ * shell（左栏/顶栏/平台壳）= 暖白 #f4f3ef；content（画布/右栏/底栏/图纸）= 白。
+ * 打开态是列/区域，只有关闭态 rail / pill 是浮卡。
+ * 绿色只用于保存、激活下划线与焦点；大块分段/标签用中性激活。
+ * 图纸木色与红色选中描边是领域色（design/包装设计.md §4.2）。
+ */
+:root{
+  --shell:#f4f3ef; --surface:#fff; --line:#e5e1d9; --line-soft:#eeeae2;
+  --ink:#1f1f1f; --ink-2:#5f5f5f; --ink-3:#8a8a8a;
+  --primary:#16653c; --primary-hover:#0f4f2e; --primary-soft:#e8f2ec;
+  --danger:#dc2626; --select:#b83e38; --table-head:#f7f5f1;
+  --mono:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+  --sans:"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  --shadow-card:0 1px 2px rgba(40,35,25,.06),0 8px 20px rgba(40,35,25,.08);
+  --shadow-float:0 2px 8px rgba(40,35,25,.08),0 16px 36px rgba(40,35,25,.10);
+  --radius:12px; --radius-sm:8px;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0; font-family:var(--sans); font-size:14px; color:var(--ink);
+  background:var(--shell); overflow:auto; min-width:1180px;
+  -webkit-font-smoothing:antialiased;
+}
+button{font-family:inherit;border:0;background:none;color:inherit;cursor:pointer;padding:0}
+input,select,textarea{font-family:inherit;font-size:14px;color:inherit}
+svg{display:block}
+.ic{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto}
+.vline{width:1px;height:18px;background:var(--line);flex:0 0 auto}
+
+.scroll-area::-webkit-scrollbar{width:10px;height:10px}
+.scroll-area::-webkit-scrollbar-track,
+.scroll-area::-webkit-scrollbar-corner{background:transparent}
+.scroll-area::-webkit-scrollbar-thumb{
+  background-color:color-mix(in oklab,var(--ink) 15%,transparent);
+  border:3px solid transparent;border-radius:999px;background-clip:padding-box;
+}
+.scroll-area:hover::-webkit-scrollbar-thumb,
+.scroll-area:focus-within::-webkit-scrollbar-thumb{
+  background-color:color-mix(in oklab,var(--ink) 28%,transparent);background-clip:padding-box;
+}
+.scroll-area::-webkit-scrollbar-thumb:hover{
+  background-color:color-mix(in oklab,var(--ink) 38%,transparent);background-clip:padding-box;
+}
+@supports not selector(::-webkit-scrollbar){
+  .scroll-area{scrollbar-width:thin;scrollbar-color:color-mix(in oklab,var(--ink) 20%,transparent) transparent}
+}
+
+/* ===== 平台壳对比 ===== */
+#shell{display:flex;height:100vh;min-height:720px;min-width:1180px;background:var(--shell)}
+.fake-sidebar{display:none;width:200px;flex:0 0 200px;flex-direction:column;background:var(--shell);border-right:1px solid var(--line);padding:10px 8px;transition:width .2s ease,flex-basis .2s ease;overflow:hidden}
+body.chrome .fake-sidebar{display:flex}
+.fake-sidebar.collapsed{width:48px;flex-basis:48px}
+.fs-brand{display:flex;align-items:center;gap:8px;font-weight:600;font-size:13px;padding:4px 6px 14px;color:var(--ink);white-space:nowrap}
+.fs-logo{width:22px;height:22px;border-radius:6px;background:var(--primary);color:#fff;display:grid;place-items:center;font-size:11px;flex:0 0 auto}
+.fs-item{height:30px;display:flex;align-items:center;gap:8px;padding:0 9px;border-radius:6px;color:var(--ink-2);font-size:12.5px;margin-bottom:2px;white-space:nowrap}
+.fs-item::before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor;opacity:.45;flex:0 0 auto}
+.fs-item.on{background:var(--primary-soft);color:var(--primary);font-weight:600}
+.fs-item.on::before{opacity:1;background:var(--primary)}
+.fs-foot{margin-top:auto;font-size:11px;color:var(--ink-3);padding:6px;line-height:1.5}
+.fake-sidebar.collapsed .fs-name,
+.fake-sidebar.collapsed .fs-foot{display:none}
+.fake-sidebar.collapsed .fs-brand{padding:4px 0 14px;justify-content:center}
+.fake-sidebar.collapsed .fs-item{justify-content:center;padding:0;font-size:0;gap:0;background:transparent}
+.fake-sidebar.collapsed .fs-item.on{background:transparent}
+.fake-sidebar.collapsed .fs-item::before{width:6px;height:6px;opacity:.5}
+.fake-sidebar.collapsed .fs-item.on::before{opacity:1}
+/* 平台全局侧栏按钮：底部全宽行 + 收起 / 展开文字，整行可点；与工作台局部面板的方形 Panel* 区分 */
+.fs-collapse{width:100%;height:32px;border-radius:8px;border:0;background:transparent;color:var(--ink-2);display:flex;align-items:center;justify-content:flex-start;gap:8px;padding:0 9px;margin:8px 0 2px;font-size:12px;flex:0 0 auto;cursor:pointer}
+.fs-collapse:hover{background:var(--table-head);color:var(--ink)}
+.fs-collapse .ic{width:14px;height:14px;flex:0 0 auto}
+.fs-collapse-label{white-space:nowrap}
+.fake-sidebar.collapsed .fs-collapse{justify-content:center;padding:0;margin-top:auto;margin-bottom:6px}
+.fake-sidebar.collapsed .fs-collapse-label{display:none}
+.app-col{display:flex;flex-direction:column;flex:1;min-width:0;min-height:0;background:var(--shell)}
+.fake-tabs{display:none;height:48px;flex:0 0 48px;align-items:center;gap:4px;padding:0 10px;background:var(--shell);border-bottom:1px solid var(--line)}
+body.chrome .fake-tabs{display:flex}
+.ftab{height:28px;display:inline-flex;align-items:center;padding:0 10px;border-radius:6px;font-size:12px;color:var(--ink-2)}
+.ftab.on{background:var(--surface);color:var(--ink);font-weight:600;box-shadow:0 1px 2px rgba(40,35,25,.06)}
+.ftab-add{width:24px;height:24px;display:grid;place-items:center;color:var(--ink-3);border-radius:6px}
+.ftab-sp{flex:1}
+.avatar{width:24px;height:24px;border-radius:50%;background:#e7e2d8;color:var(--ink-2);display:grid;place-items:center;font-size:11px}
+
+/* ===== 工作台：左栏 shell，通高 ===== */
+.workbench{flex:1;display:flex;min-height:0;min-width:0}
+.left-panel{
+  width:300px;flex:0 0 300px;background:var(--surface);border-right:1px solid var(--line);
+  display:flex;flex-direction:column;min-height:0;transition:width .18s ease;overflow:hidden;
+}
+.left-panel.collapsed{width:48px;flex-basis:48px}
+.lp-expanded{display:flex;flex-direction:column;flex:1;min-height:0}
+.left-panel.collapsed .lp-expanded{display:none}
+.lp-head{height:52px;flex:0 0 52px;display:flex;align-items:center;gap:8px;padding:0 8px 0 10px;border-bottom:1px solid var(--line);min-width:0}
+.lp-title{min-width:0;flex:1;display:flex;align-items:center;gap:8px}
+.lp-title .tx{min-width:0}
+.lp-title b{display:block;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lp-title .sub{display:block;font-size:11.5px;color:var(--ink-3);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.code-chip{font-family:var(--mono);font-size:10.5px;background:var(--primary-soft);color:var(--primary);border-radius:5px;padding:2px 5px;flex:0 0 auto}
+.lp-body{flex:1;overflow-y:auto;padding:14px 14px 24px;min-height:0}
+.lp-body.anim{animation:lpIn .18s ease}
+@keyframes lpIn{from{opacity:0;transform:translateX(-6px)}to{opacity:1;transform:translateX(0)}}
+.lp-mini{display:none;flex-direction:column;align-items:center;gap:10px;padding-top:12px;cursor:pointer;height:100%}
+.left-panel.collapsed .lp-mini{display:flex}
+.vertical{writing-mode:vertical-rl;letter-spacing:2px;font-size:11px;color:var(--ink-3)}
+.lp-mini .ic{width:14px;height:14px;color:var(--ink-3)}
+
+/* 工作台局部面板：边缘双箭头把手。区别于平台侧栏的 PanelLeft + “收起”按钮。 */
+
+
+/* 左栏平面小节 */
+.section{margin:0 0 20px}
+.section:last-child{margin-bottom:0}
+.section-head{
+  display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:var(--ink-2);
+  letter-spacing:.3px;padding-bottom:7px;border-bottom:1px solid var(--line);margin-bottom:10px;
+}
+.section-head::before{content:"";width:2px;height:12px;border-radius:1px;background:#c9c3b8;flex:0 0 auto}
+.fld{margin-bottom:10px}
+.fld:last-child{margin-bottom:0}
+.fld label{display:block;font-size:13px;color:var(--ink-2);margin-bottom:5px}
+.fld input,.fld select,.fld textarea{
+  width:100%;height:32px;border:1px solid var(--line);border-radius:6px;padding:0 9px;background:var(--surface);outline:none;
+}
+.fld textarea{height:64px;padding:6px 9px;resize:vertical;line-height:1.5}
+.fld input:focus,.fld select:focus,.fld textarea:focus{
+  border-color:var(--primary);box-shadow:0 0 0 3px color-mix(in oklab,var(--primary) 12%,transparent);
+}
+select{
+  appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%235f5f5f' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 9px center;padding-right:28px;
+}
+.fld-row{display:flex;gap:8px}
+.fld-row .fld{flex:1;min-width:0}
+.hint{font-size:12px;color:var(--ink-3);line-height:1.55;margin-top:5px}
+.readonly{background:var(--table-head) !important;color:var(--ink-2)}
+.mini-seg{display:flex;gap:4px;flex-wrap:wrap}
+.mini-seg button{height:28px;padding:0 10px;border:1px solid var(--line);border-radius:6px;background:var(--surface);font-size:12px;color:var(--ink-2)}
+.mini-seg button:hover{border-color:#cfc9bd;color:var(--ink)}
+.mini-seg button.on{background:#e9e4da;border-color:#d8d2c6;color:var(--ink);font-weight:600}
+.sum-row{display:flex;align-items:center;gap:6px;padding:7px 0;border-bottom:1px solid var(--line-soft);font-size:12.5px;cursor:pointer}
+.sum-row:last-child{border-bottom:0}
+.sum-row:hover b{color:var(--primary)}
+.sum-row .qty{margin-left:auto;font-family:var(--mono);color:var(--ink-3);font-size:11px}
+.link-btn{font-size:12.5px;color:var(--primary);display:inline-flex;align-items:center;gap:4px;padding:6px 0}
+.link-btn:hover{text-decoration:underline}
+
+.lp-note{font-size:11.5px;color:var(--ink-3);line-height:1.65;margin-top:12px}
+
+/* 左栏单元目录树：父级 = 单元类型，子级 = 模板 / 单元 */
+.cat-group{margin-bottom:10px}
+.cat-row{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;font-size:12.5px;font-weight:600;color:var(--ink-2);letter-spacing:.2px}
+.cat-row .code-chip{margin-left:auto}
+.cat-children{display:grid;gap:1px;margin-top:2px;padding-left:12px;border-left:1px solid var(--line-soft);margin-left:10px}
+.cat-item{
+  display:flex;align-items:center;gap:8px;width:100%;padding:7px 8px;border-radius:6px;
+  font-size:12.5px;color:var(--ink-2);text-align:left;cursor:pointer;
+}
+.cat-item:hover{background:#ece8e0}
+.cat-item.on{background:#e9e4da;color:var(--ink);font-weight:600}
+.cat-item .cat-name{min-width:0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cat-item .cat-cur{font-size:10.5px;color:var(--primary);background:var(--primary-soft);border-radius:5px;padding:1px 5px;flex:0 0 auto}
+.cat-item .cat-meta{font-family:var(--mono);font-size:10.5px;color:var(--ink-3);flex:0 0 auto}
+
+/* ===== 主区顶栏：shell，只覆盖画布 + 右栏 ===== */
+.main-area{flex:1;min-width:0;display:flex;flex-direction:column;min-height:0;background:var(--surface)}
+.topbar{
+  height:52px;flex:0 0 52px;display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:0 14px;background:var(--surface);border-bottom:1px solid var(--line);position:relative;z-index:30;
+}
+.tb-left,.tb-right{display:flex;align-items:center;gap:8px;min-width:0}
+.icon-btn{width:30px;height:30px;border-radius:6px;display:grid;place-items:center;color:var(--ink-2)}
+.icon-btn:hover{background:#e9e4da;color:var(--ink)}
+.doc-code{font-family:var(--mono);font-size:11.5px;color:var(--ink-2);padding:2px 6px;background:#e9e4da;border-radius:5px;white-space:nowrap}
+.doc-title-input{
+  font-size:15px;font-weight:600;color:var(--ink);width:320px;max-width:36vw;min-width:200px;
+  border:1px solid transparent;background:transparent;border-radius:6px;padding:4px 6px;outline:none;
+}
+.doc-title-input:hover{background:#e9e4da}
+.doc-title-input:focus{
+  background:var(--surface);border-color:var(--primary);
+  box-shadow:0 0 0 3px color-mix(in oklab,var(--primary) 12%,transparent);
+}
+.badge{font-size:12px;padding:2px 8px;border-radius:10px;border:1px solid var(--line);color:var(--ink-2);background:var(--surface);white-space:nowrap}
+.badge.issued{color:var(--primary);border-color:#cfe6da;background:var(--primary-soft)}
+.save-state{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--ink-2);white-space:nowrap}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--primary);flex:0 0 auto}
+.dot.dirty{background:var(--danger)}
+.seg{display:flex;padding:2px;background:#e9e4da;border:1px solid var(--line);border-radius:8px}
+.seg button{height:28px;padding:0 10px;font-size:12.5px;border-radius:6px;color:var(--ink-2)}
+.seg button:hover{color:var(--ink)}
+.seg button.on{background:var(--surface);color:var(--ink);font-weight:600;box-shadow:0 1px 2px rgba(40,35,25,.10)}
+.btn{height:32px;padding:0 12px;border-radius:8px;font-size:13px;display:inline-flex;align-items:center;gap:6px;border:1px solid transparent;white-space:nowrap}
+.btn-primary{background:var(--primary);color:#fff}
+.btn-primary:hover{background:var(--primary-hover)}
+.btn-primary.emphasize{box-shadow:0 0 0 3px color-mix(in oklab,var(--primary) 16%,transparent)}
+.btn-ghost{border-color:var(--line);background:var(--surface);color:var(--ink-2)}
+.btn-ghost:hover{background:var(--table-head);color:var(--ink)}
+.caret{font-size:9px;color:var(--ink-3)}
+.menu-wrap{position:relative}
+.menu{
+  position:absolute;right:0;top:38px;width:244px;background:var(--surface);border:1px solid var(--line);border-radius:10px;
+  box-shadow:var(--shadow-float);padding:5px;display:none;z-index:60;
+}
+.menu.open{display:block}
+.menu-item{display:flex;align-items:center;gap:8px;width:100%;padding:7px 9px;border-radius:6px;font-size:13px;text-align:left}
+.menu-item:hover{background:var(--table-head)}
+.menu-item.disabled{opacity:.38;pointer-events:none}
+.menu-item kbd{margin-left:auto;font-family:var(--mono);font-size:10.5px;color:var(--ink-3)}
+.menu-sep{height:1px;background:var(--line-soft);margin:4px 6px}
+.menu-label{font-size:10.5px;color:var(--ink-3);padding:6px 9px 2px;letter-spacing:.5px}
+
+/* ===== 主区：白 content + 右栏白列 ===== */
+.main-body{flex:1;display:flex;min-height:0;min-width:0;background:var(--surface)}
+.canvas-col{flex:1;min-width:0;display:flex;flex-direction:column;min-height:0;container-type:inline-size}
+.canvas-wrap{flex:1;min-width:0;position:relative;overflow:hidden;background:var(--surface)}
+.stage{position:absolute;inset:0;overflow:hidden}
+.pane{position:absolute;inset:0;display:none}
+.stage[data-mode="2d"] .pane-2d,
+.stage[data-mode="sheet"] .pane-2d,
+.stage[data-mode="3d"] .pane-3d,
+.stage[data-mode="split"] .pane-split{display:flex}
+.pane-2d{
+  align-items:center;justify-content:center;overflow:hidden;box-sizing:border-box;
+  padding:var(--top-inset,56px) calc(14px + var(--right-inset,56px)) var(--bottom-inset,56px) 14px;
+}
+.sheet-scale{transform-origin:center center;transition:transform .12s ease;display:flex;align-items:center;justify-content:center;width:100%;height:100%}
+.a3{
+  width:min(760px,86%);aspect-ratio:1.414;background:var(--surface);border:1px solid #e3dfd6;border-radius:2px;
+  box-shadow:0 1px 2px rgba(40,35,25,.04),0 18px 40px rgba(40,35,25,.08);position:relative;padding:12px;display:flex;
+}
+.a3-inner{flex:1;min-width:0;display:flex}
+.a3-inner svg{width:100%;height:100%}
+.a3-frame{position:absolute;inset:14px;border:1.5px solid #333;display:none;pointer-events:none}
+.a3.show-frame .a3-frame{display:block}
+.title-block{position:absolute;right:14px;bottom:14px;width:232px;height:72px;border:1.5px solid #333;background:var(--surface);display:none;font-size:9px;color:#333;grid-template-rows:22px 1fr 1fr}
+.a3.show-frame .title-block{display:grid}
+.a3.show-frame .a3-inner{padding-bottom:66px}
+.tb-title{padding:0 7px;border-bottom:1px solid #333;font-weight:600;font-size:10px;display:flex;align-items:center;justify-content:center;white-space:nowrap;overflow:hidden}
+.tb-row{display:flex;align-items:center;gap:5px;padding:0 7px;border-bottom:1px solid #bfbfbf;white-space:nowrap;overflow:hidden}
+.tb-row:last-child{border-bottom:0}
+.tb-row span{color:#7a7a7a}
+.tb-row b{font-weight:600;font-family:var(--mono);font-size:9px}
+
+.dwg{width:100%;height:100%}
+.dwg .wood{fill:#e8d3b5;stroke:#8a6a45;stroke-width:1.4}
+.dwg .wood2{fill:#dcc09a;stroke:#8a6a45;stroke-width:1.4}
+.dwg .hidden{fill:none;stroke:#b3a18c;stroke-width:1.1;stroke-dasharray:7 5}
+.dwg .hidden2{fill:none;stroke:#c8baa8;stroke-width:1;stroke-dasharray:5 7}
+.dwg .grain{stroke:#c9ad8b;stroke-width:.8;fill:none}
+.dwg .edge{stroke:#8a6a45;stroke-width:1.1;fill:none;stroke-dasharray:4 4}
+.dwg .dim{stroke:#8a8a8a;stroke-width:1;fill:none}
+.dwg text{font-family:var(--mono);font-size:22px;fill:#7a7a7a}
+.dwg .view-label{font-size:24px;fill:#9a9a9a;letter-spacing:2px}
+.part{cursor:pointer}
+.part:hover .wood,.part:hover .wood2{fill:#f1dfc7}
+.part:hover .hidden{stroke:#8a7a68}
+.part.sel rect,.part.sel polygon,.part.sel .wood,.part.sel .wood2{
+  stroke:var(--select) !important;stroke-width:2.8 !important;stroke-dasharray:none !important;
+}
+.dwg .f-top{fill:#eedcc3;stroke:#8a6a45;stroke-width:1.2}
+.dwg .f-right{fill:#dcc09a;stroke:#8a6a45;stroke-width:1.2}
+.dwg .f-left{fill:#cbaa7f;stroke:#8a6a45;stroke-width:1.2}
+.part:hover .f-top{fill:#f3e4cf}
+.part:hover .f-right{fill:#e4cbaa}
+.part:hover .f-left{fill:#d6b78d}
+.part.sel polygon{stroke:var(--select) !important;stroke-width:2.2 !important}
+
+.pane-3d{background:var(--surface);align-items:center;justify-content:center;overflow:hidden}
+.d3-wrap{width:100%;height:100%;position:relative;display:flex;align-items:center;justify-content:center}
+.d3-stage{width:86%;height:86%;display:flex;align-items:center;justify-content:center}
+.d3-stage svg{width:100%;height:100%}
+.d3-hint{
+  position:absolute;top:58px;left:50%;transform:translateX(-50%);font-size:11px;color:var(--ink-2);
+  background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:3px 10px;white-space:nowrap;z-index:2;
+}
+.pane-split{overflow:hidden}
+.split-half{flex:1;min-width:0;position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden;background:var(--surface)}
+.split-half+.split-half{border-left:1px solid var(--line)}
+.pane-label{position:absolute;top:58px;left:12px;font-size:11px;color:var(--ink-2);background:var(--surface);border:1px solid var(--line);padding:2px 7px;border-radius:5px;z-index:2}
+.split-half .a3{width:92%;padding:8px}
+.split-half .a3-inner{padding:0}
+.split-half .d3-stage{width:84%;height:84%}
+
+/* 画布上的文字工具，不再用白卡 */
+.view-tabs{position:absolute;top:12px;left:12px;z-index:6;display:flex;gap:2px}
+.view-tabs button{height:30px;padding:0 9px;font-size:12px;color:var(--ink-2);box-shadow:inset 0 -2px 0 transparent}
+.view-tabs button:hover{color:var(--ink)}
+.view-tabs button.on{color:var(--ink);font-weight:600;box-shadow:inset 0 -2px 0 var(--primary)}
+.canvas-tools{position:absolute;top:12px;right:12px;z-index:6;display:flex;align-items:center;gap:6px;white-space:nowrap}
+.canvas-meta{font-size:11.5px;color:var(--ink-2)}
+.tool-sep{width:1px;height:16px;background:var(--line)}
+.zoom{display:flex;align-items:center;gap:2px}
+.zoom button{width:24px;height:24px;font-size:13px;color:var(--ink-2);border-radius:5px}
+.zoom button:hover{background:var(--table-head);color:var(--ink)}
+.zoom .pct{width:42px;text-align:center;font-size:11px;font-family:var(--mono);color:var(--ink-2)}
+.zoom .fit{width:auto;padding:0 7px;font-size:11.5px}
+
+/* 关闭态：右侧 rail 浮卡 + 底部 pill */
+.rail-float{position:absolute;right:12px;top:56px;z-index:6}
+.rail-card{
+  width:44px;display:flex;flex-direction:column;align-items:center;gap:2px;padding:5px 0;
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow-card);
+}
+.rail-btn{width:34px;height:34px;border-radius:7px;display:grid;place-items:center;color:var(--ink-3);position:relative}
+.rail-btn:hover{background:var(--table-head);color:var(--ink)}
+.rail-btn[data-tip]::after{
+  content:attr(data-tip);position:absolute;right:42px;top:50%;transform:translateY(-50%);
+  background:var(--ink);color:#fff;font-size:11px;padding:4px 7px;border-radius:5px;white-space:nowrap;
+  opacity:0;pointer-events:none;transition:opacity .12s;z-index:80;
+}
+.rail-btn:hover::after{opacity:1}
+.rail-divider{width:24px;height:1px;background:var(--line-soft);margin:4px 0}
+.rail-dot,.tab-dot{width:6px;height:6px;border-radius:50%;background:var(--danger);display:none;flex:0 0 auto}
+.rail-dot{position:absolute;top:7px;right:7px}
+
+.bottom-launcher{
+  position:absolute;left:50%;bottom:12px;transform:translateX(-50%);z-index:12;
+  height:38px;display:flex;align-items:center;gap:6px;padding:0 10px;
+  background:var(--surface);border:1px solid var(--line);border-radius:999px;box-shadow:var(--shadow-float);
+  max-width:calc(100% - 24px);white-space:nowrap;cursor:pointer;
+}
+.bottom-launcher:hover{border-color:#d6d0c4}
+.launcher-label{font-size:11px;color:var(--ink-3);letter-spacing:.4px}
+.launcher-sep{width:1px;height:14px;background:var(--line)}
+.launcher-tab{font-size:12px;color:var(--ink);font-weight:600}
+.launcher-count{font-style:normal;font-family:var(--mono);font-size:10.5px;color:var(--ink-3)}
+.launcher-chev{width:14px;height:14px;color:var(--ink-3)}
+
+/* 打开态：底部白色区域，只在画布列 */
+.bottom-panel{
+  display:flex;flex-direction:column;height:0;overflow:hidden;background:var(--surface);
+  flex:0 0 auto;min-height:0;transition:height .2s ease;border-top:0;
+}
+.bottom-panel.open{border-top:1px solid var(--line)}
+.bp-grip{height:10px;flex:0 0 10px;display:flex;align-items:center;justify-content:center;cursor:ns-resize}
+.bp-grip::before{content:"";width:34px;height:4px;border-radius:2px;background:#d8d2c6}
+.bp-head{height:34px;flex:0 0 34px;display:flex;align-items:center;gap:8px;padding:0 8px 0 10px;border-bottom:1px solid var(--line)}
+.bp-tabs{display:flex;gap:2px;min-width:0;overflow-x:auto;scrollbar-width:none}
+.bp-tabs::-webkit-scrollbar{display:none}
+.bp-tab{height:26px;padding:0 9px;font-size:12.5px;color:var(--ink-2);white-space:nowrap;box-shadow:inset 0 -2px 0 transparent}
+.bp-tab:hover{color:var(--ink)}
+.bp-tab.on{color:var(--ink);font-weight:600;box-shadow:inset 0 -2px 0 var(--primary)}
+.bp-meta{margin-left:auto;display:flex;align-items:center;gap:6px;min-width:0}
+.bp-metrics{font-size:11px;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bp-metrics b{font-family:var(--mono);font-weight:600;font-size:11px;color:var(--ink-2)}
+.issue-btn{height:22px;display:inline-flex;align-items:center;gap:4px;padding:0 6px;border-radius:5px;color:var(--ink-2);font-size:11px}
+.issue-btn:hover{background:var(--table-head);color:var(--ink)}
+.issue-dot{width:6px;height:6px;border-radius:50%;background:var(--danger);display:inline-block;flex:0 0 auto}
+.collapse-btn{width:26px;height:24px;border-radius:5px;display:grid;place-items:center;color:var(--ink-3)}
+.collapse-btn:hover{background:var(--table-head);color:var(--ink)}
+.bp-body{flex:1;overflow:auto;min-height:0;background:var(--surface)}
+
+/* 打开态：右侧白色通高列 */
+.right-panel{
+  display:flex;flex-direction:column;width:0;flex:0 0 0;overflow:hidden;min-height:0;
+  background:var(--surface);border-left:1px solid transparent;transition:width .18s ease,flex-basis .18s ease;
+}
+.right-panel.open{width:320px;flex-basis:320px;border-left-color:var(--line)}
+.rp-tabs{height:40px;flex:0 0 40px;display:flex;align-items:stretch;border-bottom:1px solid var(--line);background:var(--surface);overflow-x:auto;scrollbar-width:none;min-width:0}
+.rp-tabs::-webkit-scrollbar{display:none}
+.rp-tab{display:flex;align-items:center;gap:5px;padding:0 9px;font-size:12.5px;color:var(--ink-2);border-right:1px solid var(--line-soft);white-space:nowrap;flex:0 0 auto;box-shadow:inset 0 -2px 0 transparent}
+.rp-tab:hover{color:var(--ink)}
+.rp-tab.on{color:var(--ink);font-weight:600;box-shadow:inset 0 -2px 0 var(--primary)}
+.rp-tab .ic{width:13px;height:13px}
+.rp-collapse{width:28px;flex:0 0 28px;margin-left:auto;display:grid;place-items:center;border-left:1px solid var(--line-soft);color:var(--ink-3)}
+.rp-collapse:hover{background:var(--table-head);color:var(--ink)}
+.rp-collapse .ic{width:14px;height:14px}
+.rp-body{flex:1;overflow-y:auto;padding:14px;min-height:0}
+
+/* 右侧内容：平面小节 */
+.tp-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:12px}
+.tp-head b{font-size:14px}
+.tp-head span{font-size:11px;color:var(--ink-3);font-family:var(--mono)}
+.seg-list{display:flex;gap:2px;border-bottom:1px solid var(--line);margin-bottom:14px;overflow-x:auto;scrollbar-width:none}
+.seg-list::-webkit-scrollbar{display:none}
+.seg-list button{height:30px;padding:0 8px;font-size:12px;color:var(--ink-2);border-bottom:2px solid transparent;white-space:nowrap;display:inline-flex;align-items:center;gap:5px}
+.seg-list button:hover{color:var(--ink)}
+.seg-list button.on{color:var(--primary);border-bottom-color:var(--primary);font-weight:600}
+.seg-list em{font-style:normal;font-family:var(--mono);font-size:10px;color:var(--ink-3);font-weight:400}
+.kv-list{border-top:1px solid var(--line-soft);margin-top:10px}
+.kv-list div{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 0;border-bottom:1px solid var(--line-soft);font-size:12px;color:var(--ink-2)}
+.kv-list b{font-family:var(--mono);font-weight:600;font-size:12px;color:var(--ink)}
+.check-list{border-top:1px solid var(--line-soft)}
+.check-item{display:flex;align-items:flex-start;gap:8px;padding:9px 0;border-bottom:1px solid var(--line-soft);font-size:12px;line-height:1.5}
+.check-item .mk{width:16px;height:16px;border-radius:50%;display:grid;place-items:center;flex:0 0 auto;margin-top:1px;font-size:10px}
+.check-item.warn .mk{background:#fbe9e9;color:var(--danger)}
+.check-item.ok .mk{background:var(--primary-soft);color:var(--primary)}
+.check-item b{display:block;font-size:12px;margin-bottom:1px;color:var(--ink)}
+.check-item p{margin:0;color:var(--ink-3);font-size:11.5px}
+.rev-row{display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--line-soft);font-size:12px}
+.rev-row .rev-no{font-family:var(--mono);font-size:11px;color:var(--primary);background:var(--primary-soft);border-radius:4px;padding:2px 5px}
+.rev-row .rev-meta{margin-left:auto;font-size:10.5px;color:var(--ink-3)}
+.kbd-table{width:100%;border-collapse:collapse;font-size:12px}
+.kbd-table td{padding:8px 2px;border-bottom:1px solid var(--line-soft);color:var(--ink-2)}
+.kbd-table td:last-child{text-align:right;font-family:var(--mono);font-size:10.5px;color:var(--ink-3)}
+.tp-empty{text-align:center;color:var(--ink-3);font-size:12px;line-height:1.7;padding:28px 10px}
+.tp-empty .ic{width:26px;height:26px;margin:0 auto 8px;color:#c4beb2}
+
+table.mock{width:100%;border-collapse:collapse;font-size:14px}
+.mock th{
+  position:sticky;top:0;height:40px;padding:0 10px;background:var(--table-head);color:var(--ink-2);
+  text-align:left;font-weight:600;font-size:12.5px;border-bottom:1px solid var(--line);white-space:nowrap;z-index:2;
+}
+.mock td{height:44px;padding:0 10px;border-bottom:1px solid var(--line-soft);white-space:nowrap}
+.mock tbody tr{cursor:pointer}
+.mock tbody tr:hover{background:var(--table-head)}
+.mock tr.sel td{background:var(--primary-soft)}
+.mock .num{text-align:right;font-family:var(--mono);font-size:13px;color:var(--ink-2)}
+.mock tfoot td{background:var(--table-head);font-weight:600;border-top:1px solid var(--line);border-bottom:0}
+table.mock.parts{min-width:960px}
+table.mock.bom{min-width:900px}
+table.mock.cut{min-width:640px}
+
+/* ===== 帮助浮层 ===== */
+.help-pop{
+  position:fixed;top:64px;right:24px;z-index:120;width:286px;background:var(--surface);border:1px solid var(--line);
+  border-radius:10px;box-shadow:var(--shadow-float);padding:10px 12px 12px;display:none;
+}
+.help-pop.open{display:block}
+.help-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding-bottom:6px;border-bottom:1px solid var(--line);margin-bottom:4px}
+.help-head b{font-size:13px}
+.help-close{width:22px;height:22px;border-radius:5px;display:grid;place-items:center;color:var(--ink-3)}
+.help-close:hover{background:var(--table-head);color:var(--ink)}
+
+.toast{
+  position:fixed;left:50%;bottom:64px;transform:translate(-50%,8px);background:var(--ink);color:#fff;font-size:12px;
+  padding:7px 12px;border-radius:7px;opacity:0;pointer-events:none;transition:all .18s;z-index:130;
+  box-shadow:0 8px 24px rgba(0,0,0,.18);max-width:70vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@container (max-width:760px){
+  .bp-metrics{display:none}
+}
+@container (max-width:560px){
+  .canvas-meta,.tool-sep{display:none}
+}
+@media (max-width:1400px){
+  .doc-code{display:none}
+}
+@media (max-width:1320px){
+  .save-state{display:none}
+}
+</style>
+</head>
+<body>
+<div id="shell">
+  <aside class="fake-sidebar" id="fakeSidebar" aria-hidden="true">
+    <div class="fs-brand"><span class="fs-logo">木</span><span class="fs-name">梅好木业</span></div>
+    <div class="fs-item">首页</div>
+    <div class="fs-item">销售管理</div>
+    <div class="fs-item">生产管理</div>
+    <div class="fs-item on">包装设计</div>
+    <div class="fs-item">系统设置</div>
+    <div class="fs-foot">平台壳仅用于对比可用空间；工作台路由隐藏面包屑行。</div>
+    <button type="button" class="fs-collapse" id="chromeCollapse" title="收起侧边栏" aria-label="收起侧边栏">
+      <svg class="ic" viewBox="0 0 24 24"><path d="m11 17-5-5 5-5"/><path d="m18 17-5-5 5-5"/></svg>
+      <span class="fs-collapse-label">收起</span>
+    </button>
+  </aside>
+
+  <div class="app-col">
+    <div class="fake-tabs" aria-hidden="true">
+      <span class="ftab on">包装设计 · PD-00001</span>
+      <span class="ftab">方案库</span>
+      <span class="ftab-add">+</span>
+      <span class="ftab-sp"></span>
+      <span class="avatar">销</span>
+    </div>
+
+    <div class="workbench">
+      <aside class="left-panel" id="leftPanel">
+        <div class="lp-expanded">
+          <div class="lp-head" id="lpHead"></div>
+          <div class="lp-body scroll-area" id="lpBody"></div>
+        </div>
+        <div class="lp-mini" data-lpact="expand" title="展开左栏" aria-label="展开左栏">
+          <svg class="ic" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/><path d="m14 9 3 3-3 3"/></svg>
+          <span class="vertical">单元目录</span>
+          <span class="code-chip">U01</span>
+        </div>
+      </aside>
+
+      <div class="main-area">
+        <header class="topbar">
+          <div class="tb-left">
+            <button class="icon-btn" id="backBtn" title="返回方案库" aria-label="返回方案库">
+              <svg class="ic" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+            </button>
+            <span class="vline"></span>
+            <span class="doc-code">PD-00001</span>
+            <input class="doc-title-input" id="docTitleInput" maxlength="100" aria-label="方案名称" title="点击修改方案名称">
+            <span class="badge" id="statusBadge">草稿</span>
+            <span class="save-state" id="saveState"><i class="dot"></i>已保存 · 14:32</span>
+          </div>
+          <div class="tb-right">
+            <div class="seg" id="modeSeg">
+              <button type="button" data-mode="2d" class="on">2D</button>
+              <button type="button" data-mode="3d">3D</button>
+              <button type="button" data-mode="sheet">图纸</button>
+              <button type="button" data-mode="split">分屏</button>
+            </div>
+            <button type="button" class="btn btn-primary" id="saveBtn">保存</button>
+            <div class="menu-wrap">
+              <button type="button" class="btn btn-ghost" id="moreBtn">更多 <span class="caret">▾</span></button>
+              <div class="menu" id="moreMenu"></div>
+            </div>
+          </div>
+        </header>
+
+        <div class="main-body">
+          <div class="canvas-col">
+            <div class="canvas-wrap">
+              <div class="view-tabs" id="viewChips">
+                <button type="button" data-view="top" class="on">俯视</button>
+                <button type="button" data-view="front">主视</button>
+                <button type="button" data-view="side">侧视</button>
+                <button type="button" data-view="iso">轴测</button>
+              </div>
+              <div class="canvas-tools">
+                <span class="canvas-meta" id="canvasMeta">A3 · 1:10 · 俯视</span>
+                <span class="tool-sep"></span>
+                <div class="zoom">
+                  <button type="button" id="zoomOut" aria-label="缩小">−</button>
+                  <span class="pct" id="zoomPct">100%</span>
+                  <button type="button" id="zoomIn" aria-label="放大">+</button>
+                  <button type="button" class="fit" id="zoomFit">适配</button>
+                </div>
+              </div>
+
+              <div class="rail-float" id="rail"></div>
+
+              <div class="bottom-launcher" id="bottomLauncher" role="button" tabindex="0">
+                <span class="launcher-label">明细</span>
+                <span class="launcher-sep"></span>
+                <span class="launcher-tab" id="launcherTab">构件表</span>
+                <em class="launcher-count" id="launcherCount">20</em>
+                <svg class="ic launcher-chev" viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></svg>
+              </div>
+
+              <div class="stage" id="stage" data-mode="2d">
+                <div class="pane pane-2d">
+                  <div class="sheet-scale" id="sheetScale">
+                    <div class="a3" id="a3">
+                      <div class="a3-inner" id="a3Body"></div>
+                      <div class="a3-frame"></div>
+                      <div class="title-block">
+                        <div class="tb-title" id="tbTitle">出口实木托盘 · 俯视图</div>
+                        <div class="tb-row"><span>图号</span><b>PD-00001-U01-01</b></div>
+                        <div class="tb-row"><span>比例</span><b>1:10</b><span>日期</span><b>2026-11-17</b></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="pane pane-3d">
+                  <div class="d3-wrap">
+                    <div class="d3-hint">静态轴测示意 · 正式版支持旋转 / 缩放</div>
+                    <div class="d3-stage" id="d3Stage"></div>
+                  </div>
+                </div>
+
+                <div class="pane pane-split" id="splitPane"></div>
+              </div>
+            </div>
+
+            <section class="bottom-panel" id="bottomPanel">
+              <div class="bp-grip" id="bsResize" title="拖动调整高度"></div>
+              <div class="bp-head">
+                <div class="bp-tabs">
+                  <button type="button" class="bp-tab on" data-sheet-tab="parts">构件表</button>
+                  <button type="button" class="bp-tab" data-sheet-tab="bom">BOM</button>
+                  <button type="button" class="bp-tab" data-sheet-tab="cutting">开料</button>
+                </div>
+                <div class="bp-meta">
+                  <span class="bp-metrics metrics-text"></span>
+                  <button type="button" class="issue-btn" data-issue title="查看校验">
+                    <i class="issue-dot"></i><span class="issue-count">1</span>
+                  </button>
+                  <button type="button" class="collapse-btn" id="bottomCollapse" title="收起底部面板" aria-label="收起底部面板">
+                    <svg class="ic" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 15h18"/><path d="m15 8-3 3-3-3"/></svg>
+                  </button>
+                </div>
+              </div>
+              <div class="bp-body scroll-area" id="bsBody"></div>
+            </section>
+          </div>
+
+          <aside class="right-panel" id="rightPanel">
+            <div class="rp-tabs" id="rpTabs"></div>
+            <div class="rp-body scroll-area" id="toolPanel"></div>
+          </aside>
+        </div>
+      </div>
+    </div>
+
+    <div class="help-pop" id="helpPop"></div>
+    <div class="toast" id="toast"></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var $ = function (sel, root) { return (root || document).querySelector(sel); };
+  var $$ = function (sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); };
+  var clamp = function (n, min, max) { return Math.min(max, Math.max(min, n)); };
+  var esc = function (s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  };
+  var nowTime = function () {
+    var d = new Date();
+    return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  };
+  var f2 = function (n) { return Number(n).toFixed(2); };
+  var f3 = function (n) { return Number(n).toFixed(3); };
+  var f4 = function (n) { return Number(n).toFixed(4); };
+
+  var IC = {
+    back: '<svg class="ic" viewBox="0 0 24 24"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>',
+    chevL: '<svg class="ic" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>',
+    chevR: '<svg class="ic" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>',
+    panelLeftClose: '<svg class="ic" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/><path d="m16 15-3-3 3-3"/></svg>',
+    panelRightClose: '<svg class="ic" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M15 3v18"/><path d="m8 9 3 3-3 3"/></svg>',
+    chevronsLeft: '<svg class="ic" viewBox="0 0 24 24"><path d="m11 17-5-5 5-5"/><path d="m18 17-5-5 5-5"/></svg>',
+    chevronsRight: '<svg class="ic" viewBox="0 0 24 24"><path d="m6 17 5-5-5-5"/><path d="m13 17 5-5-5-5"/></svg>',
+    close: '<svg class="ic" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+    scheme: '<svg class="ic" viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M8 13h8M8 17h5"/></svg>',
+    part: '<svg class="ic" viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5 9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 16l9 5 9-5"/></svg>',
+    check: '<svg class="ic" viewBox="0 0 24 24"><path d="M12 3l7 3v6c0 4-3 7-7 9-4-2-7-5-7-9V6l7-3z"/><path d="M9 12l2 2 4-4"/></svg>',
+    rev: '<svg class="ic" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 8v4l3 2"/></svg>'
+  };
+
+  var MATERIALS = {
+    PINE: { name: '松木', density: 500, price: 1600 },
+    PLY: { name: '胶合板', density: 600, price: 2400 },
+    POPLAR: { name: '杨木', density: 430, price: 1200 }
+  };
+  var TEMPLATES = [
+    ['pallet-9block-4way', '九墩块四向进叉'],
+    ['pallet-3stringer', '三纵梁两向进叉'],
+    ['pallet-notch', '开槽纵梁四向进叉'],
+    ['pallet-runner', '滑木'],
+    ['pallet-ply', '胶合板']
+  ];
+  var VIEW_LABEL = { top: '俯视图', front: '主视图', side: '侧视图', iso: '轴测图' };
+  var CRATE_TEMPLATES = [['crate-g', '普通木箱 G 型']];
+  var PALLET_DIMS = {
+    'pallet-9block-4way': [1200, 800],
+    'pallet-3stringer': [1100, 1100],
+    'pallet-notch': [1100, 1100],
+    'pallet-runner': [1200, 800],
+    'pallet-ply': [1200, 800]
+  };
+  var DEFAULT_UNIT_NAME = '1200×800 出口实木托盘';
+  var BOTTOM_LABEL = { parts: '构件表', bom: 'BOM', cutting: '开料' };
+  var TABS = [['scheme', '方案'], ['part', '构件'], ['check', '校验'], ['rev', '版本']];
+  var RAW_PARTS = [
+    { role: 'TOP_DECK', label: '面板', name: '面板', material: 'PINE', orientation: 'x', l: 1200, w: 145, h: 22, q: 5, waste: 8, fee: 3, price: 0 },
+    { role: 'STRINGER_BOARD', label: '中间纵梁板', name: '中间纵梁板', material: 'PINE', orientation: 'x', l: 1200, w: 100, h: 100, q: 3, waste: 8, fee: 2, price: 0 },
+    { role: 'BLOCK', label: '墩块', name: '墩块', material: 'PINE', orientation: 'x', l: 100, w: 100, h: 100, q: 9, waste: 8, fee: 1, price: 0 },
+    { role: 'BOTTOM_DECK', label: '底板', name: '底板', material: 'PINE', orientation: 'x', l: 1200, w: 145, h: 22, q: 3, waste: 8, fee: 3, price: 0 }
+  ];
+
+  var state = {
+    project: {
+      code: 'PD-00001',
+      name: '未命名方案',
+      customer: '苏州迈特机械有限公司',
+      destination: 'EXPORT',
+      note: ''
+    },
+    unit: {
+      code: 'U01',
+      name: DEFAULT_UNIT_NAME,
+      type: 'PALLET',
+      template: 'pallet-9block-4way',
+      length: 1200,
+      width: 800,
+      load: null,
+      entry: 'FOUR',
+      loadType: 'UNIFORM'
+    },
+    parts: RAW_PARTS.map(function (p) { return Object.assign({}, p); }),
+    selected: null,
+    dirty: false,
+    canUndo: false,
+    canRedo: false,
+    savedAt: '14:32',
+    status: 'DRAFT',
+    mode: '2d',
+    view: 'top',
+    zoom: 100,
+    leftView: 'list',
+    activeTool: 'scheme',
+    panelOpen: false,
+    sheetOpen: false,
+    sheetTab: 'parts',
+    sheetHeight: 320
+  };
+
+  function lineOf(p) {
+    var m = MATERIALS[p.material] || MATERIALS.PINE;
+    var net = p.l * p.w * p.h * p.q / 1e9;
+    var purchase = net * (1 + p.waste / 100);
+    var weight = purchase * m.density;
+    var mat = purchase * (p.price > 0 ? p.price : m.price);
+    var proc = p.q * p.fee;
+    return { net: net, purchase: purchase, weight: weight, mat: mat, proc: proc, total: mat + proc };
+  }
+  function totals() {
+    return state.parts.reduce(function (a, p) {
+      var l = lineOf(p);
+      a.net += l.net; a.purchase += l.purchase; a.weight += l.weight;
+      a.mat += l.mat; a.proc += l.proc; a.total += l.total;
+      return a;
+    }, { net: 0, purchase: 0, weight: 0, mat: 0, proc: 0, total: 0 });
+  }
+  function totalQty() {
+    return state.parts.reduce(function (s, p) { return s + p.q; }, 0);
+  }
+  function unitHeight() {
+    var top = state.parts.find(function (p) { return p.role === 'TOP_DECK'; });
+    var bot = state.parts.find(function (p) { return p.role === 'BOTTOM_DECK'; });
+    var mid = state.parts.filter(function (p) { return p.role === 'BLOCK' || p.role === 'STRINGER_BOARD'; });
+    return (top ? top.h : 0) + Math.max.apply(null, [0].concat(mid.map(function (p) { return p.h; }))) + (bot ? bot.h : 0);
+  }
+  function templateName() {
+    var hit = TEMPLATES.concat(CRATE_TEMPLATES).find(function (t) { return t[0] === state.unit.template; });
+    return hit ? hit[1] : state.unit.template;
+  }
+  function unitTypeLabel() { return state.unit.type === 'CRATE' ? '木箱' : '托盘'; }
+  function issueCount() { return state.unit.load == null ? 1 : 0; }
+
+  /* ===== 图纸 ===== */
+  function svgTop() {
+    var boards = [0, 1, 2, 3, 4].map(function (i) {
+      var y = i * 163.75;
+      return '<g class="part" data-part="TOP_DECK">' +
+        '<rect class="wood" x="0" y="' + y + '" width="1200" height="145"/>' +
+        '<line class="grain" x1="0" y1="' + (y + 48) + '" x2="1200" y2="' + (y + 48) + '"/>' +
+        '<line class="grain" x1="0" y1="' + (y + 96) + '" x2="1200" y2="' + (y + 96) + '"/>' +
+        '</g>';
+    }).join('');
+    var bottoms = [40, 327.5, 615].map(function (y) {
+      return '<g class="part" data-part="BOTTOM_DECK"><rect class="hidden2" x="0" y="' + y + '" width="1200" height="145"/></g>';
+    }).join('');
+    var stringers = [40, 350, 660].map(function (y) {
+      return '<g class="part" data-part="STRINGER_BOARD"><rect class="hidden" x="0" y="' + y + '" width="1200" height="100"/></g>';
+    }).join('');
+    var blocks = [0, 550, 1100].map(function (x) {
+      return [0, 350, 700].map(function (y) {
+        return '<g class="part" data-part="BLOCK"><rect class="hidden" x="' + x + '" y="' + y + '" width="100" height="100"/></g>';
+      }).join('');
+    }).join('');
+    return '<svg class="dwg" viewBox="0 0 1400 1000" role="img" aria-label="托盘俯视图">' +
+      '<text class="view-label" x="100" y="46">俯视图 1:10</text>' +
+      '<g transform="translate(100,80)">' + boards + stringers + blocks + bottoms + '</g>' +
+      '<g class="dim">' +
+        '<line x1="100" y1="930" x2="1300" y2="930"/>' +
+        '<line x1="100" y1="920" x2="100" y2="940"/>' +
+        '<line x1="1300" y1="920" x2="1300" y2="940"/>' +
+        '<text x="700" y="968" text-anchor="middle">1200</text>' +
+        '<line x1="1340" y1="80" x2="1340" y2="880"/>' +
+        '<line x1="1330" y1="80" x2="1350" y2="80"/>' +
+        '<line x1="1330" y1="880" x2="1350" y2="880"/>' +
+        '<text x="1374" y="480" text-anchor="middle" transform="rotate(90 1374 480)">800</text>' +
+      '</g>' +
+      '</svg>';
+  }
+
+  function svgFront() {
+    var blocks = [0, 550, 1100].map(function (x) {
+      return '<g class="part" data-part="BLOCK"><rect class="hidden" x="' + x + '" y="22" width="100" height="100"/></g>';
+    }).join('');
+    return '<svg class="dwg" viewBox="0 0 1400 720" role="img" aria-label="托盘主视图">' +
+      '<text class="view-label" x="100" y="58">主视图 1:10</text>' +
+      '<g transform="translate(100,160)">' +
+        '<g class="part" data-part="TOP_DECK"><rect class="wood" x="0" y="0" width="1200" height="22"/></g>' +
+        '<g class="part" data-part="STRINGER_BOARD"><rect class="wood2" x="0" y="22" width="1200" height="100"/><line class="edge" x1="0" y1="72" x2="1200" y2="72"/></g>' +
+        blocks +
+        '<g class="part" data-part="BOTTOM_DECK"><rect class="wood" x="0" y="122" width="1200" height="22"/></g>' +
+      '</g>' +
+      '<g class="dim">' +
+        '<line x1="100" y1="500" x2="1300" y2="500"/>' +
+        '<line x1="100" y1="490" x2="100" y2="510"/>' +
+        '<line x1="1300" y1="490" x2="1300" y2="510"/>' +
+        '<text x="700" y="538" text-anchor="middle">1200</text>' +
+        '<line x1="1340" y1="160" x2="1340" y2="304"/>' +
+        '<line x1="1330" y1="160" x2="1350" y2="160"/>' +
+        '<line x1="1330" y1="304" x2="1350" y2="304"/>' +
+        '<text x="1374" y="232" text-anchor="middle" transform="rotate(90 1374 232)">144</text>' +
+      '</g>' +
+      '</svg>';
+  }
+
+  function svgSide() {
+    var blocks = [0, 350, 700].map(function (x) {
+      return '<g class="part" data-part="BLOCK"><rect class="hidden" x="' + x + '" y="22" width="100" height="100"/></g>';
+    }).join('');
+    return '<svg class="dwg" viewBox="0 0 1400 720" role="img" aria-label="托盘侧视图">' +
+      '<text class="view-label" x="300" y="58">侧视图 1:10</text>' +
+      '<g transform="translate(300,160)">' +
+        '<g class="part" data-part="TOP_DECK"><rect class="wood" x="0" y="0" width="800" height="22"/></g>' +
+        '<g class="part" data-part="STRINGER_BOARD"><rect class="wood2" x="0" y="22" width="800" height="100"/><line class="edge" x1="0" y1="72" x2="800" y2="72"/></g>' +
+        blocks +
+        '<g class="part" data-part="BOTTOM_DECK"><rect class="wood" x="0" y="122" width="800" height="22"/></g>' +
+      '</g>' +
+      '<g class="dim">' +
+        '<line x1="300" y1="500" x2="1100" y2="500"/>' +
+        '<line x1="300" y1="490" x2="300" y2="510"/>' +
+        '<line x1="1100" y1="490" x2="1100" y2="510"/>' +
+        '<text x="700" y="538" text-anchor="middle">800</text>' +
+        '<line x1="1140" y1="160" x2="1140" y2="304"/>' +
+        '<line x1="1130" y1="160" x2="1150" y2="160"/>' +
+        '<line x1="1130" y1="304" x2="1150" y2="304"/>' +
+        '<text x="1174" y="232" text-anchor="middle" transform="rotate(90 1174 232)">144</text>' +
+      '</g>' +
+      '</svg>';
+  }
+
+  function proj(x, y, z) {
+    return [(x - y) * 0.5, (x + y) * 0.3 - z * 0.9];
+  }
+  function isoBox(role, x, y, z, l, w, h) {
+    var pt = function (X, Y, Z) { return proj(x + X, y + Y, z + Z); };
+    var a = pt(0, 0, h), b = pt(l, 0, h), c = pt(l, w, h), d = pt(0, w, h);
+    var e = pt(0, 0, 0), f = pt(l, 0, 0), g = pt(l, w, 0), k = pt(0, w, 0);
+    var pts = function (arr) {
+      return arr.map(function (p) { return p[0].toFixed(1) + ',' + p[1].toFixed(1); }).join(' ');
+    };
+    return '<g class="part" data-part="' + role + '">' +
+      '<polygon class="f-top" points="' + pts([a, b, c, d]) + '"/>' +
+      '<polygon class="f-right" points="' + pts([b, f, g, c]) + '"/>' +
+      '<polygon class="f-left" points="' + pts([d, c, g, k]) + '"/>' +
+      '</g>';
+  }
+  function svgIso() {
+    var out = [];
+    [40, 327.5, 615].forEach(function (y) { out.push(isoBox('BOTTOM_DECK', 0, y, 0, 1200, 145, 22)); });
+    [0, 550, 1100].forEach(function (x) {
+      [0, 350, 700].forEach(function (y) { out.push(isoBox('BLOCK', x, y, 42, 100, 100, 100)); });
+    });
+    [40, 350, 660].forEach(function (y) { out.push(isoBox('STRINGER_BOARD', 0, y, 162, 1200, 100, 100)); });
+    [0, 1, 2, 3, 4].forEach(function (i) { out.push(isoBox('TOP_DECK', 0, i * 163.75, 282, 1200, 145, 22)); });
+    return '<svg class="dwg" viewBox="0 0 1180 1000" role="img" aria-label="托盘轴测图">' +
+      '<g transform="translate(540,300)">' + out.join('') + '</g></svg>';
+  }
+
+  function applySelection() {
+    $$('.part').forEach(function (el) {
+      el.classList.toggle('sel', !!state.selected && el.dataset.part === state.selected);
+    });
+  }
+
+  function section(title, body) {
+    return '<section class="section"><div class="section-head">' + title + '</div>' + body + '</section>';
+  }
+
+  /* ===== 左栏 ===== */
+  function partRows() {
+    return state.parts.map(function (p) {
+      return '<div class="sum-row" data-pick-left="' + p.role + '">' +
+        '<b>' + p.label + '</b>' +
+        '<span style="color:var(--ink-3)">' + p.l + '×' + p.w + '×' + p.h + '</span>' +
+        '<span class="qty">×' + p.q + '</span>' +
+        '</div>';
+    }).join('');
+  }
+  function leftCatalog() {
+    var groups = [
+      { type: 'PALLET', label: '托盘', items: TEMPLATES },
+      { type: 'CRATE', label: '普通木箱', items: CRATE_TEMPLATES }
+    ];
+    return groups.map(function (g) {
+      return '<div class="cat-group">' +
+        '<div class="cat-row">' + g.label + '<span class="code-chip">' + g.items.length + '</span></div>' +
+        '<div class="cat-children">' +
+          g.items.map(function (item) {
+            var on = state.unit.type === g.type && state.unit.template === item[0];
+            return '<button type="button" class="cat-item' + (on ? ' on' : '') + '" data-cat-pick="' + item[0] + '" data-cat-type="' + g.type + '" aria-pressed="' + on + '">' +
+              '<span class="cat-name">' + esc(item[1]) + '</span>' +
+              (on ? '<span class="cat-cur">当前</span>' : '') +
+              '</button>';
+          }).join('') +
+        '</div></div>';
+    }).join('') +
+      '<div class="lp-note">目录来自模板库：父级为单元类型，子级为该类型的模板。选中即成为当前方案单元；首次保存后模板锁定。</div>';
+  }
+  function leftParams() {
+    var u = state.unit;
+    var h = unitHeight();
+    return section('基本参数',
+        '<div class="fld"><label>单元名称</label><input data-lfield="name" value="' + esc(u.name) + '" maxlength="100"></div>' +
+        '<div class="fld"><label>结构模板</label><input class="readonly" readonly value="' + esc(templateName()) + '"><div class="hint">由左栏单元目录选择；首次保存后锁定。</div></div>' +
+        '<div class="fld"><label>进叉方向</label><div class="mini-seg">' +
+          '<button type="button" data-lseg="entry" data-val="FOUR" class="' + (u.entry === 'FOUR' ? 'on' : '') + '">四向</button>' +
+          '<button type="button" data-lseg="entry" data-val="TWO" class="' + (u.entry === 'TWO' ? 'on' : '') + '">两向</button>' +
+        '</div></div>' +
+        '<div class="fld"><label>目标载荷 kg</label><input type="number" min="0" data-lfield="load" value="' + (u.load == null ? '' : u.load) + '" placeholder="未填写"></div>'
+      ) +
+      section('外形尺寸',
+        '<div class="fld-row">' +
+          '<div class="fld"><label>长度 mm</label><input type="number" min="1" data-lfield="length" value="' + u.length + '"></div>' +
+          '<div class="fld"><label>宽度 mm</label><input type="number" min="1" data-lfield="width" value="' + u.width + '"></div>' +
+        '</div>' +
+        '<div class="fld"><label>外形高度 mm</label><input class="readonly" id="unitHeightInput" readonly value="' + h + '"><div class="hint">由构件高度汇总，修改构件后自动更新。</div></div>'
+      ) +
+      section('载荷形式',
+        '<div class="mini-seg">' +
+          '<button type="button" data-lseg="loadType" data-val="UNIFORM" class="' + (u.loadType === 'UNIFORM' ? 'on' : '') + '">均布</button>' +
+          '<button type="button" data-lseg="loadType" data-val="CONCENTRATED" class="' + (u.loadType === 'CONCENTRATED' ? 'on' : '') + '">集中</button>' +
+        '</div>' +
+        '<div class="hint">本轮只展示，不参与承载校核。</div>'
+      ) +
+      section('构件概览',
+        '<div id="leftPartRows">' + partRows() + '</div>' +
+        '<button type="button" class="link-btn" data-lpact="sheet">在底部构件表中编辑 →</button>'
+      );
+  }
+  function collapseBtn() {
+    return '<button type="button" class="icon-btn" data-lpact="collapse" title="收起左栏" aria-label="收起左栏">' + IC.panelLeftClose + '</button>';
+  }
+  function renderLeft() {
+    var isList = state.leftView === 'list';
+    var head = $('#lpHead');
+    var body = $('#lpBody');
+    head.innerHTML = isList
+      ? '<b style="font-size:14px">单元目录</b><span class="code-chip">2</span><span style="flex:1"></span>' + collapseBtn()
+      : '<button type="button" class="icon-btn" data-lpact="back" title="返回单元目录" aria-label="返回单元目录">' + IC.back + '</button>' +
+        '<div class="lp-title"><span class="code-chip">U01</span><div class="tx">' +
+        '<b id="lpUnitName">' + esc(state.unit.name) + '</b>' +
+        '<span class="sub">' + unitTypeLabel() + ' · ' + esc(templateName()) + '</span>' +
+        '</div></div>' + collapseBtn();
+    body.innerHTML = isList ? leftCatalog() : leftParams();
+    body.classList.remove('anim');
+    void body.offsetWidth;
+    body.classList.add('anim');
+  }
+
+  /* ===== 右侧：固定 4 标签，无 × ===== */
+  function renderRail() {
+    $('#rail').innerHTML = '<div class="rail-card">' +
+      TABS.map(function (t) {
+        var dot = t[0] === 'check' ? '<i class="rail-dot"></i>' : '';
+        return '<button type="button" class="rail-btn" data-tool="' + t[0] + '" data-tip="' + t[1] + '" aria-label="' + t[1] + '">' + IC[t[0]] + dot + '</button>';
+      }).join('') +
+      '</div>';
+  }
+
+  function materialOptions(p) {
+    return Object.keys(MATERIALS).map(function (k) {
+      return '<option value="' + k + '"' + (k === p.material ? ' selected' : '') + '>' + MATERIALS[k].name + '</option>';
+    }).join('');
+  }
+  function segList() {
+    return '<div class="seg-list">' + state.parts.map(function (p) {
+      return '<button type="button" data-pick="' + p.role + '" class="' + (p.role === state.selected ? 'on' : '') + '">' +
+        p.label + '<em>' + p.q + '</em></button>';
+    }).join('') + '</div>';
+  }
+  function kvRows(l) {
+    return '<div><span>净体积</span><b>' + f4(l.net) + ' m³</b></div>' +
+      '<div><span>采购体积</span><b>' + f4(l.purchase) + ' m³</b></div>' +
+      '<div><span>重量</span><b>' + l.weight.toFixed(1) + ' kg</b></div>' +
+      '<div><span>材料费</span><b>¥' + f2(l.mat) + '</b></div>' +
+      '<div><span>加工费</span><b>¥' + f2(l.proc) + '</b></div>' +
+      '<div><span>小计</span><b>¥' + f2(l.total) + '</b></div>';
+  }
+  function lineSumHTML(p) {
+    return '<div class="kv-list" id="lineSum">' + kvRows(lineOf(p)) + '</div>';
+  }
+  function partBody() {
+    var p = state.parts.find(function (x) { return x.role === state.selected; });
+    var head = '<div class="tp-head"><b>构件</b><span>' + state.parts.length + ' 类 · ' + totalQty() + ' 件</span></div>';
+    if (!p) {
+      return head + segList() +
+        '<div class="tp-empty">' + IC.part + '<div>尚未选择构件</div><div>在画布中点击构件，或从上方切换</div></div>';
+    }
+    return head + segList() +
+      section('基本',
+        '<div class="fld"><label>名称</label><input data-pfield="name" value="' + esc(p.name) + '" maxlength="60"></div>' +
+        '<div class="fld-row">' +
+          '<div class="fld"><label>材料</label><select data-pfield="material">' + materialOptions(p) + '</select></div>' +
+          '<div class="fld"><label>方向</label><select data-pfield="orientation">' +
+            '<option value="x"' + (p.orientation === 'x' ? ' selected' : '') + '>沿长（x）</option>' +
+            '<option value="y"' + (p.orientation === 'y' ? ' selected' : '') + '>沿宽（y）</option>' +
+          '</select></div>' +
+        '</div>'
+      ) +
+      section('尺寸与用量',
+        '<div class="fld-row">' +
+          '<div class="fld"><label>长 mm</label><input type="number" min="1" data-pfield="l" value="' + p.l + '"></div>' +
+          '<div class="fld"><label>宽 mm</label><input type="number" min="1" data-pfield="w" value="' + p.w + '"></div>' +
+          '<div class="fld"><label>厚 mm</label><input type="number" min="1" data-pfield="h" value="' + p.h + '"></div>' +
+        '</div>' +
+        '<div class="fld-row">' +
+          '<div class="fld"><label>数量</label><input type="number" min="1" data-pfield="q" value="' + p.q + '"></div>' +
+          '<div class="fld"><label>损耗 %</label><input type="number" min="0" data-pfield="waste" value="' + p.waste + '"></div>' +
+        '</div>'
+      ) +
+      section('费用',
+        '<div class="fld-row">' +
+          '<div class="fld"><label>加工费 元/件</label><input type="number" min="0" data-pfield="fee" value="' + p.fee + '"></div>' +
+          '<div class="fld"><label>单价覆盖 元/m³</label><input type="number" min="0" data-pfield="price" value="' + p.price + '"></div>' +
+        '</div>'
+      ) +
+      section('本行合计', lineSumHTML(p));
+  }
+  function schemeBody() {
+    var t = totals();
+    var dest = state.project.destination;
+    var kv = '<div class="kv-list">' +
+      '<div><span>当前单元 / 构件</span><b>1 / ' + totalQty() + '</b></div>' +
+      '<div><span>采购体积</span><b>' + f3(t.purchase) + ' m³</b></div>' +
+      '<div><span>重量</span><b>' + t.weight.toFixed(1) + ' kg</b></div>' +
+      '<div><span>材料费</span><b>¥' + f2(t.mat) + '</b></div>' +
+      '<div><span>加工费</span><b>¥' + f2(t.proc) + '</b></div>' +
+      '<div><span>合计</span><b>¥' + f2(t.total) + '</b></div>' +
+      '</div>';
+    return '<div class="tp-head"><b>方案信息</b><span>' + state.project.code + '</span></div>' +
+      section('基本信息',
+        '<div class="fld"><label>客户名称</label><input id="rpCustomer" value="' + esc(state.project.customer) + '" maxlength="100"></div>' +
+        '<div class="fld"><label>使用范围</label><div class="mini-seg" id="rpDest">' +
+          '<button type="button" data-val="EXPORT" class="' + (dest === 'EXPORT' ? 'on' : '') + '">出口</button>' +
+          '<button type="button" data-val="DOMESTIC" class="' + (dest === 'DOMESTIC' ? 'on' : '') + '">内销</button>' +
+        '</div></div>'
+      ) +
+      section('备注', '<div class="fld"><textarea id="rpNote" maxlength="500">' + esc(state.project.note) + '</textarea></div>') +
+      section('当前单元合计', kv) +
+      '<div class="hint">方案名称在顶栏内联编辑；方案合计 = 当前单元合计。</div>';
+  }
+  function checkBody() {
+    var warn = state.unit.load == null;
+    var list = '<div class="check-list">' +
+      (warn ? '<div class="check-item warn"><span class="mk">!</span><div><b>未填写目标载荷</b><p>本轮只展示、不参与承载校核；填写后该提示消失。</p></div></div>' : '') +
+      '<div class="check-item ok"><span class="mk">✓</span><div><b>构件尺寸均大于 0</b><p>长、宽、厚、数量满足出图条件。</p></div></div>' +
+      '<div class="check-item ok"><span class="mk">✓</span><div><b>存在承重构件</b><p>墩块 9 件、中间纵梁板 3 件。</p></div></div>' +
+      '<div class="check-item ok"><span class="mk">✓</span><div><b>外形高度可用</b><p>当前总高 ' + unitHeight() + ' mm。</p></div></div>' +
+      '</div>';
+    return '<div class="tp-head"><b>校验</b><span>' + issueCount() + ' 项提示</span></div>' + list +
+      '<div class="hint" style="margin-top:12px">校验只保证图纸与数据可继续使用，不代表承载合格。</div>';
+  }
+  function revBody() {
+    if (state.status !== 'ISSUED') {
+      return '<div class="tp-head"><b>版本</b><span>0 个版本</span></div>' +
+        '<div class="tp-empty">' + IC.rev + '<div>尚未发布版本</div><div>发布后生成不可变快照 R01</div></div>' +
+        '<div class="hint" style="text-align:center">发布入口在顶部「更多」中；未保存时不可发布。</div>';
+    }
+    return '<div class="tp-head"><b>版本</b><span>1 个版本</span></div>' +
+      '<div class="rev-row"><span class="rev-no">R01</span><div><b>初始发布</b><div style="color:var(--ink-3);font-size:11px;margin-top:2px">' + nowTime() + ' · 已锁定</div></div>' +
+      '<span class="rev-meta">只读</span></div>';
+  }
+  var TOOL_BODY = { scheme: schemeBody, part: partBody, check: checkBody, rev: revBody };
+
+  function renderRightPanel() {
+    var open = state.panelOpen;
+    $('#rightPanel').classList.toggle('open', open);
+    $('#rail').style.display = open ? 'none' : 'block';
+    if (!open) {
+      $('#rpTabs').innerHTML = '';
+      $('#toolPanel').innerHTML = '';
+      scheduleFit();
+      return;
+    }
+    $('#rpTabs').innerHTML = TABS.map(function (t) {
+      var dot = t[0] === 'check' ? '<i class="tab-dot"></i>' : '';
+      return '<button type="button" class="rp-tab' + (t[0] === state.activeTool ? ' on' : '') + '" data-rp-tool="' + t[0] + '">' +
+        IC[t[0]] + '<span>' + t[1] + '</span>' + dot + '</button>';
+    }).join('') +
+      '<button type="button" class="rp-collapse" data-rp-collapse title="收起右栏" aria-label="收起右栏">' + IC.panelRightClose + '</button>';
+    $('#toolPanel').innerHTML = TOOL_BODY[state.activeTool]();
+    renderIssue();
+    scheduleFit();
+  }
+  function openTool(id) {
+    state.activeTool = id;
+    state.panelOpen = true;
+    renderRightPanel();
+  }
+
+  /* ===== 底部：固定 3 标签，无 × ===== */
+  function partsTable() {
+    var t = totals();
+    var rows = state.parts.map(function (p, i) {
+      var l = lineOf(p);
+      return '<tr data-row-part="' + p.role + '" class="' + (state.selected === p.role ? 'sel' : '') + '">' +
+        '<td>' + (i + 1) + '</td><td>' + p.label + '</td><td>' + esc(p.name) + '</td>' +
+        '<td>' + MATERIALS[p.material].name + '</td>' +
+        '<td>' + (p.orientation === 'x' ? '沿长' : '沿宽') + '</td>' +
+        '<td class="num">' + p.l + '</td><td class="num">' + p.w + '</td><td class="num">' + p.h + '</td>' +
+        '<td class="num">' + p.q + '</td><td class="num">' + p.waste + '</td>' +
+        '<td class="num">¥' + f2(l.mat) + '</td><td class="num">¥' + f2(l.proc) + '</td>' +
+        '</tr>';
+    }).join('');
+    return '<table class="mock parts"><thead><tr>' +
+      '<th>层级</th><th>构件</th><th>名称</th><th>材料</th><th>方向</th><th>长</th><th>宽</th><th>厚</th><th>数量</th><th>损耗%</th><th>材料费</th><th>加工费</th>' +
+      '</tr></thead><tbody>' + rows + '</tbody>' +
+      '<tfoot><tr><td colspan="8">合计</td><td class="num">' + totalQty() + '</td><td></td>' +
+      '<td class="num">¥' + f2(t.mat) + '</td><td class="num">¥' + f2(t.proc) + '</td></tr></tfoot></table>';
+  }
+  function bomTable() {
+    var t = totals();
+    var rows = state.parts.map(function (p) {
+      var l = lineOf(p);
+      return '<tr>' +
+        '<td>' + MATERIALS[p.material].name + '</td>' +
+        '<td>' + p.l + '×' + p.w + '×' + p.h + '</td>' +
+        '<td class="num">' + f4(l.net) + '</td><td class="num">' + f4(l.purchase) + '</td>' +
+        '<td class="num">' + l.weight.toFixed(1) + '</td>' +
+        '<td class="num">¥' + f2(l.mat) + '</td><td class="num">¥' + f2(l.proc) + '</td>' +
+        '<td class="num">¥' + f2(l.total) + '</td></tr>';
+    }).join('');
+    return '<table class="mock bom"><thead><tr><th>材料</th><th>规格 mm</th><th>净体积 m³</th><th>采购体积 m³</th><th>重量 kg</th><th>材料费</th><th>加工费</th><th>小计</th></tr></thead>' +
+      '<tbody>' + rows + '</tbody><tfoot><tr><td colspan="2">合计</td><td class="num">' + f4(t.net) + '</td><td class="num">' + f4(t.purchase) + '</td>' +
+      '<td class="num">' + t.weight.toFixed(1) + '</td><td class="num">¥' + f2(t.mat) + '</td><td class="num">¥' + f2(t.proc) + '</td><td class="num">¥' + f2(t.total) + '</td></tr></tfoot></table>';
+  }
+  function cuttingTable() {
+    var rows = state.parts.map(function (p) {
+      var buy = Math.ceil(p.q * (1 + p.waste / 100));
+      return '<tr><td>' + MATERIALS[p.material].name + '</td><td>' + p.l + '×' + p.w + '×' + p.h + '</td>' +
+        '<td class="num">' + p.q + '</td><td class="num">' + buy + '</td><td>损耗 ' + p.waste + '%</td></tr>';
+    }).join('');
+    return '<table class="mock cut"><thead><tr><th>材料</th><th>规格 mm</th><th>净数量</th><th>采购数量</th><th>说明</th></tr></thead>' +
+      '<tbody>' + rows + '</tbody></table><div class="hint" style="padding:8px 10px">开料排版与报价为 P4 暂缓项，本表仅按损耗估算采购数量。</div>';
+  }
+  function sheetTable() {
+    if (state.sheetTab === 'bom') { return bomTable(); }
+    if (state.sheetTab === 'cutting') { return cuttingTable(); }
+    return partsTable();
+  }
+  function metricsHTML() {
+    var t = totals();
+    return '当前单元 · <b>' + totalQty() + '</b> 件 · ' + f3(t.purchase) + ' m³ · ' + t.weight.toFixed(1) + ' kg · ¥' + f2(t.total);
+  }
+  function updateMetrics() {
+    $$('.metrics-text').forEach(function (el) { el.innerHTML = metricsHTML(); });
+  }
+  function renderIssue() {
+    var n = issueCount();
+    $$('.issue-count').forEach(function (el) { el.textContent = n; });
+    $$('.issue-btn').forEach(function (el) { el.style.display = n ? 'inline-flex' : 'none'; });
+    $$('.rail-dot').forEach(function (el) { el.style.display = n ? 'block' : 'none'; });
+    $$('.tab-dot').forEach(function (el) { el.style.display = n ? 'inline-block' : 'none'; });
+  }
+  function renderSheet() {
+    var open = state.sheetOpen;
+    var panel = $('#bottomPanel');
+    panel.classList.toggle('open', open);
+    panel.style.height = open ? state.sheetHeight + 'px' : '0px';
+    $('#bottomLauncher').style.display = open ? 'none' : 'flex';
+    $$('.bp-tab').forEach(function (b) {
+      b.classList.toggle('on', b.dataset.sheetTab === state.sheetTab);
+    });
+    $('#bsBody').innerHTML = sheetTable();
+    $('#launcherTab').textContent = BOTTOM_LABEL[state.sheetTab];
+    $('#launcherCount').textContent = totalQty();
+    $('#launcherCount').style.display = state.sheetTab === 'parts' ? 'inline' : 'none';
+    updateMetrics();
+    renderIssue();
+    scheduleFit();
+  }
+  function openSheet(tab) {
+    state.sheetOpen = true;
+    if (tab) { state.sheetTab = tab; }
+    renderSheet();
+  }
+  function closeSheet() {
+    state.sheetOpen = false;
+    renderSheet();
+  }
+
+  /* ===== 画布 ===== */
+  function render2D() {
+    var body = $('#a3Body');
+    body.innerHTML = state.view === 'front' ? svgFront() : state.view === 'side' ? svgSide() : state.view === 'iso' ? svgIso() : svgTop();
+    $('#tbTitle').textContent = state.unit.name + ' · ' + VIEW_LABEL[state.view];
+    $$('#viewChips button').forEach(function (b) {
+      b.classList.toggle('on', b.dataset.view === state.view);
+    });
+    applySelection();
+    updateMeta();
+    scheduleFit();
+  }
+  function updateMeta() {
+    var map = {
+      '2d': 'A3 · 1:10 · ' + VIEW_LABEL[state.view],
+      '3d': '轴测 · 静态示意',
+      sheet: 'A3 图纸 · ' + VIEW_LABEL[state.view],
+      split: '2D + 3D'
+    };
+    $('#canvasMeta').textContent = map[state.mode];
+  }
+  function ensureIso() {
+    var el = $('#d3Stage');
+    if (el.dataset.ready) { return; }
+    el.innerHTML = svgIso();
+    el.dataset.ready = '1';
+  }
+  function ensureSplit() {
+    var el = $('#splitPane');
+    if (el.dataset.ready) { return; }
+    el.innerHTML = '<div class="split-half"><span class="pane-label">2D · 俯视</span><div class="a3"><div class="a3-inner">' + svgTop() + '</div></div></div>' +
+      '<div class="split-half"><span class="pane-label">3D · 轴测</span><div class="d3-stage">' + svgIso() + '</div></div>';
+    el.dataset.ready = '1';
+    applySelection();
+  }
+  function setMode(mode) {
+    state.mode = mode;
+    $('#stage').dataset.mode = mode;
+    $$('#modeSeg button').forEach(function (b) { b.classList.toggle('on', b.dataset.mode === mode); });
+    var showViews = mode === '2d' || mode === 'sheet';
+    $('#viewChips').style.display = showViews ? 'flex' : 'none';
+    $('#a3').classList.toggle('show-frame', mode === 'sheet');
+    $('.zoom').style.display = showViews ? 'flex' : 'none';
+    $('.tool-sep').style.display = showViews ? 'block' : 'none';
+    if (mode === '2d' || mode === 'sheet') { render2D(); }
+    if (mode === '3d') { ensureIso(); }
+    if (mode === 'split') { ensureSplit(); }
+    updateMeta();
+    applySelection();
+    scheduleFit();
+  }
+  function setZoom(z) {
+    state.zoom = clamp(Math.round(z), 50, 200);
+    $('#sheetScale').style.transform = 'scale(' + state.zoom / 100 + ')';
+    $('#zoomPct').textContent = state.zoom + '%';
+  }
+  function fitSheet() {
+    if (state.mode !== '2d' && state.mode !== 'sheet') { return; }
+    var wrap = $('.canvas-wrap');
+    var pane = $('.pane-2d');
+    var a3 = $('#a3');
+    if (!wrap || !pane || !a3) { return; }
+    var r = wrap.getBoundingClientRect();
+    var top = 56;
+    var right = state.panelOpen ? 0 : 56;
+    var bottom = state.sheetOpen ? 12 : 56;
+    pane.style.setProperty('--top-inset', top + 'px');
+    pane.style.setProperty('--right-inset', right + 'px');
+    pane.style.setProperty('--bottom-inset', bottom + 'px');
+    var availW = r.width - 28 - right;
+    var availH = r.height - top - bottom;
+    if (availW < 40 || availH < 40) { return; }
+    var w = Math.min(760, availW * 0.94, availH * 0.94 * 1.414);
+    w = Math.max(220, w);
+    a3.style.width = w + 'px';
+    a3.style.height = (w / 1.414) + 'px';
+  }
+  var fitTimer = null;
+  function scheduleFit() {
+    cancelAnimationFrame(scheduleFit.raf || 0);
+    scheduleFit.raf = requestAnimationFrame(fitSheet);
+    clearTimeout(fitTimer);
+    fitTimer = setTimeout(fitSheet, 240);
+  }
+  function selectPart(role) {
+    var p = state.parts.find(function (x) { return x.role === role; });
+    if (!p) { return; }
+    state.selected = role;
+    applySelection();
+    if (state.sheetOpen) { $('#bsBody').innerHTML = sheetTable(); }
+    openTool('part');
+  }
+
+  /* ===== 状态 ===== */
+  function updateSaveUI() {
+    $('#saveState').innerHTML = '<i class="dot' + (state.dirty ? ' dirty' : '') + '"></i>' + (state.dirty ? '未保存' : '已保存 · ' + state.savedAt);
+    $('#saveBtn').classList.toggle('emphasize', state.dirty);
+  }
+  var toastTimer = null;
+  function toast(msg) {
+    var t = $('#toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.classList.remove('show'); }, 1800);
+  }
+  function markDirty() {
+    state.dirty = true;
+    state.canUndo = true;
+    state.canRedo = false;
+    updateSaveUI();
+  }
+  function save() {
+    if (state.status === 'ISSUED') { toast('已发布方案只读'); return; }
+    state.dirty = false;
+    state.canUndo = false;
+    state.canRedo = false;
+    state.savedAt = nowTime();
+    updateSaveUI();
+    toast('已保存当前单元 · ' + state.project.code);
+  }
+  function undo() {
+    if (!state.canUndo) { return; }
+    state.canUndo = false;
+    state.canRedo = true;
+    state.dirty = false;
+    updateSaveUI();
+    toast('已撤销（演示）');
+  }
+  function redo() {
+    if (!state.canRedo) { return; }
+    state.canRedo = false;
+    state.canUndo = true;
+    state.dirty = true;
+    updateSaveUI();
+    toast('已重做（演示）');
+  }
+  function publish() {
+    if (state.dirty) { toast('请先保存再发布'); return; }
+    if (state.status === 'ISSUED') { toast('该方案已发布'); return; }
+    state.status = 'ISSUED';
+    var badge = $('#statusBadge');
+    badge.textContent = '已发布';
+    badge.classList.add('issued');
+    toast('已发布 · 生成版本 R01（演示）');
+    if (state.panelOpen && state.activeTool === 'rev') { renderRightPanel(); }
+  }
+  function toggleChrome() {
+    var on = document.body.classList.toggle('chrome');
+    scheduleFit();
+    toast(on ? '已显示平台壳：标签行 + 工作台顶栏，无面包屑' : '已隐藏平台壳');
+  }
+  function renderMenu() {
+    var menu = $('#moreMenu');
+    var issued = state.status === 'ISSUED';
+    var chrome = document.body.classList.contains('chrome');
+    menu.innerHTML =
+      '<button type="button" class="menu-item' + (state.canUndo ? '' : ' disabled') + '" data-act="undo"><span>撤销</span><kbd>Ctrl Z</kbd></button>' +
+      '<button type="button" class="menu-item' + (state.canRedo ? '' : ' disabled') + '" data-act="redo"><span>重做</span><kbd>Ctrl ⇧ Z</kbd></button>' +
+      '<div class="menu-sep"></div>' +
+      '<button type="button" class="menu-item' + (state.dirty || issued ? ' disabled' : '') + '" data-act="publish"><span>发布版本</span></button>' +
+      '<button type="button" class="menu-item" data-act="print"><span>打印报告（A4）</span></button>' +
+      '<div class="menu-label">导出</div>' +
+      '<button type="button" class="menu-item" data-act="svg"><span>SVG 图纸</span></button>' +
+      '<button type="button" class="menu-item" data-act="dxf"><span>DXF 图纸</span></button>' +
+      '<button type="button" class="menu-item" data-act="csv"><span>BOM / 开料 CSV</span></button>' +
+      '<div class="menu-sep"></div>' +
+      '<button type="button" class="menu-item" data-act="scheme"><span>方案信息</span></button>' +
+      '<button type="button" class="menu-item" data-act="help"><span>快捷键</span></button>' +
+      '<div class="menu-sep"></div>' +
+      '<button type="button" class="menu-item" data-act="chrome"><span>演示：平台壳</span><kbd>' + (chrome ? '已显示' : '已隐藏') + '</kbd></button>';
+  }
+
+  /* ===== 帮助浮层 ===== */
+  function helpTable() {
+    var rows = [
+      ['保存', 'Ctrl / ⌘ + S'],
+      ['撤销', 'Ctrl / ⌘ + Z'],
+      ['重做', 'Ctrl / ⌘ + Shift + Z'],
+      ['取消选中', 'Esc'],
+      ['打开 / 收起工具', '点击右侧图标 / 「»」'],
+      ['收起底部面板', '点击面板右下角箭头']
+    ];
+    return '<table class="kbd-table"><tbody>' + rows.map(function (r) {
+      return '<tr><td>' + r[0] + '</td><td>' + r[1] + '</td></tr>';
+    }).join('') + '</tbody></table>';
+  }
+  function toggleHelp() {
+    var pop = $('#helpPop');
+    if (pop.classList.contains('open')) { pop.classList.remove('open'); return; }
+    pop.innerHTML = '<div class="help-head"><b>快捷键</b><button type="button" class="help-close" data-help-close aria-label="关闭">' + IC.close + '</button></div>' + helpTable();
+    pop.classList.add('open');
+  }
+
+  /* ===== 左栏交互 ===== */
+  var leftPanel = $('#leftPanel');
+  leftPanel.addEventListener('click', function (e) {
+    var actEl = e.target.closest('[data-lpact]');
+    if (actEl) {
+      var act = actEl.dataset.lpact;
+      if (act === 'collapse') { leftPanel.classList.add('collapsed'); scheduleFit(); return; }
+      if (act === 'expand') { leftPanel.classList.remove('collapsed'); scheduleFit(); return; }
+      if (act === 'back') { state.leftView = 'list'; renderLeft(); return; }
+      if (act === 'sheet') { openSheet('parts'); return; }
+    }
+    var cat = e.target.closest('[data-cat-pick]');
+    if (cat) {
+      var type = cat.dataset.catType;
+      var code = cat.dataset.catPick;
+      if (type === 'CRATE') {
+        state.unit.type = 'CRATE';
+        state.unit.template = code;
+        state.unit.name = '普通木箱 G 型';
+        state.unit.length = 1230;
+        state.unit.width = 830;
+        toast('已切换到木箱目录（演示图形仍为托盘示意）');
+      } else {
+        var dims = PALLET_DIMS[code] || [1200, 800];
+        var hit = TEMPLATES.find(function (t) { return t[0] === code; });
+        state.unit.type = 'PALLET';
+        state.unit.template = code;
+        state.unit.length = dims[0];
+        state.unit.width = dims[1];
+        state.unit.name = dims[0] + '×' + dims[1] + ' ' + (hit ? hit[1] : '托盘');
+      }
+      state.parts = RAW_PARTS.map(function (p) { return Object.assign({}, p); });
+      state.selected = null;
+      markDirty();
+      state.leftView = 'params';
+      renderLeft();
+      render2D();
+      if (state.sheetOpen) { renderSheet(); }
+      return;
+    }
+    var seg = e.target.closest('[data-lseg]');
+    if (seg) {
+      if (seg.dataset.lseg === 'entry') { state.unit.entry = seg.dataset.val; }
+      else { state.unit.loadType = seg.dataset.val; }
+      markDirty();
+      renderLeft();
+      return;
+    }
+    var pick = e.target.closest('[data-pick-left]');
+    if (pick) { selectPart(pick.dataset.pickLeft); return; }
+  });
+  leftPanel.addEventListener('input', function (e) {
+    var f = e.target.dataset.lfield;
+    if (f === 'name') {
+      state.unit.name = e.target.value;
+      var el = $('#lpUnitName');
+      if (el) { el.textContent = e.target.value || '未命名单元'; }
+      markDirty();
+      return;
+    }
+    if (f === 'load') {
+      var v = String(e.target.value).trim();
+      state.unit.load = v === '' ? null : Math.max(0, Math.round(Number(v) || 0));
+      renderIssue();
+      if (state.panelOpen && state.activeTool === 'check') { renderRightPanel(); }
+      markDirty();
+    }
+  });
+  leftPanel.addEventListener('change', function (e) {
+    var f = e.target.dataset.lfield;
+    if (!f || f === 'name') { return; }
+    if (f === 'length') { state.unit.length = Math.max(1, Math.round(Number(e.target.value) || 1)); }
+    if (f === 'width') { state.unit.width = Math.max(1, Math.round(Number(e.target.value) || 1)); }
+    if (f === 'load') {
+      var v = String(e.target.value).trim();
+      state.unit.load = v === '' ? null : Math.max(0, Math.round(Number(v) || 0));
+      renderIssue();
+      if (state.panelOpen && state.activeTool === 'check') { renderRightPanel(); }
+    }
+    markDirty();
+  });
+
+  /* ===== 右侧交互 ===== */
+  $('#rail').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-tool]');
+    if (b) { openTool(b.dataset.tool); }
+  });
+  $('#rightPanel').addEventListener('click', function (e) {
+    var tab = e.target.closest('[data-rp-tool]');
+    if (tab) { state.activeTool = tab.dataset.rpTool; renderRightPanel(); return; }
+    if (e.target.closest('[data-rp-collapse]')) { state.panelOpen = false; renderRightPanel(); return; }
+    var pick = e.target.closest('[data-pick]');
+    if (pick) { selectPart(pick.dataset.pick); return; }
+    var dest = e.target.closest('#rpDest [data-val]');
+    if (dest) { state.project.destination = dest.dataset.val; markDirty(); renderRightPanel(); return; }
+  });
+  function onPanelInput(e) {
+    var t = e.target;
+    if (t.dataset.pfield) { updatePartField(t.dataset.pfield, t.value); return; }
+    if (t.id === 'rpCustomer') { state.project.customer = t.value; markDirty(); }
+    if (t.id === 'rpNote') { state.project.note = t.value; markDirty(); }
+  }
+  $('#rightPanel').addEventListener('input', onPanelInput);
+  $('#rightPanel').addEventListener('change', onPanelInput);
+  function updatePartField(field, value) {
+    var p = state.parts.find(function (x) { return x.role === state.selected; });
+    if (!p) { return; }
+    if (['l', 'w', 'h', 'q', 'waste', 'fee', 'price'].indexOf(field) >= 0) {
+      var min = (field === 'waste' || field === 'fee' || field === 'price') ? 0 : 1;
+      var n = Number(value);
+      p[field] = Number.isFinite(n) ? Math.max(min, Math.round(n)) : min;
+    } else {
+      p[field] = value;
+    }
+    markDirty();
+    var badge = document.querySelector('[data-pick="' + p.role + '"] em');
+    if (badge) { badge.textContent = p.q; }
+    var sum = $('#lineSum');
+    if (sum) { sum.innerHTML = kvRows(lineOf(p)); }
+    var h = $('#unitHeightInput');
+    if (h) { h.value = unitHeight(); }
+    var rows = $('#leftPartRows');
+    if (rows) { rows.innerHTML = partRows(); }
+    var lc = $('#launcherCount');
+    if (lc) {
+      lc.textContent = totalQty();
+      lc.style.display = state.sheetTab === 'parts' ? 'inline' : 'none';
+    }
+    updateMetrics();
+    renderIssue();
+    if (state.sheetOpen) { $('#bsBody').innerHTML = sheetTable(); }
+    applySelection();
+  }
+
+  /* ===== 顶部 ===== */
+  $('#docTitleInput').addEventListener('input', function () {
+    state.project.name = this.value;
+    markDirty();
+  });
+  $('#backBtn').addEventListener('click', function () { toast('返回方案库（演示）'); });
+  $('#saveBtn').addEventListener('click', save);
+  var moreBtn = $('#moreBtn');
+  var moreMenu = $('#moreMenu');
+  moreBtn.addEventListener('click', function (e) {
+    e.stopPropagation();
+    renderMenu();
+    moreMenu.classList.toggle('open');
+  });
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest('.menu-wrap')) { moreMenu.classList.remove('open'); }
+    if (!e.target.closest('#helpPop') && !e.target.closest('[data-act="help"]')) {
+      $('#helpPop').classList.remove('open');
+    }
+  });
+  moreMenu.addEventListener('click', function (e) {
+    var item = e.target.closest('[data-act]');
+    if (!item || item.classList.contains('disabled')) { return; }
+    moreMenu.classList.remove('open');
+    var act = item.dataset.act;
+    if (act === 'undo') { undo(); }
+    if (act === 'redo') { redo(); }
+    if (act === 'publish') { publish(); }
+    if (act === 'print') { toast('打印 A4 报告（演示）'); }
+    if (act === 'svg') { toast('导出 SVG 图纸（演示）'); }
+    if (act === 'dxf') { toast('导出 DXF 图纸（演示）'); }
+    if (act === 'csv') { toast('导出 BOM / 开料 CSV（演示）'); }
+    if (act === 'scheme') { openTool('scheme'); }
+    if (act === 'help') { toggleHelp(); }
+    if (act === 'chrome') { toggleChrome(); }
+  });
+  $('#modeSeg').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-mode]');
+    if (b) { setMode(b.dataset.mode); }
+  });
+  $('#viewChips').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-view]');
+    if (!b) { return; }
+    state.view = b.dataset.view;
+    render2D();
+  });
+  $('#stage').addEventListener('click', function (e) {
+    var part = e.target.closest('.part');
+    if (part) { selectPart(part.dataset.part); }
+  });
+  $('#zoomIn').addEventListener('click', function () { setZoom(state.zoom + 10); });
+  $('#zoomOut').addEventListener('click', function () { setZoom(state.zoom - 10); });
+  $('#zoomFit').addEventListener('click', function () { setZoom(100); toast('已适配画布'); });
+
+  /* ===== 底部 dock / sheet 交互 ===== */
+  $$('.bp-tab').forEach(function (b) {
+    b.addEventListener('click', function () { openSheet(b.dataset.sheetTab); });
+  });
+  $('#bottomCollapse').addEventListener('click', closeSheet);
+  var chromeCollapsed = false;
+  $('#chromeCollapse').addEventListener('click', function () {
+    chromeCollapsed = !chromeCollapsed;
+    $('#fakeSidebar').classList.toggle('collapsed', chromeCollapsed);
+    this.innerHTML = (chromeCollapsed ? IC.chevronsRight : IC.chevronsLeft) +
+      '<span class="fs-collapse-label">' + (chromeCollapsed ? '展开' : '收起') + '</span>';
+    this.title = chromeCollapsed ? '展开侧边栏' : '收起侧边栏';
+    this.setAttribute('aria-label', this.title);
+    scheduleFit();
+  });
+  $('#bottomLauncher').addEventListener('click', function () { openSheet(state.sheetTab); });
+  $('#bottomLauncher').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openSheet(state.sheetTab); }
+  });
+  $$('.issue-btn').forEach(function (b) {
+    b.addEventListener('click', function () { openTool('check'); });
+  });
+  $('#bsBody').addEventListener('click', function (e) {
+    var row = e.target.closest('[data-row-part]');
+    if (row) { selectPart(row.dataset.rowPart); }
+  });
+  var drag = null;
+  $('#bsResize').addEventListener('pointerdown', function (e) {
+    if (!state.sheetOpen) { return; }
+    drag = { y: e.clientY, h: state.sheetHeight };
+    $('#bottomPanel').style.transition = 'none';
+    e.preventDefault();
+  });
+  window.addEventListener('pointermove', function (e) {
+    if (!drag) { return; }
+    var h = clamp(drag.h + (drag.y - e.clientY), 160, Math.min(520, window.innerHeight - 240));
+    state.sheetHeight = h;
+    $('#bottomPanel').style.height = h + 'px';
+    requestAnimationFrame(fitSheet);
+  });
+  window.addEventListener('pointerup', function () {
+    if (!drag) { return; }
+    drag = null;
+    $('#bottomPanel').style.transition = '';
+    scheduleFit();
+  });
+  window.addEventListener('resize', scheduleFit);
+  $('#helpPop').addEventListener('click', function (e) {
+    if (e.target.closest('[data-help-close]')) { this.classList.remove('open'); }
+  });
+
+  /* ===== 快捷键 ===== */
+  document.addEventListener('keydown', function (e) {
+    var meta = e.ctrlKey || e.metaKey;
+    var key = String(e.key).toLowerCase();
+    var editing = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
+    if (key === 'escape') {
+      moreMenu.classList.remove('open');
+      $('#helpPop').classList.remove('open');
+    }
+    if (meta && key === 's') {
+      e.preventDefault();
+      save();
+    }
+    if (!editing && meta && key === 'z') {
+      e.preventDefault();
+      if (e.shiftKey) { redo(); } else { undo(); }
+    }
+  });
+
+  /* ===== 初始化 ===== */
+  $('#docTitleInput').value = state.project.name;
+  renderRail();
+  renderLeft();
+  renderRightPanel();
+  renderSheet();
+  setMode('2d');
+  setZoom(100);
+  updateSaveUI();
+  renderIssue();
+  updateMetrics();
+})();
+</script>
+</body>
+</html>

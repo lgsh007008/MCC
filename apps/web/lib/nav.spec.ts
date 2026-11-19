@@ -44,10 +44,10 @@ describe('菜单可见性', () => {
     ]);
   });
 
-  it('托盘设计在独立的「设计」分组', () => {
+  it('包装设计在独立的「设计」分组', () => {
     const design = visibleNavGroups('ADMIN').find((group) => group.label === '设计');
-    expect(design?.items.map((item) => item.title)).toEqual(['托盘设计']);
-    expect(design?.items[0]?.href).toBe('/admin/pallet-design');
+    expect(design?.items.map((item) => item.title)).toEqual(['包装设计']);
+    expect(design?.items[0]?.href).toBe('/admin/packaging-design');
   });
 });
 
@@ -88,10 +88,10 @@ describe('路由 scope', () => {
     expect(scopeForPath('/admin/customers')).toBe('customer:view');
     expect(scopeForPath('/admin/customers/new')).toBe('customer:manage');
     expect(scopeForPath('/admin/customers/abc/edit')).toBe('customer:manage');
-    expect(scopeForPath('/admin/pallet-design')).toBe('pallet:view');
-    expect(scopeForPath('/admin/pallet-design/new')).toBe('pallet:manage');
-    expect(scopeForPath('/admin/pallet-design/abc')).toBe('pallet:view');
-    expect(scopeForPath('/admin/pallet-design/abc/report')).toBe('pallet:view');
+    expect(scopeForPath('/admin/packaging-design')).toBe('packaging:view');
+    expect(scopeForPath('/admin/packaging-design/new')).toBe('packaging:manage');
+    expect(scopeForPath('/admin/packaging-design/abc')).toBe('packaging:view');
+    expect(scopeForPath('/admin/packaging-design/abc/report')).toBe('packaging:view');
     expect(scopeForPath('/admin/purchases')).toBe('purchase:view');
     expect(scopeForPath('/admin/purchases/new')).toBe('purchase:manage');
     expect(scopeForPath('/admin/purchases/abc/edit')).toBe('purchase:manage');

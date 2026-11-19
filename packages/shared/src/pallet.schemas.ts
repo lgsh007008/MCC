@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { paginationQuerySchema } from './pagination.schemas';
 
-// 托盘设计领域的边界校验（design/托盘设计.md §3）：
+// 托盘单元的边界校验（design/包装设计.md §4）：
 // 前后端共用同一份；几何、BOM 与校验纯函数只依赖本文件的类型。
 
 export const palletTemplateTypeSchema = z.enum([
@@ -24,6 +24,11 @@ export const palletComponentRoleSchema = z.enum([
   'runner',
   'plywood',
   'spacer',
+  'panel',
+  'frame',
+  'batten',
+  'steelStrap',
+  'dunnage',
   'custom',
 ]);
 export type PalletComponentRole = z.infer<typeof palletComponentRoleSchema>;

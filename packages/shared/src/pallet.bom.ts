@@ -1,6 +1,6 @@
 import type { PalletComponentInput, PalletMaterialLike } from './pallet.schemas';
 
-// 托盘木材料单（design/托盘设计.md §3.4）：只算材料与加工，不含报价、税与毛利。
+// 托盘木材料单（design/包装设计.md §5.1）：只算材料与加工，不含报价、税与毛利。
 
 export interface PalletBomItem {
   componentIndex: number;

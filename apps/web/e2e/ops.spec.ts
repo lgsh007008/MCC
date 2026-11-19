@@ -30,6 +30,9 @@ test('平台运营：登录 → 租户列表 → 开通租户 → 平台审计',
 
   await expect(page).toHaveURL(/\/ops\/tenants$/);
   await expect(page.getByRole('columnheader', { name: '编号' })).toBeVisible();
+  // 租户数量会随 e2e 运行累积，先按编号筛选，避免默认租户被分页挤出第一页
+  await page.getByPlaceholder('TN-00001').fill('TN-00001');
+  await page.getByRole('button', { name: '查询' }).click();
   await expect(page.getByRole('cell', { name: 'TN-00001', exact: true })).toBeVisible();
 
   // 套餐页：标准版可见

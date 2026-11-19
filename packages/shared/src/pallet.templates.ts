@@ -5,7 +5,7 @@ import type {
   PalletTemplateType,
 } from './pallet.schemas';
 
-// 托盘结构模板与默认材料（product/托盘设计.md R-托盘设计-001 / 002）：
+// 托盘结构模板与默认材料（product/包装设计.md R-包装设计-012 / 013）：
 // 默认构件是唯一实现；产品文档只登记结构关系，不重复尺寸与材料。
 
 export const PALLET_ROLE_COLORS: Record<PalletComponentRole, string> = {
@@ -18,6 +18,11 @@ export const PALLET_ROLE_COLORS: Record<PalletComponentRole, string> = {
   runner: '#8f6841',
   plywood: '#c79b62',
   spacer: '#a77b4d',
+  panel: '#c9a06a',
+  frame: '#8f6841',
+  batten: '#a77b4d',
+  steelStrap: '#7d8791',
+  dunnage: '#b09a7a',
   custom: '#9eaa9f',
 };
 
@@ -31,6 +36,11 @@ export const PALLET_ROLE_LABELS: Record<PalletComponentRole, string> = {
   runner: '滑木',
   plywood: '胶合板面板',
   spacer: '垫块',
+  panel: '箱板',
+  frame: '框架',
+  batten: '木条',
+  steelStrap: '钢带',
+  dunnage: '垫木',
   custom: '自定义',
 };
 
@@ -46,6 +56,7 @@ export const PALLET_DEFAULT_MATERIALS: PalletMaterialLike[] = [
   { code: 'hardwood', name: '混合硬木', densityKgM3: 600, pricePerM3: 1550, fumigation: true, color: '#8f6841' },
   { code: 'plywood', name: '胶合板', densityKgM3: 600, pricePerM3: 1850, fumigation: false, color: '#c79b62' },
   { code: 'lvl', name: 'LVL', densityKgM3: 550, pricePerM3: 2150, fumigation: false, color: '#b77f48' },
+  { code: 'steel-strap', name: '钢带', densityKgM3: 7850, pricePerM3: 5800, fumigation: false, color: '#7d8791' },
 ];
 
 export interface PalletTemplateOption {
@@ -230,4 +241,60 @@ export function palletTemplateComponents(
       ...base,
     },
   ];
+}
+
+/** 铺板数量手动上限（product/包装设计.md R-包装设计-015）：超出按上限计算并在左栏显式提示。 */
+export const PALLET_DECK_MAX = 10;
+
+export type PalletDeckMode = 'auto' | 'manual';
+
+export interface PalletDeckCounts {
+  /** 上铺板（面板）数量；模板无面板时为 null */
+  top: number | null;
+  /** 下铺板（底板）数量；模板无底板时为 null */
+  bottom: number | null;
+}
+
+const countRole = (
+  templateType: PalletTemplateType,
+  lengthMm: number,
+  widthMm: number,
+  role: 'topDeck' | 'bottomDeck',
+): number | null => {
+  const part = palletTemplateComponents(templateType, lengthMm, widthMm).find(
+    (component) => component.role === role,
+  );
+  return part ? Math.max(1, Math.round(part.quantity)) : null;
+};
+
+/** 模板在当前尺寸下的铺板默认数量；用于「自动」模式与手动覆盖的初值。 */
+export function palletDeckDefaults(
+  templateType: PalletTemplateType,
+  lengthMm: number,
+  widthMm: number,
+): PalletDeckCounts {
+  return {
+    top: countRole(templateType, lengthMm, widthMm, 'topDeck'),
+    bottom: countRole(templateType, lengthMm, widthMm, 'bottomDeck'),
+  };
+}
+
+export function clampPalletDeckCount(count: number): number {
+  return Math.min(PALLET_DECK_MAX, Math.max(1, Math.round(Number.isFinite(count) ? count : 1)));
+}
+
+/** 把上 / 下铺板数量写回构件；其余构件保持模板派生结果。 */
+export function applyPalletDeckCounts(
+  components: PalletComponentInput[],
+  counts: { top?: number | null; bottom?: number | null },
+): PalletComponentInput[] {
+  return components.map((component) => {
+    if (component.role === 'topDeck' && counts.top != null) {
+      return { ...component, quantity: clampPalletDeckCount(counts.top) };
+    }
+    if (component.role === 'bottomDeck' && counts.bottom != null) {
+      return { ...component, quantity: clampPalletDeckCount(counts.bottom) };
+    }
+    return component;
+  });
 }

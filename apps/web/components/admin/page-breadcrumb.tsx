@@ -2,9 +2,10 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
-// 页面级面包屑标识（product/平台布局.md 整体布局）：
-// 页面经 usePageCrumb 向壳注入当前页层级（如详情 = 单号；编辑 = 单号 / 编辑；新建 = 新建），
-// 壳统一渲染：上级可点击、最后一项为当前页纯文本。design/平台布局.md §1.5 壳层。
+// 页面级层级标识（product/平台布局.md 整体布局）：
+// 页面经 usePageCrumb 注入当前页层级（如详情 = 单号；编辑 = 单号 / 编辑；新建 = 新建）。
+// 界面暂不渲染面包屑（design/平台布局.md §1.5），该层级目前只供标签页标题拼接；
+// 恢复面包屑时在壳层第二行消费这些层级即可，页面侧无需改动。
 
 export interface PageCrumb {
   title: string;

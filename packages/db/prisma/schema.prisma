@@ -895,21 +895,30 @@ model InventoryAdjustmentItem {
   @@map("inventory_adjustment_items")
 }
 
-// ── 托盘设计领域（pallet，design/托盘设计.md §2）────────────
-// 项目、构件与只读材料目录；本轮不建报价、力学与批次模型。
+// ── 包装设计领域（packaging，design/包装设计.md §2）────────────
+// 方案 → 单元 → 构件三层；模板、材料与版本快照；托盘是第一种单元类型。
 
-enum PalletTemplateType {
-  BLOCK
-  STRINGER
-  NOTCHED
+enum PackagingUnitType {
+  PALLET
+  CRATE
   SKID
-  PLYWOOD
-  CUSTOM
+  FRAME
+  DIVIDER
+  DUNNAGE
+  STEEL_STRAP
 
-  @@map("pallet_template_type")
+  @@map("packaging_unit_type")
 }
 
-enum PalletComponentRole {
+enum PackagingProjectStatus {
+  DRAFT
+  ISSUED
+  ARCHIVED
+
+  @@map("packaging_project_status")
+}
+
+enum PackagingPartRole {
   TOP_DECK
   END_DECK
   STRINGER_BOARD
@@ -919,33 +928,38 @@ enum PalletComponentRole {
   RUNNER
   PLYWOOD
   SPACER
+  PANEL
+  FRAME
+  BATTEN
+  STEEL_STRAP
+  DUNNAGE
   CUSTOM
 
-  @@map("pallet_component_role")
+  @@map("packaging_part_role")
 }
 
-enum PalletOrientation {
+enum PackagingOrientation {
   X
   Y
 
-  @@map("pallet_orientation")
+  @@map("packaging_orientation")
 }
 
-enum PalletDestination {
+enum PackagingDestination {
   EXPORT
   DOMESTIC
 
-  @@map("pallet_destination")
+  @@map("packaging_destination")
 }
 
-enum PalletLoadType {
+enum PackagingLoadType {
   UNIFORM
   CONCENTRATED
 
-  @@map("pallet_load_type")
+  @@map("packaging_load_type")
 }
 
-model PalletProject {
+model PackagingProject {
   id        String    @id @default(uuid()) @db.Uuid
   tenantId  String    @map("tenant_id")
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
@@ -953,53 +967,82 @@ model PalletProject {
   deletedAt DateTime? @map("deleted_at")
 
   // 编号 PD-#####（租户内流水，软删不回收）
-  code           String             @map("code")
-  name           String             @map("name")
-  customerName   String             @default("") @map("customer_name")
-  templateType   PalletTemplateType @map("template_type")
-  destination    PalletDestination  @default(DOMESTIC) @map("destination")
-  // 四向 / 两向
-  entryDirection String             @default("4") @map("entry_direction")
-
-  lengthMm      Int            @map("length_mm")
-  widthMm       Int            @map("width_mm")
-  totalHeightMm Int            @default(0) @map("total_height_mm")
-  targetLoadKg  Int?           @map("target_load_kg")
-  loadType      PalletLoadType @default(UNIFORM) @map("load_type")
+  code         String                 @map("code")
+  name         String                 @map("name")
+  customerName String                 @default("") @map("customer_name")
+  destination  PackagingDestination   @default(DOMESTIC) @map("destination")
+  status       PackagingProjectStatus @default(DRAFT) @map("status")
+  note         String                 @default("") @map("note")
 
   // 合计由服务端重算落库，不信任前端提交值
-  totalVolumeM3  Decimal @default(0) @map("total_volume_m3") @db.Decimal(18, 5)
-  totalWeightKg  Decimal @default(0) @map("total_weight_kg") @db.Decimal(18, 1)
-  materialCost   Decimal @default(0) @map("material_cost") @db.Decimal(18, 2)
-  processingCost Decimal @default(0) @map("processing_cost") @db.Decimal(18, 2)
+  totalVolumeM3   Decimal @default(0) @map("total_volume_m3") @db.Decimal(18, 5)
+  totalWeightKg   Decimal @default(0) @map("total_weight_kg") @db.Decimal(18, 1)
+  materialCost    Decimal @default(0) @map("material_cost") @db.Decimal(18, 2)
+  processingCost  Decimal @default(0) @map("processing_cost") @db.Decimal(18, 2)
+  currentRevision Int     @default(0) @map("current_revision")
 
-  note String @default("") @map("note")
-
-  components PalletComponent[]
+  units     PackagingUnit[]
+  revisions PackagingRevision[]
 
   @@unique([tenantId, code])
   @@index([tenantId, updatedAt])
-  @@index([tenantId, templateType])
-  @@map("pallet_projects")
+  @@index([tenantId, status])
+  @@map("packaging_projects")
 }
 
-model PalletComponent {
+model PackagingUnit {
   id        String    @id @default(uuid()) @db.Uuid
   tenantId  String    @map("tenant_id")
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
   deletedAt DateTime? @map("deleted_at")
 
-  projectId String        @map("project_id") @db.Uuid
-  project   PalletProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId String           @map("project_id") @db.Uuid
+  project   PackagingProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
-  // 行序：从上到下的物理层级，生成后不回改
+  // 行序：方案内顺序，可调整；图号绑定 id，不绑定当前排序
   seq Int @map("seq")
 
-  role          PalletComponentRole @map("role")
+  unitType     PackagingUnitType @map("unit_type")
+  templateCode String            @map("template_code")
+  name         String            @map("name")
+
+  lengthMm      Int             @map("length_mm")
+  widthMm       Int             @map("width_mm")
+  totalHeightMm Int             @default(0) @map("total_height_mm")
+  targetLoadKg  Int?            @map("target_load_kg")
+  loadType      PackagingLoadType @default(UNIFORM) @map("load_type")
+  // 单元类型特有参数（进叉方向、板厚、箱型等）
+  params        Json            @default("{}") @map("params")
+
+  totalVolumeM3  Decimal @default(0) @map("total_volume_m3") @db.Decimal(18, 5)
+  totalWeightKg  Decimal @default(0) @map("total_weight_kg") @db.Decimal(18, 1)
+  materialCost   Decimal @default(0) @map("material_cost") @db.Decimal(18, 2)
+  processingCost Decimal @default(0) @map("processing_cost") @db.Decimal(18, 2)
+
+  parts PackagingPart[]
+
+  @@unique([projectId, seq])
+  @@index([projectId])
+  @@map("packaging_units")
+}
+
+model PackagingPart {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @map("tenant_id")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at")
+
+  unitId String        @map("unit_id") @db.Uuid
+  unit   PackagingUnit @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  seq Int @map("seq")
+
+  role          PackagingPartRole   @map("role")
   name          String              @map("name")
   materialCode  String              @map("material_code")
-  orientation   PalletOrientation   @map("orientation")
+  orientation   PackagingOrientation @map("orientation")
   lengthMm      Int                 @map("length_mm")
   widthMm       Int                 @map("width_mm")
   heightMm      Int                 @map("height_mm")
@@ -1009,27 +1052,74 @@ model PalletComponent {
   processCost   Decimal             @default(0) @map("process_cost") @db.Decimal(12, 2)
   priceOverride Decimal             @default(0) @map("price_override") @db.Decimal(12, 2)
 
-  @@unique([projectId, seq])
-  @@index([projectId])
-  @@map("pallet_components")
+  @@unique([unitId, seq])
+  @@index([unitId])
+  @@map("packaging_parts")
 }
 
-model PalletMaterial {
+model PackagingTemplate {
   id        String    @id @default(uuid()) @db.Uuid
   tenantId  String    @map("tenant_id")
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
   deletedAt DateTime? @map("deleted_at")
 
-  code        String  @map("code")
-  name        String  @map("name")
-  densityKgM3 Int     @map("density_kg_m3")
-  pricePerM3  Decimal @map("price_per_m3") @db.Decimal(12, 2)
-  fumigation  Boolean @default(false) @map("fumigation")
-  color       String  @default("#b9824e") @map("color")
-  isSystem    Boolean @default(true) @map("is_system")
+  code          String            @map("code")
+  unitType      PackagingUnitType @map("unit_type")
+  name          String            @map("name")
+  schemaVersion Int               @default(1) @map("schema_version")
+  definition    Json              @map("definition")
+  isSystem      Boolean           @default(true) @map("is_system")
+  active        Boolean           @default(true) @map("active")
+
+  @@unique([tenantId, code])
+  @@index([tenantId, unitType])
+  @@map("packaging_templates")
+}
+
+model PackagingMaterial {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @map("tenant_id")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at")
+
+  code               String  @map("code")
+  name               String  @map("name")
+  densityKgM3        Int     @map("density_kg_m3")
+  pricePerM3         Decimal @map("price_per_m3") @db.Decimal(12, 2)
+  fumigation         Boolean @default(false) @map("fumigation")
+  color              String  @default("#b9824e") @map("color")
+  // 空数组 = 全部单元类型可用
+  applicableUnitTypes String[] @default([]) @map("applicable_unit_types")
+  isSystem           Boolean @default(true) @map("is_system")
 
   @@unique([tenantId, code])
   @@index([tenantId])
-  @@map("pallet_materials")
+  @@map("packaging_materials")
+}
+
+model PackagingRevision {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  projectId String           @map("project_id") @db.Uuid
+  project   PackagingProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  revisionNo Int    @map("revision_no")
+  snapshot   Json   @map("snapshot")
+  note       String @default("") @map("note")
+  issuedBy   String @map("issued_by")
+  issuedAt   DateTime @default(now()) @map("issued_at") @db.Timestamptz(3)
+
+  totalVolumeM3  Decimal @default(0) @map("total_volume_m3") @db.Decimal(18, 5)
+  totalWeightKg  Decimal @default(0) @map("total_weight_kg") @db.Decimal(18, 1)
+  materialCost   Decimal @default(0) @map("material_cost") @db.Decimal(18, 2)
+  processingCost Decimal @default(0) @map("processing_cost") @db.Decimal(18, 2)
+
+  @@unique([projectId, revisionNo])
+  @@index([projectId])
+  @@map("packaging_revisions")
 }

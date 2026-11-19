@@ -65,15 +65,15 @@ export const navGroups: NavGroup[] = [
   },
   {
     label: '设计',
-    domain: 'pallet',
+    domain: 'packaging',
     icon: RulerIcon,
     items: [
       {
-        title: '托盘设计',
+        title: '包装设计',
         icon: FrameIcon,
-        href: '/admin/pallet-design',
-        scope: 'pallet:view',
-        feature: 'pallet_design',
+        href: '/admin/packaging-design',
+        scope: 'packaging:view',
+        feature: 'packaging_design',
       },
     ],
   },
@@ -147,8 +147,8 @@ export function featureForPath(pathname: string): FeatureCode | null {
   if (pathname.startsWith('/admin/customers')) {
     return 'customer';
   }
-  if (pathname.startsWith('/admin/pallet-design')) {
-    return 'pallet_design';
+  if (pathname.startsWith('/admin/packaging-design')) {
+    return 'packaging_design';
   }
   if (pathname.startsWith('/admin/purchases')) {
     return 'purchase';
@@ -281,8 +281,8 @@ export function scopeForPath(pathname: string): Scope | null {
       ? 'customer:manage'
       : 'customer:view';
   }
-  if (pathname.startsWith('/admin/pallet-design')) {
-    return pathname === '/admin/pallet-design/new' ? 'pallet:manage' : 'pallet:view';
+  if (pathname.startsWith('/admin/packaging-design')) {
+    return pathname === '/admin/packaging-design/new' ? 'packaging:manage' : 'packaging:view';
   }
   if (pathname.startsWith('/admin/production/batches')) {
     return 'production:view';

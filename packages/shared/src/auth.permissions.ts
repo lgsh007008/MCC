@@ -20,8 +20,8 @@ export const SCOPES = [
   'production:manage',
   'inventory:view',
   'inventory:manage',
-  'pallet:view',
-  'pallet:manage',
+  'packaging:view',
+  'packaging:manage',
   'profit:view',
   'account:manage',
   'audit:view',
@@ -45,8 +45,8 @@ export const ROLE_SCOPES: Record<UserRole, readonly Scope[]> = {
     'production:manage',
     'inventory:view',
     'inventory:manage',
-    'pallet:view',
-    'pallet:manage',
+    'packaging:view',
+    'packaging:manage',
   ],
   FINANCE: [
     'order:view',
@@ -57,7 +57,7 @@ export const ROLE_SCOPES: Record<UserRole, readonly Scope[]> = {
     'finance:manage',
     'production:view',
     'inventory:view',
-    'pallet:view',
+    'packaging:view',
   ],
   WORKER: ['order:view'],
 };
@@ -72,8 +72,8 @@ export const ROLE_LABELS: Record<UserRole, string> = {
 // 角色说明（账号管理页的角色下拉与权限说明弹窗共用，避免文案两处维护）
 export const ROLE_DESCRIPTIONS: Record<UserRole, string> = {
   ADMIN: '全部模块 + 账号管理 + 审计日志',
-  SALES: '订单、客户、采购、供应商、生产与库存、托盘设计、财务全部维护',
-  FINANCE: '财务维护，订单、客户、采购、供应商、生产与库存、托盘设计只读',
+  SALES: '订单、客户、采购、供应商、生产与库存、包装设计、财务全部维护',
+  FINANCE: '财务维护，订单、客户、采购、供应商、生产与库存、包装设计只读',
   WORKER: '仅订单只读',
 };
 

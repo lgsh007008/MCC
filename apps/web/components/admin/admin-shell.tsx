@@ -1,6 +1,6 @@
-﻿'use client';
+﻿﻿'use client';
 
-import { Fragment, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { ChevronDownIcon, PanelLeftCloseIcon, PanelLeftOpenIcon } from 'lucide-react';
@@ -8,14 +8,6 @@ import { ROLE_LABELS, changePasswordSchema, hasScope, type FeatureCode, type Use
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from '@/components/ui/breadcrumb';
 import {
   Dialog,
   DialogContent,
@@ -60,13 +52,14 @@ import {
 } from '@/lib/nav';
 import { RoleProvider } from '@/components/auth/permission-context';
 import { ConfirmProvider } from '@/components/ui/confirm-dialog';
-import { PageBreadcrumbProvider, usePageBreadcrumb } from './page-breadcrumb';
+import { PageBreadcrumbProvider } from './page-breadcrumb';
 import { TabBar, TabsProvider, useTabs } from './tabs';
 
 // 后台布局壳（design/平台布局.md §1）：经典三区——侧边栏 / 顶栏 / 主内容区。
 // 业务页面只实现主内容区（children），不各自拼壳；路由与守卫结构见同文档 §1.2。
-// 顶栏两行：第一行多标签页 + 头像（design/平台布局.md §1.6），第二行折叠开关 + 面包屑；
-// 面包屑最后一层（页面标识）由页面经 usePageCrumb 注入（design/平台布局.md §1.5）。
+// 顶栏单行：多标签页 + 头像（design/平台布局.md §1.6）。
+// 面包屑界面暂不渲染（design/平台布局.md §1.5）；页面经 usePageCrumb 注入的层级
+// 仍保留，供标签页标题拼接，恢复时只需加回第二行渲染。
 export function AdminShell({
   children,
   defaultSidebarOpen = true,
@@ -85,7 +78,8 @@ export function AdminShell({
   );
 }
 
-// 侧边栏折叠开关（product/平台布局.md 整体布局）：置于侧边栏底部；展开态显示文字，折叠态只显示图标
+// 平台全局侧栏折叠开关（design/平台布局.md §1.5）：底部全宽行，PanelLeftClose/Open + 收起 / 展开文字；
+// 整行可点，折叠态文字隐藏；图标与工作台边缘双箭头把手区分。
 function SidebarCollapseButton(): React.ReactElement {
   const { state, toggleSidebar } = useSidebar();
   const open = state !== 'collapsed';
@@ -104,7 +98,7 @@ function SidebarCollapseButton(): React.ReactElement {
       ) : (
         <PanelLeftOpenIcon className="size-4 shrink-0" />
       )}
-      <span className="group-data-[collapsible=icon]:hidden">收起</span>
+      <span className="group-data-[collapsible=icon]:hidden">{open ? '收起' : '展开'}</span>
     </Button>
   );
 }
@@ -115,6 +109,34 @@ function NoPermission(): React.ReactElement {
       无权限访问该页面。
     </div>
   );
+}
+
+// 进入包装设计工作台时把平台侧栏折叠为图标栏（design/平台布局.md §1.5 / design/包装设计.md §9.2）：
+// 只沿平台自身的 useSidebar 状态、图标与宽度动画折叠一次；用户可手动展开，
+// 工作台内部路由切换（/new → /[id]）不会再次折叠。
+function WorkbenchSidebarAutoCollapse(): null {
+  const pathname = usePathname();
+  const { isMobile, setOpen, setOpenMobile } = useSidebar();
+  const lastArea = useRef<'workbench' | 'other' | null>(null);
+  const inWorkbench = /^\/admin\/packaging-design\/(?:new|[0-9a-fA-F-]{36})$/.test(pathname);
+
+  useEffect(() => {
+    const area = inWorkbench ? 'workbench' : 'other';
+    if (lastArea.current === area) {
+      return;
+    }
+    lastArea.current = area;
+    if (area !== 'workbench') {
+      return;
+    }
+    if (isMobile) {
+      setOpenMobile(false);
+      return;
+    }
+    setOpen(false);
+  }, [inWorkbench, isMobile, setOpen, setOpenMobile]);
+
+  return null;
 }
 
 function AdminShellInner({
@@ -192,9 +214,11 @@ function AdminShellInner({
   }
 
   const current = findNavByPath(pathname);
-  const pageCrumbs = usePageBreadcrumb()?.crumbs ?? [];
   const groups = visibleNavGroups(role, features);
   const username = currentUsername();
+  // 包装设计工作台占满主内容区（design/包装设计.md §9.1 / design/平台布局.md §1.5）；
+  // 报告页与方案库仍按常规页面边距与滚动。
+  const fullBleed = /^\/admin\/packaging-design\/(?:new|[0-9a-fA-F-]{36})$/.test(pathname);
   // 路由裁剪：无权限 / 未开通功能时显示统一提示，不渲染页面内容（服务端守卫仍是最终边界）
   const requiredScope = scopeForPath(pathname);
   const requiredFeature = featureForPath(pathname);
@@ -244,6 +268,7 @@ function AdminShellInner({
   return (
     <RoleProvider role={role}>
       <SidebarProvider defaultOpen={defaultSidebarOpen} className="h-svh overflow-hidden">
+      <WorkbenchSidebarAutoCollapse />
       <Sidebar collapsible="icon">
         <SidebarHeader className="border-b border-border">
           <span className="px-2 text-sm font-semibold">
@@ -370,72 +395,15 @@ function AdminShellInner({
             </div>
           </div>
 
-          {/* 第二行：面包屑（窄屏截断，不撑宽页面） */}
-          <div className="flex h-10 min-w-0 items-center gap-2 overflow-hidden border-t border-border/60 px-4 [&_li]:min-w-0 [&_li]:truncate [&_ol]:flex-nowrap [&_ol]:overflow-hidden">
-            <Breadcrumb>
-              <BreadcrumbList>
-                {pathname === homeItem.href ? (
-                  <BreadcrumbItem title="首页">
-                    <BreadcrumbPage>首页</BreadcrumbPage>
-                  </BreadcrumbItem>
-                ) : (
-                  <>
-                    <BreadcrumbItem title="首页">
-                      <BreadcrumbLink render={<Link href="/admin" />}>首页</BreadcrumbLink>
-                    </BreadcrumbItem>
-                    {current && current.groupLabel ? (
-                      <>
-                        <BreadcrumbSeparator />
-                        <BreadcrumbItem title={current.groupLabel}>
-                          {current.itemTitle ? (
-                            current.groupLabel
-                          ) : (
-                            <BreadcrumbPage>{current.groupLabel}</BreadcrumbPage>
-                          )}
-                        </BreadcrumbItem>
-                      </>
-                    ) : null}
-                    {current && current.itemTitle ? (
-                      <>
-                        <BreadcrumbSeparator />
-                        <BreadcrumbItem title={current.itemTitle}>
-                          {pathname === current.itemHref ? (
-                            <BreadcrumbPage>{current.itemTitle}</BreadcrumbPage>
-                          ) : (
-                            <BreadcrumbLink render={<Link href={current.itemHref ?? '/admin'} />}>
-                              {current.itemTitle}
-                            </BreadcrumbLink>
-                          )}
-                        </BreadcrumbItem>
-                      </>
-                    ) : null}
-                    {pageCrumbs.map((crumb, index) => {
-                      const isLast = index === pageCrumbs.length - 1;
-                      return (
-                        <Fragment key={`${crumb.title}-${index}`}>
-                          <BreadcrumbSeparator />
-                          <BreadcrumbItem title={crumb.title}>
-                            {isLast ? (
-                              <BreadcrumbPage>{crumb.title}</BreadcrumbPage>
-                            ) : crumb.href ? (
-                              <BreadcrumbLink render={<Link href={crumb.href} />}>
-                                {crumb.title}
-                              </BreadcrumbLink>
-                            ) : (
-                              <span>{crumb.title}</span>
-                            )}
-                          </BreadcrumbItem>
-                        </Fragment>
-                      );
-                    })}
-                  </>
-                )}
-              </BreadcrumbList>
-            </Breadcrumb>
-          </div>
         </header>
 
-        <main ref={mainRef} className="scroll-area min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-7">
+        <main
+          ref={mainRef}
+          className={cn(
+            'scroll-area min-w-0 flex-1 overflow-x-hidden',
+            fullBleed ? 'overflow-hidden p-0' : 'overflow-y-auto p-7',
+          )}
+        >
           {allowed ? children : <NoPermission />}
         </main>
       </SidebarInset>

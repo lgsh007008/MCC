@@ -63,22 +63,21 @@ test('登录 → 首页 → 订单菜单 → 销售单列表 → 退出 → 未�
   // 固定合计行（列表页表格底部，汇总标签在编号列）
   await expect(page.getByRole('cell', { name: '合计', exact: true })).toBeVisible();
 
-  // 新建客户：保存后进详情，面包屑 = 客户编号
+  // 新建客户：保存后进详情，页面展示客户编号
   await page.goto('/admin/customers/new');
   await page.getByPlaceholder('客户名称').fill(customerName);
   await page.getByRole('button', { name: '保存' }).click();
   await expect(page).toHaveURL(/\/admin\/customers\/[0-9a-f-]{36}$/);
-  const breadcrumb = page.getByRole('navigation', { name: 'breadcrumb' });
-  await expect(breadcrumb.getByText(/^CT-\d{5}$/)).toBeVisible();
+  await expect(page.getByText(/^CT-\d{5}$/)).toBeVisible();
 
-  // 新建页：明细区行操作「复制行」可用（1 → 2 行）；面包屑页面标识 =「新建」
+  // 新建页：明细区行操作「复制行」可用（1 → 2 行）；页面标题 =「新建销售单」
   await page.goto('/admin/sale-orders/new');
   await expect(page.getByText('共 1 / 200 行')).toBeVisible();
   await page.getByRole('button', { name: '复制行' }).first().click();
   await expect(page.getByText('共 2 / 200 行')).toBeVisible();
-  await expect(breadcrumb.getByText('新建', { exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '新建销售单' })).toBeVisible();
 
-  // 填写并保存 → 详情页面包屑 = 单号；编辑页面包屑 = 单号 / 编辑
+  // 填写并保存 → 详情页标题 = 单号；编辑页标题 =「编辑销售单」
   await page.getByRole('button', { name: '删除行' }).last().click();
   await expect(page.getByText('共 1 / 200 行')).toBeVisible();
   // 客户下拉：应用内下拉（非原生 select），点触发器后选上一步新建的客户
@@ -105,7 +104,9 @@ test('登录 → 首页 → 订单菜单 → 销售单列表 → 退出 → 未�
   }
 
   await expect(page).toHaveURL(/\/admin\/sale-orders\/[0-9a-f-]{36}$/);
-  await expect(breadcrumb.getByText(/^SO-\d{5}$/)).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: /销售单 SO-\d{5}/ }),
+  ).toBeVisible();
 
   // 打印预览：弹窗打开、A4 模板内容可见、ESC 关闭（product/order.md R-订单-002）
   await page.getByRole('button', { name: '打印', exact: true }).click();
@@ -123,7 +124,7 @@ test('登录 → 首页 → 订单菜单 → 销售单列表 → 退出 → 未�
 
   await page.getByRole('link', { name: '编辑' }).click();
   await expect(page).toHaveURL(/\/edit$/);
-  await expect(breadcrumb.getByText('编辑', { exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /编辑销售单/ })).toBeVisible();
 
   // 客户批量启停用：应用内确认弹窗（非浏览器原生）→ 状态变更 → 再批量启用恢复
   await page.goto('/admin/customers');

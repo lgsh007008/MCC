@@ -1,6 +1,6 @@
 import type { PalletComponentInput, PalletTemplateType } from './pallet.schemas';
 
-// 托盘结构基础校验（design/托盘设计.md §3.5）：
+// 托盘结构基础校验（design/包装设计.md §4）：
 // 只保证图纸与数据可继续使用，不代表承载合格；error 阻止保存，warning 提示确认。
 
 export interface PalletIssue {
@@ -17,12 +17,17 @@ const LAYER_RANK: Record<PalletComponentInput['role'], number> = {
   topDeck: 0,
   endDeck: 0,
   plywood: 0,
+  panel: 0,
   stringerBoard: 1,
+  batten: 1,
   block: 2,
   stringer: 2,
   runner: 2,
   spacer: 2,
+  frame: 2,
   bottomDeck: 3,
+  dunnage: 3,
+  steelStrap: 4,
   custom: 2,
 };
 

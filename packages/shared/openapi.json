@@ -4083,9 +4083,9 @@
         ]
       }
     },
-    "/api/v1/pallet/projects": {
+    "/api/v1/packaging/projects": {
       "get": {
-        "operationId": "PalletController_list",
+        "operationId": "PackagingController_list",
         "parameters": [
           {
             "name": "sortOrder",
@@ -4119,18 +4119,33 @@
             }
           },
           {
-            "name": "templateType",
+            "name": "status",
             "required": false,
             "in": "query",
-            "description": "结构模板",
+            "description": "状态",
             "schema": {
               "enum": [
-                "block",
-                "stringer",
-                "notched",
-                "skid",
-                "plywood",
-                "custom"
+                "DRAFT",
+                "ISSUED",
+                "ARCHIVED"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitType",
+            "required": false,
+            "in": "query",
+            "description": "单元类型",
+            "schema": {
+              "enum": [
+                "PALLET",
+                "CRATE",
+                "SKID",
+                "FRAME",
+                "DIVIDER",
+                "DUNNAGE",
+                "STEEL_STRAP"
               ],
               "type": "string"
             }
@@ -4139,7 +4154,7 @@
             "name": "keyword",
             "required": false,
             "in": "query",
-            "description": "项目名称 / 编号 / 客户名称模糊",
+            "description": "方案名称 / 编号 / 客户名称模糊",
             "schema": {
               "type": "string"
             }
@@ -4151,26 +4166,26 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PalletProjectListDto"
+                  "$ref": "#/components/schemas/PackagingProjectListDto"
                 }
               }
             }
           }
         },
-        "summary": "托盘项目列表：关键字 / 模板筛选 + 分页",
+        "summary": "包装方案列表：关键字 / 单元类型 / 状态筛选 + 分页",
         "tags": [
-          "pallet"
+          "packaging"
         ]
       },
       "post": {
-        "operationId": "PalletController_create",
+        "operationId": "PackagingController_create",
         "parameters": [],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/PalletProjectBodyDto"
+                "$ref": "#/components/schemas/PackagingProjectBodyDto"
               }
             }
           }
@@ -4181,21 +4196,21 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PalletProjectDto"
+                  "$ref": "#/components/schemas/PackagingProjectDto"
                 }
               }
             }
           }
         },
-        "summary": "新建托盘项目（PD 编号自动生成）",
+        "summary": "新建包装方案（PD 编号自动生成）",
         "tags": [
-          "pallet"
+          "packaging"
         ]
       }
     },
-    "/api/v1/pallet/projects/{id}": {
+    "/api/v1/packaging/projects/{id}": {
       "get": {
-        "operationId": "PalletController_detail",
+        "operationId": "PackagingController_detail",
         "parameters": [
           {
             "name": "id",
@@ -4212,19 +4227,19 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PalletProjectDto"
+                  "$ref": "#/components/schemas/PackagingProjectDto"
                 }
               }
             }
           }
         },
-        "summary": "托盘项目详情（含构件）",
+        "summary": "包装方案详情（含单元与构件）",
         "tags": [
-          "pallet"
+          "packaging"
         ]
       },
       "put": {
-        "operationId": "PalletController_update",
+        "operationId": "PackagingController_update",
         "parameters": [
           {
             "name": "id",
@@ -4240,7 +4255,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/PalletProjectBodyDto"
+                "$ref": "#/components/schemas/PackagingProjectBodyDto"
               }
             }
           }
@@ -4251,19 +4266,19 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PalletProjectDto"
+                  "$ref": "#/components/schemas/PackagingProjectDto"
                 }
               }
             }
           }
         },
-        "summary": "更新托盘项目与构件（整单提交，服务端重算合计）",
+        "summary": "更新包装方案、单元与构件（整单提交，服务端重算合计）",
         "tags": [
-          "pallet"
+          "packaging"
         ]
       },
       "delete": {
-        "operationId": "PalletController_remove",
+        "operationId": "PackagingController_remove",
         "parameters": [
           {
             "name": "id",
@@ -4279,15 +4294,15 @@
             "description": "已删除"
           }
         },
-        "summary": "删除托盘项目（软删除，编号不回收）",
+        "summary": "删除包装方案（软删除，编号不回收）",
         "tags": [
-          "pallet"
+          "packaging"
         ]
       }
     },
-    "/api/v1/pallet/projects/{id}/duplicate": {
+    "/api/v1/packaging/projects/{id}/duplicate": {
       "post": {
-        "operationId": "PalletController_duplicate",
+        "operationId": "PackagingController_duplicate",
         "parameters": [
           {
             "name": "id",
@@ -4304,21 +4319,197 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PalletProjectDto"
+                  "$ref": "#/components/schemas/PackagingProjectDto"
                 }
               }
             }
           }
         },
-        "summary": "复制托盘项目（生成新编号）",
+        "summary": "复制包装方案（生成新编号）",
         "tags": [
-          "pallet"
+          "packaging"
         ]
       }
     },
-    "/api/v1/pallet/materials": {
+    "/api/v1/packaging/projects/{id}/issue": {
+      "post": {
+        "operationId": "PackagingController_issue",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PackagingRevisionDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "发布包装方案（生成不可变版本，锁定设计数据）",
+        "tags": [
+          "packaging"
+        ]
+      }
+    },
+    "/api/v1/packaging/projects/{id}/next-revision": {
+      "post": {
+        "operationId": "PackagingController_nextRevision",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PackagingProjectDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "已发布方案新建下一版本（回到草稿，保留历史快照）",
+        "tags": [
+          "packaging"
+        ]
+      }
+    },
+    "/api/v1/packaging/projects/{id}/revisions": {
       "get": {
-        "operationId": "PalletController_materials",
+        "operationId": "PackagingController_revisions",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PackagingRevisionListDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "包装方案版本列表",
+        "tags": [
+          "packaging"
+        ]
+      }
+    },
+    "/api/v1/packaging/projects/{id}/revisions/{revisionNo}": {
+      "get": {
+        "operationId": "PackagingController_revision",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "revisionNo",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PackagingRevisionDetailDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "包装方案版本快照",
+        "tags": [
+          "packaging"
+        ]
+      }
+    },
+    "/api/v1/packaging/templates": {
+      "get": {
+        "operationId": "PackagingController_templates",
+        "parameters": [
+          {
+            "name": "unitType",
+            "required": false,
+            "in": "query",
+            "description": "按单元类型筛选",
+            "schema": {
+              "enum": [
+                "PALLET",
+                "CRATE",
+                "SKID",
+                "FRAME",
+                "DIVIDER",
+                "DUNNAGE",
+                "STEEL_STRAP"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PackagingTemplateDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "包装设计模板目录（首次读取落预置）",
+        "tags": [
+          "packaging"
+        ]
+      }
+    },
+    "/api/v1/packaging/materials": {
+      "get": {
+        "operationId": "PackagingController_materials",
         "parameters": [],
         "responses": {
           "200": {
@@ -4328,16 +4519,16 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/PalletMaterialDto"
+                    "$ref": "#/components/schemas/PackagingMaterialDto"
                   }
                 }
               }
             }
           }
         },
-        "summary": "托盘材料目录（只读）",
+        "summary": "包装材料目录（只读）",
         "tags": [
-          "pallet"
+          "packaging"
         ]
       }
     }
@@ -8899,88 +9090,7 @@
           "deleted"
         ]
       },
-      "PalletProjectListItemDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "description": "项目 id"
-          },
-          "code": {
-            "type": "string",
-            "description": "项目编号"
-          },
-          "name": {
-            "type": "string",
-            "description": "项目名称"
-          },
-          "customerName": {
-            "type": "string",
-            "description": "客户名称快照"
-          },
-          "templateType": {
-            "type": "string",
-            "description": "结构模板"
-          },
-          "lengthMm": {
-            "type": "number",
-            "description": "外形长度（mm）"
-          },
-          "widthMm": {
-            "type": "number",
-            "description": "外形宽度（mm）"
-          },
-          "totalHeightMm": {
-            "type": "number",
-            "description": "外形高度（mm）"
-          },
-          "totalVolumeM3": {
-            "type": "string",
-            "description": "木材净体积（m³）"
-          },
-          "totalWeightKg": {
-            "type": "string",
-            "description": "估算重量（kg）"
-          },
-          "updatedAt": {
-            "type": "string",
-            "description": "更新时间（ISO）"
-          }
-        },
-        "required": [
-          "id",
-          "code",
-          "name",
-          "customerName",
-          "templateType",
-          "lengthMm",
-          "widthMm",
-          "totalHeightMm",
-          "totalVolumeM3",
-          "totalWeightKg",
-          "updatedAt"
-        ]
-      },
-      "PalletProjectListDto": {
-        "type": "object",
-        "properties": {
-          "total": {
-            "type": "number",
-            "description": "总数"
-          },
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/PalletProjectListItemDto"
-            }
-          }
-        },
-        "required": [
-          "total",
-          "items"
-        ]
-      },
-      "PalletComponentDto": {
+      "PackagingPartDto": {
         "type": "object",
         "properties": {
           "id": {
@@ -9052,48 +9162,40 @@
           "priceOverride"
         ]
       },
-      "PalletProjectDto": {
+      "PackagingUnitDto": {
         "type": "object",
         "properties": {
           "id": {
             "type": "string",
-            "description": "项目 id"
+            "description": "单元 id"
           },
-          "code": {
+          "seq": {
+            "type": "number",
+            "description": "方案内行序"
+          },
+          "unitType": {
             "type": "string",
-            "description": "项目编号（PD-#####）"
+            "description": "单元类型"
+          },
+          "templateCode": {
+            "type": "string",
+            "description": "模板 code"
           },
           "name": {
             "type": "string",
-            "description": "项目名称"
-          },
-          "customerName": {
-            "type": "string",
-            "description": "客户名称快照"
-          },
-          "templateType": {
-            "type": "string",
-            "description": "结构模板"
-          },
-          "destination": {
-            "type": "string",
-            "description": "使用范围"
-          },
-          "entryDirection": {
-            "type": "string",
-            "description": "进叉方向"
+            "description": "单元名称"
           },
           "lengthMm": {
             "type": "number",
-            "description": "外形长度（mm）"
+            "description": "长度（mm）"
           },
           "widthMm": {
             "type": "number",
-            "description": "外形宽度（mm）"
+            "description": "宽度（mm）"
           },
           "totalHeightMm": {
             "type": "number",
-            "description": "外形高度（mm）"
+            "description": "高度（mm）"
           },
           "targetLoadKg": {
             "type": "number",
@@ -9104,9 +9206,190 @@
             "type": "string",
             "description": "载荷形式"
           },
+          "params": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "单元类型特有参数"
+          },
           "totalVolumeM3": {
             "type": "string",
-            "description": "木材净体积（m³，5 位小数）"
+            "description": "净体积（m³，5 位小数）"
+          },
+          "totalWeightKg": {
+            "type": "string",
+            "description": "估算重量（kg，1 位小数）"
+          },
+          "materialCost": {
+            "type": "string",
+            "description": "材料费（元，2 位小数）"
+          },
+          "processingCost": {
+            "type": "string",
+            "description": "加工费（元，2 位小数）"
+          },
+          "parts": {
+            "description": "构件列表",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PackagingPartDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "seq",
+          "unitType",
+          "templateCode",
+          "name",
+          "lengthMm",
+          "widthMm",
+          "totalHeightMm",
+          "targetLoadKg",
+          "loadType",
+          "params",
+          "totalVolumeM3",
+          "totalWeightKg",
+          "materialCost",
+          "processingCost",
+          "parts"
+        ]
+      },
+      "PackagingProjectListItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "方案 id"
+          },
+          "code": {
+            "type": "string",
+            "description": "方案编号"
+          },
+          "name": {
+            "type": "string",
+            "description": "方案名称"
+          },
+          "customerName": {
+            "type": "string",
+            "description": "客户名称快照"
+          },
+          "unitType": {
+            "type": "string",
+            "description": "首个单元类型"
+          },
+          "unitCount": {
+            "type": "number",
+            "description": "单元数"
+          },
+          "firstUnit": {
+            "nullable": true,
+            "description": "首个单元（方案库缩略图用）",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PackagingUnitDto"
+              }
+            ]
+          },
+          "lengthMm": {
+            "type": "number",
+            "description": "首单元长度（mm）"
+          },
+          "widthMm": {
+            "type": "number",
+            "description": "首单元宽度（mm）"
+          },
+          "totalHeightMm": {
+            "type": "number",
+            "description": "首单元高度（mm）"
+          },
+          "totalVolumeM3": {
+            "type": "string",
+            "description": "净体积（m³）"
+          },
+          "totalWeightKg": {
+            "type": "string",
+            "description": "估算重量（kg）"
+          },
+          "status": {
+            "type": "string",
+            "description": "状态"
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "更新时间（ISO）"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "customerName",
+          "unitType",
+          "unitCount",
+          "firstUnit",
+          "lengthMm",
+          "widthMm",
+          "totalHeightMm",
+          "totalVolumeM3",
+          "totalWeightKg",
+          "status",
+          "updatedAt"
+        ]
+      },
+      "PackagingProjectListDto": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "number",
+            "description": "总数"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PackagingProjectListItemDto"
+            }
+          }
+        },
+        "required": [
+          "total",
+          "items"
+        ]
+      },
+      "PackagingProjectDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "方案 id"
+          },
+          "code": {
+            "type": "string",
+            "description": "方案编号（PD-#####）"
+          },
+          "name": {
+            "type": "string",
+            "description": "方案名称"
+          },
+          "customerName": {
+            "type": "string",
+            "description": "客户名称快照"
+          },
+          "destination": {
+            "type": "string",
+            "description": "使用范围"
+          },
+          "status": {
+            "type": "string",
+            "description": "状态：DRAFT / ISSUED / ARCHIVED"
+          },
+          "currentRevision": {
+            "type": "number",
+            "description": "当前版本号"
+          },
+          "totalVolumeM3": {
+            "type": "string",
+            "description": "净体积（m³，5 位小数）"
           },
           "totalWeightKg": {
             "type": "string",
@@ -9132,11 +9415,11 @@
             "type": "string",
             "description": "更新时间（ISO）"
           },
-          "components": {
-            "description": "构件列表",
+          "units": {
+            "description": "单元列表",
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/PalletComponentDto"
+              "$ref": "#/components/schemas/PackagingUnitDto"
             }
           }
         },
@@ -9145,14 +9428,9 @@
           "code",
           "name",
           "customerName",
-          "templateType",
           "destination",
-          "entryDirection",
-          "lengthMm",
-          "widthMm",
-          "totalHeightMm",
-          "targetLoadKg",
-          "loadType",
+          "status",
+          "currentRevision",
           "totalVolumeM3",
           "totalWeightKg",
           "materialCost",
@@ -9160,10 +9438,10 @@
           "note",
           "createdAt",
           "updatedAt",
-          "components"
+          "units"
         ]
       },
-      "PalletComponentBodyDto": {
+      "PackagingPartBodyDto": {
         "type": "object",
         "properties": {
           "role": {
@@ -9178,6 +9456,11 @@
               "runner",
               "plywood",
               "spacer",
+              "panel",
+              "frame",
+              "batten",
+              "steelStrap",
+              "dunnage",
               "custom"
             ],
             "description": "构件类型"
@@ -9243,56 +9526,40 @@
           "quantity"
         ]
       },
-      "PalletProjectBodyDto": {
+      "PackagingUnitBodyDto": {
         "type": "object",
         "properties": {
+          "unitType": {
+            "type": "string",
+            "enum": [
+              "PALLET",
+              "CRATE",
+              "SKID",
+              "FRAME",
+              "DIVIDER",
+              "DUNNAGE",
+              "STEEL_STRAP"
+            ],
+            "description": "单元类型",
+            "default": "PALLET"
+          },
+          "templateCode": {
+            "type": "string",
+            "description": "模板 code",
+            "example": "block"
+          },
           "name": {
             "type": "string",
-            "description": "项目名称",
-            "example": "1200×800 出口实木托盘"
-          },
-          "customerName": {
-            "type": "string",
-            "description": "客户名称快照",
-            "default": ""
-          },
-          "templateType": {
-            "type": "string",
-            "enum": [
-              "block",
-              "stringer",
-              "notched",
-              "skid",
-              "plywood",
-              "custom"
-            ],
-            "description": "结构模板"
-          },
-          "destination": {
-            "type": "string",
-            "enum": [
-              "export",
-              "domestic"
-            ],
-            "description": "使用范围",
-            "default": "domestic"
-          },
-          "entryDirection": {
-            "type": "string",
-            "enum": [
-              "4",
-              "2"
-            ],
-            "description": "进叉方向",
-            "default": "4"
+            "description": "单元名称",
+            "example": "1200×800 出口托盘"
           },
           "lengthMm": {
             "type": "number",
-            "description": "外形长度（整数毫米）"
+            "description": "长度（整数毫米）"
           },
           "widthMm": {
             "type": "number",
-            "description": "外形宽度（整数毫米）"
+            "description": "宽度（整数毫米）"
           },
           "targetLoadKg": {
             "type": "number",
@@ -9308,28 +9575,222 @@
             "description": "载荷形式",
             "default": "uniform"
           },
+          "params": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "单元类型特有参数，如进叉方向、板厚",
+            "default": {}
+          },
+          "parts": {
+            "description": "构件列表（从上到下）",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PackagingPartBodyDto"
+            }
+          }
+        },
+        "required": [
+          "unitType",
+          "templateCode",
+          "name",
+          "lengthMm",
+          "widthMm",
+          "parts"
+        ]
+      },
+      "PackagingProjectBodyDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "方案名称",
+            "example": "出口包装方案"
+          },
+          "customerName": {
+            "type": "string",
+            "description": "客户名称快照",
+            "default": ""
+          },
+          "destination": {
+            "type": "string",
+            "enum": [
+              "export",
+              "domestic"
+            ],
+            "description": "使用范围",
+            "default": "domestic"
+          },
           "note": {
             "type": "string",
             "description": "备注",
             "default": ""
           },
-          "components": {
-            "description": "构件列表（从上到下）",
+          "units": {
+            "description": "单元列表（1..n）",
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/PalletComponentBodyDto"
+              "$ref": "#/components/schemas/PackagingUnitBodyDto"
             }
           }
         },
         "required": [
           "name",
-          "templateType",
-          "lengthMm",
-          "widthMm",
-          "components"
+          "units"
         ]
       },
-      "PalletMaterialDto": {
+      "PackagingRevisionDto": {
+        "type": "object",
+        "properties": {
+          "revisionNo": {
+            "type": "number",
+            "description": "版本号"
+          },
+          "issuedAt": {
+            "type": "string",
+            "description": "发布时间（ISO）"
+          },
+          "issuedBy": {
+            "type": "string",
+            "description": "发布人"
+          },
+          "note": {
+            "type": "string",
+            "description": "备注"
+          },
+          "totalVolumeM3": {
+            "type": "string",
+            "description": "净体积（m³）"
+          },
+          "totalWeightKg": {
+            "type": "string",
+            "description": "估算重量（kg）"
+          },
+          "materialCost": {
+            "type": "string",
+            "description": "材料费（元）"
+          },
+          "processingCost": {
+            "type": "string",
+            "description": "加工费（元）"
+          }
+        },
+        "required": [
+          "revisionNo",
+          "issuedAt",
+          "issuedBy",
+          "note",
+          "totalVolumeM3",
+          "totalWeightKg",
+          "materialCost",
+          "processingCost"
+        ]
+      },
+      "PackagingRevisionListDto": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "number",
+            "description": "总数"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PackagingRevisionDto"
+            }
+          }
+        },
+        "required": [
+          "total",
+          "items"
+        ]
+      },
+      "PackagingRevisionDetailDto": {
+        "type": "object",
+        "properties": {
+          "revisionNo": {
+            "type": "number",
+            "description": "版本号"
+          },
+          "issuedAt": {
+            "type": "string",
+            "description": "发布时间（ISO）"
+          },
+          "issuedBy": {
+            "type": "string",
+            "description": "发布人"
+          },
+          "note": {
+            "type": "string",
+            "description": "备注"
+          },
+          "totalVolumeM3": {
+            "type": "string",
+            "description": "净体积（m³）"
+          },
+          "totalWeightKg": {
+            "type": "string",
+            "description": "估算重量（kg）"
+          },
+          "materialCost": {
+            "type": "string",
+            "description": "材料费（元）"
+          },
+          "processingCost": {
+            "type": "string",
+            "description": "加工费（元）"
+          },
+          "snapshot": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "版本快照"
+          }
+        },
+        "required": [
+          "revisionNo",
+          "issuedAt",
+          "issuedBy",
+          "note",
+          "totalVolumeM3",
+          "totalWeightKg",
+          "materialCost",
+          "processingCost",
+          "snapshot"
+        ]
+      },
+      "PackagingTemplateDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "模板 code"
+          },
+          "unitType": {
+            "type": "string",
+            "description": "单元类型"
+          },
+          "name": {
+            "type": "string",
+            "description": "模板名称"
+          },
+          "schemaVersion": {
+            "type": "number",
+            "description": "模板结构版本"
+          },
+          "definition": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "模板定义"
+          }
+        },
+        "required": [
+          "code",
+          "unitType",
+          "name",
+          "schemaVersion",
+          "definition"
+        ]
+      },
+      "PackagingMaterialDto": {
         "type": "object",
         "properties": {
           "code": {
@@ -9355,6 +9816,13 @@
           "color": {
             "type": "string",
             "description": "图纸颜色"
+          },
+          "applicableUnitTypes": {
+            "description": "适用单元类型；空数组表示全部可用",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [
@@ -9363,7 +9831,8 @@
           "densityKgM3",
           "pricePerM3",
           "fumigation",
-          "color"
+          "color",
+          "applicableUnitTypes"
         ]
       }
     }

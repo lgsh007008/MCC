@@ -139,7 +139,22 @@ test('原木领用与方木产出：PC / 移动页面与材料毛利卡可达', 
 
     // PC 生产批次：弹窗新建 / 编辑、行关闭、批量关闭、详情（成本池 + 领用 / 产出）
     await page.goto('/admin/production/batches');
-    await expect(page.getByText(String(batchBody.code)).first()).toBeVisible();
+    // 等列表数据返回（共 0 条时下一页恒为禁用，过早循环会直接退出）
+    await expect(page.getByText(/共 [1-9]\d* 条/)).toBeVisible();
+    // 批次按日期倒序、20 条 / 页；历史 e2e 批次可能把本批次挤到后续页，逐页查找
+    const batchRow = page.getByRole('row', { name: new RegExp(String(batchBody.code)) });
+    const nextPageButton = page.getByRole('button', { name: '下一页' });
+    for (let pageIndex = 0; pageIndex < 10; pageIndex += 1) {
+      if ((await batchRow.count()) > 0) break;
+      if (await nextPageButton.isDisabled()) break;
+      await nextPageButton.click();
+      await expect(page.getByText(new RegExp(`第 ${pageIndex + 2} / \\d+ 页`))).toBeVisible();
+      // 页码状态先于列表数据更新，等本页数据渲染后再判断
+      await page.waitForTimeout(400);
+    }
+    await expect(batchRow).toBeVisible();
+    // 回到列表首页，继续后续行关闭 / 批量关闭用例
+    await page.goto('/admin/production/batches');
     await expect(page.getByText(String(closeTargetBody.code)).first()).toBeVisible();
 
     // 新建 / 编辑改为弹窗，不再有独立表单页
@@ -294,7 +309,17 @@ test('原木领用与方木产出：PC / 移动页面与材料毛利卡可达', 
     // 移动生产批次：列表底部新建弹窗 + 详情编辑弹窗（与 PC 共用同一弹窗）
     await page.goto('/m/production/batches');
     await expect(page.getByRole('heading', { name: '生产批次' })).toBeVisible();
-    await expect(page.getByText(String(batchBody.code)).first()).toBeVisible();
+    await expect(page.locator('a[href^="/m/production/batches/"]').first()).toBeVisible();
+    // 移动端为「加载更多」分页，历史 e2e 批次可能把本批次挤到后续批次
+    const mobileBatch = page.getByText(String(batchBody.code)).first();
+    for (let pageIndex = 0; pageIndex < 10; pageIndex += 1) {
+      if ((await mobileBatch.count()) > 0) break;
+      const loadMore = page.getByRole('button', { name: '加载更多' });
+      if ((await loadMore.count()) === 0) break;
+      await loadMore.click();
+      await page.waitForTimeout(500);
+    }
+    await expect(mobileBatch).toBeVisible();
     await page.getByRole('button', { name: '新建生产批次' }).click();
     await expect(page.getByRole('dialog').getByRole('heading', { name: '新建生产批次' })).toBeVisible();
     await page.getByRole('dialog').getByRole('button', { name: '取消' }).click();

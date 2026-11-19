@@ -1297,44 +1297,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/pallet/projects": {
+    "/api/v1/packaging/projects": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** 托盘项目列表：关键字 / 模板筛选 + 分页 */
-        get: operations["PalletController_list"];
+        /** 包装方案列表：关键字 / 单元类型 / 状态筛选 + 分页 */
+        get: operations["PackagingController_list"];
         put?: never;
-        /** 新建托盘项目（PD 编号自动生成） */
-        post: operations["PalletController_create"];
+        /** 新建包装方案（PD 编号自动生成） */
+        post: operations["PackagingController_create"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/v1/pallet/projects/{id}": {
+    "/api/v1/packaging/projects/{id}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** 托盘项目详情（含构件） */
-        get: operations["PalletController_detail"];
-        /** 更新托盘项目与构件（整单提交，服务端重算合计） */
-        put: operations["PalletController_update"];
+        /** 包装方案详情（含单元与构件） */
+        get: operations["PackagingController_detail"];
+        /** 更新包装方案、单元与构件（整单提交，服务端重算合计） */
+        put: operations["PackagingController_update"];
         post?: never;
-        /** 删除托盘项目（软删除，编号不回收） */
-        delete: operations["PalletController_remove"];
+        /** 删除包装方案（软删除，编号不回收） */
+        delete: operations["PackagingController_remove"];
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/v1/pallet/projects/{id}/duplicate": {
+    "/api/v1/packaging/projects/{id}/duplicate": {
         parameters: {
             query?: never;
             header?: never;
@@ -1343,23 +1343,108 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** 复制托盘项目（生成新编号） */
-        post: operations["PalletController_duplicate"];
+        /** 复制包装方案（生成新编号） */
+        post: operations["PackagingController_duplicate"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/v1/pallet/materials": {
+    "/api/v1/packaging/projects/{id}/issue": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** 托盘材料目录（只读） */
-        get: operations["PalletController_materials"];
+        get?: never;
+        put?: never;
+        /** 发布包装方案（生成不可变版本，锁定设计数据） */
+        post: operations["PackagingController_issue"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/packaging/projects/{id}/next-revision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 已发布方案新建下一版本（回到草稿，保留历史快照） */
+        post: operations["PackagingController_nextRevision"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/packaging/projects/{id}/revisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 包装方案版本列表 */
+        get: operations["PackagingController_revisions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/packaging/projects/{id}/revisions/{revisionNo}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 包装方案版本快照 */
+        get: operations["PackagingController_revision"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/packaging/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 包装设计模板目录（首次读取落预置） */
+        get: operations["PackagingController_templates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/packaging/materials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 包装材料目录（只读） */
+        get: operations["PackagingController_materials"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3083,36 +3168,7 @@ export interface components {
             /** @description 实际删除（软删除）条数 */
             deleted: number;
         };
-        PalletProjectListItemDto: {
-            /** @description 项目 id */
-            id: string;
-            /** @description 项目编号 */
-            code: string;
-            /** @description 项目名称 */
-            name: string;
-            /** @description 客户名称快照 */
-            customerName: string;
-            /** @description 结构模板 */
-            templateType: string;
-            /** @description 外形长度（mm） */
-            lengthMm: number;
-            /** @description 外形宽度（mm） */
-            widthMm: number;
-            /** @description 外形高度（mm） */
-            totalHeightMm: number;
-            /** @description 木材净体积（m³） */
-            totalVolumeM3: string;
-            /** @description 估算重量（kg） */
-            totalWeightKg: string;
-            /** @description 更新时间（ISO） */
-            updatedAt: string;
-        };
-        PalletProjectListDto: {
-            /** @description 总数 */
-            total: number;
-            items: components["schemas"]["PalletProjectListItemDto"][];
-        };
-        PalletComponentDto: {
+        PackagingPartDto: {
             /** @description 构件 id */
             id: string;
             /** @description 行序（从 1 开始） */
@@ -3140,32 +3196,93 @@ export interface components {
             /** @description 单价覆盖（元/m³） */
             priceOverride: number;
         };
-        PalletProjectDto: {
-            /** @description 项目 id */
+        PackagingUnitDto: {
+            /** @description 单元 id */
             id: string;
-            /** @description 项目编号（PD-#####） */
-            code: string;
-            /** @description 项目名称 */
+            /** @description 方案内行序 */
+            seq: number;
+            /** @description 单元类型 */
+            unitType: string;
+            /** @description 模板 code */
+            templateCode: string;
+            /** @description 单元名称 */
             name: string;
-            /** @description 客户名称快照 */
-            customerName: string;
-            /** @description 结构模板 */
-            templateType: string;
-            /** @description 使用范围 */
-            destination: string;
-            /** @description 进叉方向 */
-            entryDirection: string;
-            /** @description 外形长度（mm） */
+            /** @description 长度（mm） */
             lengthMm: number;
-            /** @description 外形宽度（mm） */
+            /** @description 宽度（mm） */
             widthMm: number;
-            /** @description 外形高度（mm） */
+            /** @description 高度（mm） */
             totalHeightMm: number;
             /** @description 目标载荷（kg） */
             targetLoadKg: number | null;
             /** @description 载荷形式 */
             loadType: string;
-            /** @description 木材净体积（m³，5 位小数） */
+            /** @description 单元类型特有参数 */
+            params: {
+                [key: string]: unknown;
+            };
+            /** @description 净体积（m³，5 位小数） */
+            totalVolumeM3: string;
+            /** @description 估算重量（kg，1 位小数） */
+            totalWeightKg: string;
+            /** @description 材料费（元，2 位小数） */
+            materialCost: string;
+            /** @description 加工费（元，2 位小数） */
+            processingCost: string;
+            /** @description 构件列表 */
+            parts: components["schemas"]["PackagingPartDto"][];
+        };
+        PackagingProjectListItemDto: {
+            /** @description 方案 id */
+            id: string;
+            /** @description 方案编号 */
+            code: string;
+            /** @description 方案名称 */
+            name: string;
+            /** @description 客户名称快照 */
+            customerName: string;
+            /** @description 首个单元类型 */
+            unitType: string;
+            /** @description 单元数 */
+            unitCount: number;
+            /** @description 首个单元（方案库缩略图用） */
+            firstUnit: components["schemas"]["PackagingUnitDto"] | null;
+            /** @description 首单元长度（mm） */
+            lengthMm: number;
+            /** @description 首单元宽度（mm） */
+            widthMm: number;
+            /** @description 首单元高度（mm） */
+            totalHeightMm: number;
+            /** @description 净体积（m³） */
+            totalVolumeM3: string;
+            /** @description 估算重量（kg） */
+            totalWeightKg: string;
+            /** @description 状态 */
+            status: string;
+            /** @description 更新时间（ISO） */
+            updatedAt: string;
+        };
+        PackagingProjectListDto: {
+            /** @description 总数 */
+            total: number;
+            items: components["schemas"]["PackagingProjectListItemDto"][];
+        };
+        PackagingProjectDto: {
+            /** @description 方案 id */
+            id: string;
+            /** @description 方案编号（PD-#####） */
+            code: string;
+            /** @description 方案名称 */
+            name: string;
+            /** @description 客户名称快照 */
+            customerName: string;
+            /** @description 使用范围 */
+            destination: string;
+            /** @description 状态：DRAFT / ISSUED / ARCHIVED */
+            status: string;
+            /** @description 当前版本号 */
+            currentRevision: number;
+            /** @description 净体积（m³，5 位小数） */
             totalVolumeM3: string;
             /** @description 估算重量（kg，1 位小数） */
             totalWeightKg: string;
@@ -3179,15 +3296,15 @@ export interface components {
             createdAt: string;
             /** @description 更新时间（ISO） */
             updatedAt: string;
-            /** @description 构件列表 */
-            components: components["schemas"]["PalletComponentDto"][];
+            /** @description 单元列表 */
+            units: components["schemas"]["PackagingUnitDto"][];
         };
-        PalletComponentBodyDto: {
+        PackagingPartBodyDto: {
             /**
              * @description 构件类型
              * @enum {string}
              */
-            role: "topDeck" | "endDeck" | "stringerBoard" | "block" | "bottomDeck" | "stringer" | "runner" | "plywood" | "spacer" | "custom";
+            role: "topDeck" | "endDeck" | "stringerBoard" | "block" | "bottomDeck" | "stringer" | "runner" | "plywood" | "spacer" | "panel" | "frame" | "batten" | "steelStrap" | "dunnage" | "custom";
             /**
              * @description 构件名称
              * @example 面板
@@ -3227,37 +3344,26 @@ export interface components {
              */
             priceOverride: number;
         };
-        PalletProjectBodyDto: {
+        PackagingUnitBodyDto: {
             /**
-             * @description 项目名称
-             * @example 1200×800 出口实木托盘
+             * @description 单元类型
+             * @default PALLET
+             * @enum {string}
+             */
+            unitType: "PALLET" | "CRATE" | "SKID" | "FRAME" | "DIVIDER" | "DUNNAGE" | "STEEL_STRAP";
+            /**
+             * @description 模板 code
+             * @example block
+             */
+            templateCode: string;
+            /**
+             * @description 单元名称
+             * @example 1200×800 出口托盘
              */
             name: string;
-            /**
-             * @description 客户名称快照
-             * @default
-             */
-            customerName: string;
-            /**
-             * @description 结构模板
-             * @enum {string}
-             */
-            templateType: "block" | "stringer" | "notched" | "skid" | "plywood" | "custom";
-            /**
-             * @description 使用范围
-             * @default domestic
-             * @enum {string}
-             */
-            destination: "export" | "domestic";
-            /**
-             * @description 进叉方向
-             * @default 4
-             * @enum {string}
-             */
-            entryDirection: "4" | "2";
-            /** @description 外形长度（整数毫米） */
+            /** @description 长度（整数毫米） */
             lengthMm: number;
-            /** @description 外形宽度（整数毫米） */
+            /** @description 宽度（整数毫米） */
             widthMm: number;
             /** @description 目标载荷（kg） */
             targetLoadKg?: number | null;
@@ -3268,14 +3374,100 @@ export interface components {
              */
             loadType: "uniform" | "concentrated";
             /**
+             * @description 单元类型特有参数，如进叉方向、板厚
+             * @default {}
+             */
+            params: {
+                [key: string]: unknown;
+            };
+            /** @description 构件列表（从上到下） */
+            parts: components["schemas"]["PackagingPartBodyDto"][];
+        };
+        PackagingProjectBodyDto: {
+            /**
+             * @description 方案名称
+             * @example 出口包装方案
+             */
+            name: string;
+            /**
+             * @description 客户名称快照
+             * @default
+             */
+            customerName: string;
+            /**
+             * @description 使用范围
+             * @default domestic
+             * @enum {string}
+             */
+            destination: "export" | "domestic";
+            /**
              * @description 备注
              * @default
              */
             note: string;
-            /** @description 构件列表（从上到下） */
-            components: components["schemas"]["PalletComponentBodyDto"][];
+            /** @description 单元列表（1..n） */
+            units: components["schemas"]["PackagingUnitBodyDto"][];
         };
-        PalletMaterialDto: {
+        PackagingRevisionDto: {
+            /** @description 版本号 */
+            revisionNo: number;
+            /** @description 发布时间（ISO） */
+            issuedAt: string;
+            /** @description 发布人 */
+            issuedBy: string;
+            /** @description 备注 */
+            note: string;
+            /** @description 净体积（m³） */
+            totalVolumeM3: string;
+            /** @description 估算重量（kg） */
+            totalWeightKg: string;
+            /** @description 材料费（元） */
+            materialCost: string;
+            /** @description 加工费（元） */
+            processingCost: string;
+        };
+        PackagingRevisionListDto: {
+            /** @description 总数 */
+            total: number;
+            items: components["schemas"]["PackagingRevisionDto"][];
+        };
+        PackagingRevisionDetailDto: {
+            /** @description 版本号 */
+            revisionNo: number;
+            /** @description 发布时间（ISO） */
+            issuedAt: string;
+            /** @description 发布人 */
+            issuedBy: string;
+            /** @description 备注 */
+            note: string;
+            /** @description 净体积（m³） */
+            totalVolumeM3: string;
+            /** @description 估算重量（kg） */
+            totalWeightKg: string;
+            /** @description 材料费（元） */
+            materialCost: string;
+            /** @description 加工费（元） */
+            processingCost: string;
+            /** @description 版本快照 */
+            snapshot: {
+                [key: string]: unknown;
+            };
+        };
+        PackagingTemplateDto: {
+            /** @description 模板 code */
+            code: string;
+            /** @description 单元类型 */
+            unitType: string;
+            /** @description 模板名称 */
+            name: string;
+            /** @description 模板结构版本 */
+            schemaVersion: number;
+            /** @description 模板定义 */
+            definition: {
+                [key: string]: unknown;
+            };
+        };
+        PackagingMaterialDto: {
             /** @description 材料 code */
             code: string;
             /** @description 材料名称 */
@@ -3288,6 +3480,8 @@ export interface components {
             fumigation: boolean;
             /** @description 图纸颜色 */
             color: string;
+            /** @description 适用单元类型；空数组表示全部可用 */
+            applicableUnitTypes: string[];
         };
     };
     responses: never;
@@ -5799,7 +5993,7 @@ export interface operations {
             };
         };
     };
-    PalletController_list: {
+    PackagingController_list: {
         parameters: {
             query?: {
                 /** @description 更新时间排序，默认 desc */
@@ -5808,9 +6002,11 @@ export interface operations {
                 pageSize?: number;
                 /** @description 页码，默认 1 */
                 page?: number;
-                /** @description 结构模板 */
-                templateType?: "block" | "stringer" | "notched" | "skid" | "plywood" | "custom";
-                /** @description 项目名称 / 编号 / 客户名称模糊 */
+                /** @description 状态 */
+                status?: "DRAFT" | "ISSUED" | "ARCHIVED";
+                /** @description 单元类型 */
+                unitType?: "PALLET" | "CRATE" | "SKID" | "FRAME" | "DIVIDER" | "DUNNAGE" | "STEEL_STRAP";
+                /** @description 方案名称 / 编号 / 客户名称模糊 */
                 keyword?: string;
             };
             header?: never;
@@ -5824,12 +6020,12 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PalletProjectListDto"];
+                    "application/json": components["schemas"]["PackagingProjectListDto"];
                 };
             };
         };
     };
-    PalletController_create: {
+    PackagingController_create: {
         parameters: {
             query?: never;
             header?: never;
@@ -5838,7 +6034,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["PalletProjectBodyDto"];
+                "application/json": components["schemas"]["PackagingProjectBodyDto"];
             };
         };
         responses: {
@@ -5847,12 +6043,12 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PalletProjectDto"];
+                    "application/json": components["schemas"]["PackagingProjectDto"];
                 };
             };
         };
     };
-    PalletController_detail: {
+    PackagingController_detail: {
         parameters: {
             query?: never;
             header?: never;
@@ -5868,12 +6064,12 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PalletProjectDto"];
+                    "application/json": components["schemas"]["PackagingProjectDto"];
                 };
             };
         };
     };
-    PalletController_update: {
+    PackagingController_update: {
         parameters: {
             query?: never;
             header?: never;
@@ -5884,7 +6080,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["PalletProjectBodyDto"];
+                "application/json": components["schemas"]["PackagingProjectBodyDto"];
             };
         };
         responses: {
@@ -5893,12 +6089,12 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PalletProjectDto"];
+                    "application/json": components["schemas"]["PackagingProjectDto"];
                 };
             };
         };
     };
-    PalletController_remove: {
+    PackagingController_remove: {
         parameters: {
             query?: never;
             header?: never;
@@ -5918,7 +6114,7 @@ export interface operations {
             };
         };
     };
-    PalletController_duplicate: {
+    PackagingController_duplicate: {
         parameters: {
             query?: never;
             header?: never;
@@ -5934,12 +6130,119 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PalletProjectDto"];
+                    "application/json": components["schemas"]["PackagingProjectDto"];
                 };
             };
         };
     };
-    PalletController_materials: {
+    PackagingController_issue: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PackagingRevisionDto"];
+                };
+            };
+        };
+    };
+    PackagingController_nextRevision: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PackagingProjectDto"];
+                };
+            };
+        };
+    };
+    PackagingController_revisions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PackagingRevisionListDto"];
+                };
+            };
+        };
+    };
+    PackagingController_revision: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                revisionNo: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PackagingRevisionDetailDto"];
+                };
+            };
+        };
+    };
+    PackagingController_templates: {
+        parameters: {
+            query?: {
+                /** @description 按单元类型筛选 */
+                unitType?: "PALLET" | "CRATE" | "SKID" | "FRAME" | "DIVIDER" | "DUNNAGE" | "STEEL_STRAP";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PackagingTemplateDto"][];
+                };
+            };
+        };
+    };
+    PackagingController_materials: {
         parameters: {
             query?: never;
             header?: never;
@@ -5953,7 +6256,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PalletMaterialDto"][];
+                    "application/json": components["schemas"]["PackagingMaterialDto"][];
                 };
             };
         };

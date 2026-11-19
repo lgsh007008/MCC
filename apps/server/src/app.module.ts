@@ -1,4 +1,4 @@
-﻿import { Module } from '@nestjs/common';
+﻿﻿import { Module } from '@nestjs/common';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { AuditInterceptor } from './common/audit.interceptor.js';
 import { HealthController } from './common/health.controller.js';
@@ -16,7 +16,7 @@ import { AuthModule } from './modules/auth/index.js';
 import { CustomerModule } from './modules/customer/index.js';
 import { FinanceModule } from './modules/finance/index.js';
 import { OrderModule } from './modules/order/index.js';
-import { PalletModule } from './modules/pallet/index.js';
+import { PackagingModule } from './modules/packaging/index.js';
 import { ProductionModule } from './modules/production/index.js';
 import { PurchaseModule } from './modules/purchase/index.js';
 import { SupplierModule } from './modules/supplier/index.js';
@@ -38,7 +38,7 @@ import { TenantModule } from './modules/tenant/index.js';
     ProductionModule,
     OrderModule,
     PurchaseModule,
-    PalletModule,
+    PackagingModule,
   ],
   controllers: [HealthController],
   providers: [

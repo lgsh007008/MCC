@@ -21,4 +21,14 @@
   --text-mobile-caption: var(--mcc-text-caption);
   --text-mobile-numeric: var(--mcc-text-numeric);
   --text-mobile-numeric-strong: var(--mcc-text-numeric-strong);
+  /* 工作台字阶（PC 专用）：text-wb-body / text-wb-meta */
+  --text-wb-body: var(--mcc-text-workbench-body);
+  --text-wb-meta: var(--mcc-text-workbench-meta);
+  /* 提示语义色：bg-warning-bg / text-warning / border-warning-border，success 同构 */
+  --color-warning: var(--mcc-color-warning);
+  --color-warning-bg: var(--mcc-color-warning-bg);
+  --color-warning-border: var(--mcc-color-warning-border);
+  --color-success: var(--mcc-color-success);
+  --color-success-bg: var(--mcc-color-success-bg);
+  --color-success-border: var(--mcc-color-success-border);
 }

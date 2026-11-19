@@ -1,8 +1,9 @@
 import { createCn } from "cn/config"
 
-// 移动端字号角色（packages/config/tailwind/theme.css 的 @theme inline）以 text-mobile-* 命名，
-// cn 默认分组不认识这些键，会把它们当作文字颜色：与 text-primary-foreground 等同时出现时，
-// 后写的字号类会删掉前面的颜色类（症状：主色按钮变绿底黑字）。这里显式登记为字号组。
+// 自定义字号令牌（packages/config/tailwind/theme.css 的 @theme inline）必须在此登记：
+// cn 默认分组不认识这些键，会把它们当作文字颜色；与 text-foreground 等同时出现时，
+// 后写的颜色类会删掉字号类（症状：字号回退到 16px、主色按钮变绿底黑字）。
+// 新增任何 text-* 字号令牌，都要同步加入 font-size 组。
 export const cn = createCn({
   extend: {
     classGroups: {
@@ -15,6 +16,8 @@ export const cn = createCn({
             "mobile-caption",
             "mobile-numeric",
             "mobile-numeric-strong",
+            "wb-body",
+            "wb-meta",
           ],
         },
       ],

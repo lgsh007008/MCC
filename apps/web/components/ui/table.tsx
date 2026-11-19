@@ -7,15 +7,18 @@ function Table({
   className,
   containerClassName,
   containerRef,
+  density = 'default',
   ...props
 }: React.ComponentProps<"table"> & {
   containerClassName?: string
   containerRef?: React.Ref<HTMLDivElement>
+  density?: 'default' | 'dense'
 }) {
   return (
     <div
       ref={containerRef}
       data-slot="table-container"
+      data-density={density === 'dense' ? 'dense' : undefined}
       className={cn("scroll-area relative w-full overflow-x-auto", containerClassName)}
     >
       <table
