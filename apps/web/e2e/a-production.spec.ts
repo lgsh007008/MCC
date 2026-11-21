@@ -8,10 +8,10 @@ import { expectPageFrame } from './support/page-frame';
 // 必须排在所有会开单的用例之前执行，否则干净库无法补建期初。
 
 test('原木领用与方木产出：PC / 移动页面与材料毛利卡可达', async ({ page, request }) => {
+  test.setTimeout(60_000);
   const login = await request.post('/api/v1/auth/login', {
     data: {
-      tenantCode: 'TN-00001',
-      username: 'admin',
+      phone: '13800000001',
       password: 'Mcc@2026',
       rememberMe: false,
     },
@@ -92,11 +92,10 @@ test('原木领用与方木产出：PC / 移动页面与材料毛利卡可达', 
 
   try {
     await page.goto('/login');
-    await page.getByPlaceholder('如 TN-00001').fill('TN-00001');
-    await page.getByPlaceholder('请输入账号').fill('admin');
+    await page.getByPlaceholder('请输入 11 位手机号').fill('13800000001');
     await page.getByPlaceholder('请输入密码').fill('Mcc@2026');
     await page.getByRole('button', { name: '登录' }).click();
-    await expect(page).toHaveURL(/\/admin/);
+    await expect(page).toHaveURL(/\/admin\/packaging-design/);
 
     // PC 原木领用：列表 → 详情 → 编辑
     await page.goto('/admin/production/issues');

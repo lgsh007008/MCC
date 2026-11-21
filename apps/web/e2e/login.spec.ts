@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 // 阶段一验收冒烟（product/账号与权限.md R-账号与权限-001、product/平台布局.md R-平台布局-001、
-// product/order.md R-订单-001）：登录 → 首页（静态欢迎页）→ 侧边菜单（首页 + 订单组 / 销售单，无待建标注）
+// product/order.md R-订单-001）：登录 → 包装设计（当前阶段默认落地页）→ 侧边菜单（设计组 / 包装设计 + 订单组 / 销售单）
 // → 销售单列表 → 退出 → 未登录访问后台弹回登录页。
 // 账号：seed 初始化（apps/server/scripts/seed.ts）；密码错误锁定等负面用例见 server 集成测试（test/auth.spec.ts）。
 
@@ -23,21 +23,21 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-test('登录 → 首页 → 订单菜单 → 销售单列表 → 退出 → 未登录守卫', async ({ page }) => {
+test('登录 → 包装设计 → 订单菜单 → 销售单列表 → 退出 → 未登录守卫', async ({ page }) => {
   await page.goto('/login');
   await expect(page.getByRole('heading', { name: '登录' })).toBeVisible();
 
-  await page.getByPlaceholder('如 TN-00001').fill('TN-00001');
-  await page.getByPlaceholder('请输入账号').fill('admin');
+  await page.getByPlaceholder('请输入 11 位手机号').fill('13800000001');
   await page.getByPlaceholder('请输入密码').fill('Mcc@2026');
   await page.getByRole('button', { name: '登录' }).click();
 
-  // 登录成功进入首页（静态欢迎页）
-  await expect(page).toHaveURL(/\/admin$/);
-  await expect(page.getByRole('heading', { name: '首页' })).toBeVisible();
-  await expect(page.getByText('欢迎使用梅好木业数字化系统', { exact: false })).toBeVisible();
+  // 登录成功进入包装设计（当前阶段默认落地页）
+  await expect(page).toHaveURL(/\/admin\/packaging-design$/);
+  await expect(page.getByPlaceholder('方案名称 / 编号 / 客户名称')).toBeVisible();
+  await expect(page.getByRole('link', { name: '新建包装方案', exact: true })).toBeVisible();
 
-  // 侧边菜单：首页 + 销售组（销售单 / 客户档案），未建分组不再预置、无「待建」标注
+  // 侧边菜单：设计组（包装设计）+ 销售组（销售单 / 客户档案），未建分组不再预置、无「待建」标注
+  await expect(page.getByRole('link', { name: '包装设计', exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: '销售单', exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: '客户档案', exact: true })).toBeVisible();
   await expect(page.getByText('待建', { exact: true })).toHaveCount(0);
@@ -53,7 +53,11 @@ test('登录 → 首页 → 订单菜单 → 销售单列表 → 退出 → 未�
     (await page.context().cookies()).find((cookie) => cookie.name === 'sidebar_state')?.value;
   await page.getByRole('button', { name: '收起侧边栏' }).click();
   await expect.poll(sidebarState).toBe('false');
-  await page.getByRole('link', { name: '销售单', exact: true }).click();
+  await page.getByRole('button', { name: '销售', exact: true }).hover();
+  await page
+    .getByRole('navigation', { name: '销售菜单' })
+    .getByRole('link', { name: '销售单', exact: true })
+    .click();
   await expect(page).toHaveURL(/\/admin\/sale-orders$/);
   await expect.poll(sidebarState).toBe('false');
   // 恢复展开，继续后续流程
@@ -166,11 +170,11 @@ test('登录 → 首页 → 订单菜单 → 销售单列表 → 退出 → 未�
   await page.getByText('销', { exact: true }).click();
   await page.getByText('账号管理', { exact: true }).click();
   await expect(page).toHaveURL(/\/admin\/users$/);
-  await expect(page.getByRole('columnheader', { name: '账号' })).toBeVisible();
+  await expect(page.getByRole('columnheader', { name: '姓名' })).toBeVisible();
   await expect(page.getByRole('cell', { name: 'admin', exact: true })).toBeVisible();
 
-  // 列表页模式：账号筛选 + 分页总数
-  await page.getByPlaceholder('账号名模糊').fill('admin');
+  // 列表页模式：姓名/手机号筛选 + 分页总数
+  await page.getByPlaceholder('姓名或手机号模糊').fill('admin');
   await page.getByRole('button', { name: '查询', exact: true }).click();
   await expect(page.getByRole('cell', { name: 'admin', exact: true })).toBeVisible();
   await expect(page.getByText(/第 1 \/ \d+ 页 · 共 \d+ 条/)).toBeVisible();

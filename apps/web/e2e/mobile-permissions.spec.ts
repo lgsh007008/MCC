@@ -22,12 +22,12 @@ test.beforeEach(async ({ page }) => {
 test('工人移动端越权路由被拦截，订单只读可访问', async ({ page, browser }) => {
   // 固定账号复用：E2E 无删除接口，重复运行不新增账号，避免占满套餐额度
   const username = 'e2e-worker-permissions';
+  const workerPhone = '13800000002';
   const password = 'Worker@2026';
 
   // 管理员建一个工人账号（没有删除接口，结束时停用）
   await page.goto('/login');
-  await page.getByPlaceholder('如 TN-00001').fill('TN-00001');
-  await page.getByPlaceholder('请输入账号').fill('admin');
+  await page.getByPlaceholder('请输入 11 位手机号').fill('13800000001');
   await page.getByPlaceholder('请输入密码').fill('Mcc@2026');
   await page.getByRole('button', { name: '登录' }).click();
   // 窄视口登录后落到移动首页（login/page.tsx 按视口宽度分流）
@@ -52,6 +52,10 @@ test('工人移动端越权路由被拦截，订单只读可访问', async ({ pa
       data: { password },
       headers: adminAuth,
     });
+    await page.request.patch(`/api/v1/users/${existing.id}/phone`, {
+      data: { phone: workerPhone },
+      headers: adminAuth,
+    });
     await page.request.patch(`/api/v1/users/${existing.id}/status`, {
       data: { status: 'active' },
       headers: adminAuth,
@@ -59,7 +63,7 @@ test('工人移动端越权路由被拦截，订单只读可访问', async ({ pa
     worker = existing;
   } else {
     const created = await page.request.post('/api/v1/users', {
-      data: { username, password, role: 'WORKER' },
+      data: { username, phone: workerPhone, password, role: 'WORKER' },
       headers: adminAuth,
     });
     expect(created.ok()).toBeTruthy();
@@ -72,9 +76,19 @@ test('工人移动端越权路由被拦截，订单只读可访问', async ({ pa
 
   try {
     await workerPage.goto('/login');
-    await workerPage.getByPlaceholder('如 TN-00001').fill('TN-00001');
-    await workerPage.getByPlaceholder('请输入账号').fill(username);
+    await workerPage.getByPlaceholder('请输入 11 位手机号').fill(workerPhone);
     await workerPage.getByPlaceholder('请输入密码').fill(password);
+    await workerPage.getByRole('button', { name: '登录' }).click();
+
+    // 新建 / 重置后的首次登录必须改密（ADR-015）
+    await expect(workerPage.getByRole('dialog')).toBeVisible();
+    await workerPage.getByLabel('当前密码').fill(password);
+    await workerPage.getByLabel('新密码（至少 8 位）').fill(`${password}New`);
+    await workerPage.getByRole('button', { name: '修改并重新登录' }).click();
+    await expect(workerPage).toHaveURL(/\/login/);
+
+    await workerPage.getByPlaceholder('请输入 11 位手机号').fill(workerPhone);
+    await workerPage.getByPlaceholder('请输入密码').fill(`${password}New`);
     await workerPage.getByRole('button', { name: '登录' }).click();
     await expect(workerPage).toHaveURL(/\/m$/);
 

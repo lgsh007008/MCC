@@ -3,7 +3,7 @@ import {
   evaluatePackagingConclusion,
   PACKAGING_CONCLUSION_DISCLAIMER,
 } from './design/conclusion';
-import type { PalletIssue } from './pallet.validation';
+import type { PalletIssue } from './design/pallet/validation';
 
 const baseInput = {
   unitType: 'PALLET' as const,

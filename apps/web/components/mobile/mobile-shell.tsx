@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { ArrowLeftIcon } from 'lucide-react';
 import { hasScope, type UserRole } from '@mcc/shared';
 import { RoleProvider } from '@/components/auth/permission-context';
+import { ForcePasswordChangeDialog } from '@/components/auth/force-password-change';
 import { ConfirmProvider } from '@/components/ui/confirm-dialog';
 import { refreshSession } from '@/lib/api';
 import { authSession, currentRole } from '@/lib/auth/session';
@@ -19,6 +20,9 @@ import { scopeForMobilePath } from '@/lib/nav';
 export function MobileShell({ children }: { children: React.ReactNode }): React.ReactElement {
   const pathname = usePathname();
   const [role, setRole] = useState<UserRole | null>(currentRole());
+  const [mustChangePassword, setMustChangePassword] = useState(
+    authSession.mustChangePassword(),
+  );
 
   // 登录态守卫：与 AdminShell 同口径，挂载后经 refresh（httpOnly Cookie）静默恢复；失败跳登录页
   useEffect(() => {
@@ -29,6 +33,7 @@ export function MobileShell({ children }: { children: React.ReactNode }): React.
         return;
       }
       setRole(currentRole());
+      setMustChangePassword(authSession.mustChangePassword());
       if (!ok) {
         window.location.assign('/login');
       }
@@ -53,6 +58,7 @@ export function MobileShell({ children }: { children: React.ReactNode }): React.
             )}
           </div>
         </div>
+        <ForcePasswordChangeDialog open={mustChangePassword} />
       </ConfirmProvider>
     </RoleProvider>
   );

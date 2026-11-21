@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from '../src/app.module.js';
 import { API_PREFIX } from '../src/common/api-prefix.js';
 import { PrismaService } from '../src/common/prisma.service.js';
-import { scopedClient, TEST_TENANT_CODE, TEST_TENANT_ID } from './helpers.js';
+import { scopedClient, TEST_TENANT_ID, testPhone } from './helpers.js';
 
 // 供应商与采购关键路径（契约/集成层，技术方案 §10）：
 // 供应商期初应付 + 采购应计 − 付款流水 = 应付；现结派生 / 同步 / 软删付款流水。
@@ -45,11 +45,16 @@ describe('供应商与采购（契约/集成）', () => {
     prisma = app.get(PrismaService);
     db = scopedClient(prisma.client);
     await db.user.create({
-      data: { tenantId: TEST_TENANT_ID, username, passwordHash: await hash(password), role: 'SALES' },
+      data: {
+        tenantId: TEST_TENANT_ID,
+        username,
+        phone: testPhone(username),
+        passwordHash: await hash(password),
+        role: 'SALES',
+      },
     });
     const login = await request(app.getHttpServer()).post(`/${API_PREFIX}/auth/login`).send({
-      tenantCode: TEST_TENANT_CODE,
-      username,
+      phone: testPhone(username),
       password,
       rememberMe: false,
     });

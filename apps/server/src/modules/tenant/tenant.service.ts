@@ -34,6 +34,8 @@ import type { PlanDto, PlanListDto } from './dto/plan.dto.js';
 
 const FEATURE_CACHE_TTL_SECONDS = 60;
 const featureCacheKey = (tenantId: string): string => `tenant:features:${tenantId}`;
+// 自助注册固定套餐：迁移写入的标准版（design/租户.md §6.4），按固定 id 取，避免套餐改名失效。
+const SELF_REGISTER_PLAN_ID = '00000000-0000-4000-8000-000000000001';
 
 export interface TenantSummary {
   id: string;
@@ -51,11 +53,16 @@ type TenantRow = {
   name: string;
   planId: string;
   status: string;
+  source: string;
   sessionEpoch: number;
   note: string;
   createdAt: Date;
   plan: { id: string; name: string; maxAccounts: number };
 };
+
+// 接口层枚举用可读小写（与 status 同口径），数据库枚举保持 OPS / SELF_REGISTER。
+const toSourceDto = (source: string): 'ops' | 'self_register' =>
+  source === 'SELF_REGISTER' ? 'self_register' : 'ops';
 
 type PlanRow = {
   id: string;
@@ -185,6 +192,9 @@ export class TenantService {
     if (query.planId) {
       where.planId = query.planId;
     }
+    if (query.source) {
+      where.source = query.source === 'self_register' ? 'SELF_REGISTER' : 'OPS';
+    }
 
     const [total, rows] = await Promise.all([
       this.prisma.client.tenant.count({ where }),
@@ -206,6 +216,7 @@ export class TenantService {
         planId: row.planId,
         planName: row.plan.name,
         status: row.status === 'ACTIVE' ? 'active' : 'suspended',
+        source: toSourceDto(row.source),
         maxAccounts: row.plan.maxAccounts,
         note: row.note,
         createdAt: row.createdAt.toISOString(),
@@ -226,40 +237,35 @@ export class TenantService {
       throw problem(400, 'PLAN_INACTIVE', '套餐已停用，不能用于开通租户');
     }
 
-    const maxAttempts = 3;
-    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-      try {
-        const created = await this.prisma.client.$transaction(async (tx) => {
-          // 事务内取 TN- 前缀最大流水 + 1；唯一约束兜底并发冲突（design/租户.md §4）
-          const latest = await tx.tenant.findFirst({
-            where: { code: { startsWith: 'TN-' } },
-            orderBy: { code: 'desc' },
-            select: { code: true },
-          });
-          const nextNumber = latest
-            ? Number.parseInt(latest.code.slice('TN-'.length), 10) + 1
-            : 1;
-          return tx.tenant.create({
-            data: {
-              code: `TN-${String(nextNumber).padStart(5, '0')}`,
-              name: input.name,
-              planId: input.planId,
-              note: input.note,
-            },
-          });
-        });
-        return this.detailOf(created.id);
-      } catch (error) {
-        if (isUniqueViolation(error)) {
-          if (attempt < maxAttempts - 1) {
-            continue;
-          }
-          throw problem(409, 'TENANT_CODE_CONFLICT', '租户编号生成冲突，请重试');
-        }
-        throw error;
-      }
+    const id = await this.insertTenant({
+      name: input.name,
+      planId: input.planId,
+      note: input.note,
+      source: 'OPS',
+    });
+    return this.detailOf(id);
+  }
+
+  // 自助注册专用开通（design/租户.md §6.4）：套餐固定标准版、来源自助注册、状态启用。
+  // 首管理员由 auth 在本租户作用域内创建；任一步失败由 auth 置停用，本方法不感知账号。
+  async createSelfRegistered(name: string): Promise<TenantSummary> {
+    const plan = await this.prisma.client.plan.findUnique({
+      where: { id: SELF_REGISTER_PLAN_ID },
+    });
+    if (!plan || plan.status !== 'ACTIVE') {
+      throw problem(503, 'REGISTRATION_UNAVAILABLE', '自助注册暂不可用，请联系平台运营');
     }
-    throw problem(409, 'TENANT_CODE_CONFLICT', '租户编号生成冲突，请重试');
+    const id = await this.insertTenant({
+      name,
+      planId: plan.id,
+      note: '',
+      source: 'SELF_REGISTER',
+    });
+    const tenant = await this.findById(id);
+    if (!tenant) {
+      throw problem(500, 'REGISTRATION_FAILED', '注册失败，请稍后重试');
+    }
+    return tenant;
   }
 
   async update(id: string, input: TenantUpdateInput): Promise<TenantDetailDto> {
@@ -423,6 +429,50 @@ export class TenantService {
 
   // ── 内部 ───────────────────────────────────────────────────────────
 
+  // 编号生成：事务内取 TN- 前缀最大流水 + 1，唯一约束兜底并发冲突（design/租户.md §4）。
+  // 运营开通与自助注册共用；source 只在此处按入口写入，创建后不可编辑。
+  private async insertTenant(input: {
+    name: string;
+    planId: string;
+    note: string;
+    source: 'OPS' | 'SELF_REGISTER';
+  }): Promise<string> {
+    const maxAttempts = 3;
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      try {
+        const created = await this.prisma.client.$transaction(async (tx) => {
+          // 按数字后缀取最大值：字符串排序在 TN-99999 → TN-100000 时会退化，
+          // 导致每次生成同一个已存在编号而永久冲突。
+          const [latest] = await tx.$queryRaw<Array<{ max: number | null }>>`
+            SELECT MAX(CAST(SUBSTRING("code" FROM 4) AS INTEGER)) AS "max"
+            FROM "tenants"
+            WHERE "code" ~ '^TN-[0-9]+$'
+          `;
+          const nextNumber = Number(latest?.max ?? 0) + 1;
+          return tx.tenant.create({
+            data: {
+              code: `TN-${String(nextNumber).padStart(5, '0')}`,
+              name: input.name,
+              planId: input.planId,
+              note: input.note,
+              source: input.source,
+            },
+          });
+        });
+        return created.id;
+      } catch (error) {
+        if (isUniqueViolation(error)) {
+          if (attempt < maxAttempts - 1) {
+            continue;
+          }
+          throw problem(409, 'TENANT_CODE_CONFLICT', '租户编号生成冲突，请重试');
+        }
+        throw error;
+      }
+    }
+    throw problem(409, 'TENANT_CODE_CONFLICT', '租户编号生成冲突，请重试');
+  }
+
   private toSummary(row: {
     id: string;
     code: string;
@@ -484,6 +534,7 @@ export class TenantService {
       planId: row.planId,
       planName: row.plan.name,
       status: row.status === 'ACTIVE' ? 'active' : 'suspended',
+      source: toSourceDto(row.source),
       maxAccounts: row.plan.maxAccounts,
       note: row.note,
       createdAt: row.createdAt.toISOString(),

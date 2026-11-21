@@ -11,6 +11,7 @@ import {
   type PlatformUserStatusInput,
   type TenantAccountCountsQuery,
   type TenantAdminCreateInput,
+  type TenantAdminPhoneInput,
   type TenantAdminResetPasswordInput,
 } from '@mcc/shared';
 import { problem } from '../../common/http-problem.js';
@@ -46,6 +47,15 @@ const toPlatformUserDto = (row: PlatformUserRow): PlatformUserDto => ({
 
 const isUniqueViolation = (error: unknown): boolean =>
   error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
+
+const isPhoneViolation = (error: unknown): boolean => {
+  if (!isUniqueViolation(error)) {
+    return false;
+  }
+  const target = (error as Prisma.PrismaClientKnownRequestError).meta?.target;
+  const fields = Array.isArray(target) ? target.map(String) : [String(target ?? '')];
+  return fields.some((field) => field.includes('phone'));
+};
 
 // 平台账号与租户管理员账号（design/账号与权限.md §3）：
 // 平台账号归 platform_users；租户管理员操作在目标租户作用域内执行（runWithTenant），不代登录。
@@ -160,12 +170,13 @@ export class PlatformUsersService {
       return this.prisma.client.user.findMany({
         where: { role: 'ADMIN', deletedAt: null },
         orderBy: { createdAt: 'asc' },
-        select: { id: true, username: true, status: true, createdAt: true },
+        select: { id: true, username: true, phone: true, status: true, createdAt: true },
       });
     });
     const items: TenantAdminDto[] = rows.map((row) => ({
       id: row.id,
       username: row.username,
+      phone: row.phone,
       status: row.status === ACTIVE ? 'active' : 'inactive',
       createdAt: row.createdAt.toISOString(),
     }));
@@ -184,25 +195,63 @@ export class PlatformUsersService {
           data: {
             tenantId: tenant.id,
             username: input.username,
+            phone: input.phone,
             passwordHash: await hash(input.password),
             role: 'ADMIN',
             status: ACTIVE,
+            mustChangePassword: true,
           },
-          select: { id: true, username: true, status: true, createdAt: true },
+          select: { id: true, username: true, phone: true, status: true, createdAt: true },
         });
       });
       return {
         id: created.id,
         username: created.username,
+        phone: created.phone,
         status: created.status === ACTIVE ? 'active' : 'inactive',
         createdAt: created.createdAt.toISOString(),
       };
     } catch (error) {
+      if (isPhoneViolation(error)) {
+        throw problem(409, 'PHONE_TAKEN', '手机号已被使用');
+      }
       if (isUniqueViolation(error)) {
-        throw problem(409, 'USERNAME_TAKEN', '账号已存在');
+        throw problem(409, 'USERNAME_TAKEN', '姓名已存在');
       }
       throw error;
     }
+  }
+
+  async updateTenantAdminPhone(
+    tenantId: string,
+    userId: string,
+    input: TenantAdminPhoneInput,
+  ): Promise<void> {
+    await this.requireTenant(tenantId);
+    await runWithTenant(tenantId, async () => {
+      const target = await this.prisma.client.user.findFirst({
+        where: { id: userId, role: 'ADMIN', deletedAt: null },
+        select: { id: true },
+      });
+      if (!target) {
+        throw problem(404, 'NOT_FOUND', '租户管理员不存在');
+      }
+      try {
+        await this.prisma.client.user.updateMany({
+          where: { id: userId },
+          data: { phone: input.phone },
+        });
+      } catch (error) {
+        if (isPhoneViolation(error)) {
+          throw problem(409, 'PHONE_TAKEN', '手机号已被使用');
+        }
+        throw error;
+      }
+      await this.prisma.client.refreshToken.updateMany({
+        where: { userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+    });
   }
 
   async resetTenantAdminPassword(
@@ -221,7 +270,10 @@ export class PlatformUsersService {
       }
       await this.prisma.client.user.updateMany({
         where: { id: userId },
-        data: { passwordHash: await hash(input.password) },
+        data: {
+          passwordHash: await hash(input.password),
+          mustChangePassword: true,
+        },
       });
       await this.prisma.client.refreshToken.updateMany({
         where: { userId, revokedAt: null },

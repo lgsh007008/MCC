@@ -5,11 +5,10 @@
 
 async function login(page: import('@playwright/test').Page): Promise<void> {
   await page.goto('/login');
-  await page.getByPlaceholder('如 TN-00001').fill('TN-00001');
-  await page.getByPlaceholder('请输入账号').fill('admin');
+  await page.getByPlaceholder('请输入 11 位手机号').fill('13800000001');
   await page.getByPlaceholder('请输入密码').fill('Mcc@2026');
   await page.getByRole('button', { name: '登录' }).click();
-  await expect(page).toHaveURL(/\/admin$/);
+  await expect(page).toHaveURL(/\/admin\/packaging-design$/);
 }
 
 // 隐藏 Next 开发工具的悬浮层，避免它遮挡侧栏底部控件（仅 dev 存在）
@@ -32,7 +31,7 @@ test('多标签页：生成 / 切换 / 关闭 / 刷新保留 / 登出清空', as
   await login(page);
 
   const tablist = page.getByRole('tablist', { name: '页面标签' });
-  await expect(tablist.getByRole('tab', { name: '首页', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(tablist.getByRole('tab', { name: '包装设计', exact: true })).toHaveAttribute('aria-selected', 'true');
   // 未溢出时不出现左右切换按钮
   await expect(page.getByRole('button', { name: '左移标签' })).toHaveCount(0);
 
@@ -43,8 +42,8 @@ test('多标签页：生成 / 切换 / 关闭 / 刷新保留 / 登出清空', as
   await expect(tablist.getByRole('tab')).toHaveCount(2);
 
   // 重复进入同一路径只激活，不新增
-  await page.getByRole('tab', { name: '首页', exact: true }).click();
-  await expect(page).toHaveURL(/\/admin$/);
+  await page.getByRole('tab', { name: '包装设计', exact: true }).click();
+  await expect(page).toHaveURL(/\/admin\/packaging-design$/);
   await page.getByRole('tab', { name: '销售单', exact: true }).click();
   await expect(page).toHaveURL(/\/admin\/sale-orders$/);
   await expect(tablist.getByRole('tab')).toHaveCount(2);
@@ -66,9 +65,9 @@ test('多标签页：生成 / 切换 / 关闭 / 刷新保留 / 登出清空', as
   await expect(page).toHaveURL(/\/admin\/sale-orders\/new$/);
   await expect(tablist.getByRole('tab')).toHaveCount(2);
 
-  // 关闭最右标签（销售单 / 新建）→ 跳左邻（首页）
+  // 关闭最右标签（销售单 / 新建）→ 跳左邻（包装设计）
   await page.getByRole('button', { name: '关闭 销售单 / 新建', exact: true }).click();
-  await expect(page).toHaveURL(/\/admin$/);
+  await expect(page).toHaveURL(/\/admin\/packaging-design$/);
   await expect(tablist.getByRole('tab')).toHaveCount(1);
 
   // 刷新后标签在会话内保留

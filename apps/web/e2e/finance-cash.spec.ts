@@ -29,11 +29,10 @@ test('资金流水 → 收支汇总资金卡', async ({ page }) => {
   const entryNoteC = `e2e 其他收入-${stamp}`;
 
   await page.goto('/login');
-  await page.getByPlaceholder('如 TN-00001').fill('TN-00001');
-  await page.getByPlaceholder('请输入账号').fill('admin');
+  await page.getByPlaceholder('请输入 11 位手机号').fill('13800000001');
   await page.getByPlaceholder('请输入密码').fill('Mcc@2026');
   await page.getByRole('button', { name: '登录' }).click();
-  await expect(page).toHaveURL(/\/admin$/);
+  await expect(page).toHaveURL(/\/admin\/packaging-design$/);
 
   // 财务分组两项菜单（台账、固定资产均已下线）
   for (const name of ['资金流水', '收支汇总']) {

@@ -365,3 +365,38 @@ export class PackagingRevisionDetailDto extends PackagingRevisionDto {
   @ApiProperty({ type: Object, additionalProperties: true, description: '版本快照' })
   snapshot!: Record<string, unknown>;
 }
+
+export class PackagingPrintEventBodyDto {
+  @ApiPropertyOptional({ type: Number, nullable: true, description: '打印的版本号；当前版本不传' })
+  revisionNo?: number | null;
+}
+
+export class PackagingExportEventBodyDto {
+  @ApiProperty({
+    type: String,
+    enum: ['svg_view', 'svg_sheet', 'dxf', 'csv_bom', 'csv_cutting', 'obj', 'stl'],
+    description: '导出格式',
+  })
+  format!: string;
+
+  @ApiPropertyOptional({
+    type: String,
+    enum: ['top', 'front', 'side', 'iso'],
+    description: 'SVG 视图；仅 format = svg_view 时必填',
+  })
+  view?: string;
+
+  @ApiPropertyOptional({ type: Number, nullable: true, description: '导出的版本号；当前版本不传' })
+  revisionNo?: number | null;
+
+  @ApiPropertyOptional({ type: String, description: '单元图号，如 PD-00001-U01' })
+  unitCode?: string;
+}
+
+export class PackagingOutputEventDto {
+  @ApiProperty({ type: String, description: '方案 id' })
+  id!: string;
+
+  @ApiProperty({ type: String, description: '方案编号（PD-#####）' })
+  code!: string;
+}

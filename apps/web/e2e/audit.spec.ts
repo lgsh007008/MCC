@@ -23,11 +23,10 @@ test('管理员查询审计日志并筛出自己的写操作', async ({ page }) 
   const customerName = `e2e-audit-${Date.now()}`;
 
   await page.goto('/login');
-  await page.getByPlaceholder('如 TN-00001').fill('TN-00001');
-  await page.getByPlaceholder('请输入账号').fill('admin');
+  await page.getByPlaceholder('请输入 11 位手机号').fill('13800000001');
   await page.getByPlaceholder('请输入密码').fill('Mcc@2026');
   await page.getByRole('button', { name: '登录' }).click();
-  await expect(page).toHaveURL(/\/admin$/);
+  await expect(page).toHaveURL(/\/admin\/packaging-design$/);
 
   const refresh = await page.request.post('/api/v1/auth/refresh', { data: {} });
   const { accessToken } = (await refresh.json()) as { accessToken: string };

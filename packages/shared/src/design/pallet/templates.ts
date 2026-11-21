@@ -3,7 +3,7 @@ import type {
   PalletComponentRole,
   PalletMaterialLike,
   PalletTemplateType,
-} from './pallet.schemas';
+} from './schemas';
 
 // 托盘结构模板与默认材料（product/包装设计.md R-包装设计-012 / 013）：
 // 默认构件是唯一实现；产品文档只登记结构关系，不重复尺寸与材料。

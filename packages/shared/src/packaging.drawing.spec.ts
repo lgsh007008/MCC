@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { buildUnitDrawingSheets } from './design/drawing';
 import { drawingToDxf } from './design/dxf';
 import { drawingToSvg, drawingToViewSvg } from './design/svg';
-import { buildPalletGeometry } from './pallet.geometry';
-import { palletTemplateComponents } from './pallet.templates';
+import { buildPalletGeometry } from './design/pallet/geometry';
+import { palletTemplateComponents } from './design/pallet/templates';
 
 const geometry = buildPalletGeometry(
   { lengthMm: 1200, widthMm: 800, templateType: 'block' },

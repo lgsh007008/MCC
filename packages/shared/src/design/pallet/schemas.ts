@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { paginationQuerySchema } from './pagination.schemas';
+import { paginationQuerySchema } from '../../pagination.schemas';
 
 // 托盘单元的边界校验（design/包装设计.md §4）：
 // 前后端共用同一份；几何、BOM 与校验纯函数只依赖本文件的类型。

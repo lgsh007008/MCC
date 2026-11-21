@@ -13,6 +13,7 @@
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "format": "prettier --write .",
+    "docs:check": "node scripts/check-docs.mjs",
     "db:generate": "pnpm --filter @mcc/db run generate",
     "db:migrate:dev": "pnpm --filter @mcc/db run migrate:dev",
     "db:migrate:deploy": "pnpm --filter @mcc/db run migrate:deploy",

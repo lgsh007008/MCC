@@ -25,11 +25,10 @@ test('销售单现结：实收与差额、自动收款流水、改赊销回退',
   const customerName = `e2e 现结客户-${stamp}`;
 
   await page.goto('/login');
-  await page.getByPlaceholder('如 TN-00001').fill('TN-00001');
-  await page.getByPlaceholder('请输入账号').fill('admin');
+  await page.getByPlaceholder('请输入 11 位手机号').fill('13800000001');
   await page.getByPlaceholder('请输入密码').fill('Mcc@2026');
   await page.getByRole('button', { name: '登录' }).click();
-  await expect(page).toHaveURL(/\/admin$/);
+  await expect(page).toHaveURL(/\/admin\/packaging-design$/);
 
   const refresh = await page.request.post('/api/v1/auth/refresh', { data: {} });
   const { accessToken } = (await refresh.json()) as { accessToken: string };

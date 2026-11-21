@@ -318,6 +318,18 @@ export class PackagingService {
     return toProjectDto(row);
   }
 
+  // 打印 / 导出审计端点只回方案编号，供全局审计拦截器记录 objectCode；不加载单元与构件。
+  async codeOf(id: string): Promise<string> {
+    const row = await this.prisma.client.packagingProject.findFirst({
+      where: { id, deletedAt: null },
+      select: { code: true },
+    });
+    if (!row) {
+      throw problem(404, 'PACKAGING_NOT_FOUND', '包装方案不存在');
+    }
+    return row.code;
+  }
+
   async listMaterials(): Promise<PackagingMaterialDto[]> {
     const rows = await this.ensureMaterials();
     return rows.map((row) => ({

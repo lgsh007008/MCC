@@ -5,8 +5,8 @@ import {
   projectIsometricPoint,
   projectPalletPiece,
   sortPiecesForIsometric,
-} from './pallet.geometry';
-import { palletTemplateComponents, PALLET_TEMPLATE_OPTIONS } from './pallet.templates';
+} from './geometry';
+import { palletTemplateComponents, PALLET_TEMPLATE_OPTIONS } from './templates';
 
 const projectFor = (template: (typeof PALLET_TEMPLATE_OPTIONS)[number]) => ({
   lengthMm: template.defaultLengthMm,

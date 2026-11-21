@@ -41,15 +41,7 @@ modules/order/
 - 删除 = 软删除（§5.1 `deleted_at` 落值）：编号不回收，列表默认过滤已删
 - **客户 = 引用 + 快照**：`customer_id` 外键指向 `customer` 表（`product/customer.md` R-客户-001），用于归属与聚合；`customer_name` 保留为下单当时的名称快照，客户改名不回改历史单据。跨模块只经 customer 的 `index.ts` 公开接口校验，不读 customer 表（§4.2）
 - 迁移纪律（§5.3）：先加 `customer_id` 列并回填存量 → 切读 → 再评估下线名称直填入口
-- **本次迁移（v20261110，破坏性、已授权）**：正式库无订单数据，测试库按序执行
-  1. 新建只含 `SQUARE_TIMBER` 的产品类型枚举与 `VOLUME`/`PIECE` 计价方式枚举；明细表加 `pricing_mode`，默认 `VOLUME`
-  2. 删除 `product_type = 'OTHER'` 的明细
-  3. 删除因此变成零明细的主单
-  4. 新增 `thickness_mm` / `width_mm` / `length_mm` 整数列，按 `ROUND(cm × 10)` 回填
-  5. 用新尺寸重算剩余明细的 `volume_m3` 与 `line_amount`（默认按方量）
-  6. 重算受影响主单的 `total_volume` / `subtotal_amount` / `total_amount`
-  7. 删除旧 cm 列与旧枚举，`volume_m3`、`pieces`、`pricing_mode` 收紧为非空
-  8. 尺寸列叫法与顺序统一（追加迁移，非破坏）：`thickness_mm` 重命名为 `height_mm`，数据保留；接口字段同步为 `heightMm`，顺序为长度 / 宽度 / 高度
+- **迁移记录**：已执行的历史迁移见 `packages/db/prisma/migrations/`，执行与决策记录见本文 changelog（v20261110）；正文只保留当前表结构与接口口径。
 
 ## 3. 计算规则（纯函数，`packages/shared`）
 
@@ -193,6 +185,12 @@ modules/order/
 | --- | --- | --- | --- | --- |
 | 5 接口清单 | 删除 | `recalculate-cost`（`POST /api/v1/sale-orders/:id/recalculate-cost`，要求 `profit:manage`，写审计） | 删除该接口；`profit` 接口保留 | 重算按当前批次余额试算，与「按下单时点」口径不符；编辑保存已有补录路径 |
 | 7 前端实现节 · 材料毛利卡 | 修改 | `profit:manage` 且 `PENDING` 时显示「重算材料成本」，`useConfirm` 确认后调 `recalculate-cost`，成功后失效详情与利润查询 | 删除重算按钮与 `useConfirm`；`PENDING` 时徽标旁提示「补录产出后，编辑保存本单即可补上成本」；成本来源默认收起，前 3 层内联、「查看全部（N 层）」进口径弹窗 | 与 product/order.md R-订单-003 同步；消除空权限单元 |
+
+### v20261120
+
+| 位置 | 类型 | 原本 | 现在 | 原因 |
+| --- | --- | --- | --- | --- |
+| 2 数据模型概览 · 本次迁移 | 删除 | v20261110 破坏性迁移的 8 步执行细节 | 整段删除；迁移文件与 v20261110 changelog 已承载，正文只留指针 | 正文只放当前真相；已执行迁移步骤属历史，避免与当前表结构混淆 |
 
 ---
 

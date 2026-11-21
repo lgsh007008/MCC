@@ -18,6 +18,8 @@ export class TenantListItemDto {
   @ApiProperty({ type: String }) planId!: string;
   @ApiProperty({ type: String }) planName!: string;
   @ApiProperty({ type: String, enum: ['active', 'suspended'] }) status!: string;
+  @ApiProperty({ type: String, enum: ['ops', 'self_register'], description: '开通渠道：运营开通 / 自助注册' })
+  source!: string;
   @ApiProperty({ type: Number, description: '套餐账号额度（账号数由 auth 批量接口前端组合）' })
   maxAccounts!: number;
   @ApiProperty({ type: String }) note!: string;
@@ -36,6 +38,8 @@ export class TenantDetailDto {
   @ApiProperty({ type: String }) planId!: string;
   @ApiProperty({ type: String }) planName!: string;
   @ApiProperty({ type: String, enum: ['active', 'suspended'] }) status!: string;
+  @ApiProperty({ type: String, enum: ['ops', 'self_register'], description: '开通渠道：运营开通 / 自助注册' })
+  source!: string;
   @ApiProperty({ type: Number }) maxAccounts!: number;
   @ApiProperty({ type: String }) note!: string;
   @ApiProperty({ type: String }) createdAt!: string;

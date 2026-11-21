@@ -6,6 +6,18 @@ export const TEST_TENANT_ID = 'it-tenant';
 export const TEST_TENANT_CODE = 'TN-90001';
 
 /**
+ * 由测试账号名派生一个稳定的 11 位手机号（ADR-015 后登录标识）：
+ * 同一测试文件内同一账号名始终得到同一号码，避免随机数导致重跑冲突。
+ */
+export function testPhone(seed: string): string {
+  let hash = 0;
+  for (const char of seed) {
+    hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+  }
+  return `13${String(800_000_000 + (hash % 100_000_000))}`;
+}
+
+/**
  * 给原始 Prisma Client 套一层租户作用域：每次委托方法调用都在 runWithTenant 内执行，
  * 与真实请求的数据访问路径一致（业务表必须带租户上下文）。
  * 用法：`db = scopedClient(prisma.client);` 之后用 `db.user.create(...)`。

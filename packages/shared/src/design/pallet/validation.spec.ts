@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { palletTemplateComponents } from './pallet.templates';
-import { hasPalletErrors, validatePalletStructure } from './pallet.validation';
+import { palletTemplateComponents } from './templates';
+import { hasPalletErrors, validatePalletStructure } from './validation';
 
 describe('validatePalletStructure', () => {
   it('标准九墩块结构无错误', () => {

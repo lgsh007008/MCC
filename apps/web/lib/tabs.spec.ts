@@ -158,6 +158,19 @@ describe('tabsReducer restore / reset', () => {
     expect(next.activePath).toBe(HOME_PATH);
   });
 
+  it('阶段切换后丢弃旧首页 /admin 标签', () => {
+    const next = tabsReducer(initialTabsState(), {
+      type: 'restore',
+      tabs: [
+        { path: '/admin', title: '首页', lastActiveAt: 9 },
+        { path: '/b', title: 'B', lastActiveAt: 2 },
+      ],
+      activePath: '/admin',
+    });
+    expect(next.tabs.map((tab) => tab.path)).toEqual([HOME_PATH, '/b']);
+    expect(next.activePath).toBe(HOME_PATH);
+  });
+
   it('reset 回到仅首页', () => {
     const state = stateWith(['/a', '/b'], '/b');
     expect(tabsReducer(state, { type: 'reset' })).toEqual(initialTabsState());

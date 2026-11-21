@@ -7,8 +7,7 @@ import { expect, test } from '@playwright/test';
 test('采购单：列表与详情展示金额，移动入口可达', async ({ page, request }) => {
   const login = await request.post('/api/v1/auth/login', {
     data: {
-      tenantCode: 'TN-00001',
-      username: 'admin',
+      phone: '13800000001',
       password: 'Mcc@2026',
       rememberMe: false,
     },
@@ -46,11 +45,10 @@ test('采购单：列表与详情展示金额，移动入口可达', async ({ pa
   try {
     // PC 登录 → 采购单列表 → 详情
     await page.goto('/login');
-    await page.getByPlaceholder('如 TN-00001').fill('TN-00001');
-    await page.getByPlaceholder('请输入账号').fill('admin');
+    await page.getByPlaceholder('请输入 11 位手机号').fill('13800000001');
     await page.getByPlaceholder('请输入密码').fill('Mcc@2026');
     await page.getByRole('button', { name: '登录' }).click();
-    await expect(page).toHaveURL(/\/admin/);
+    await expect(page).toHaveURL(/\/admin\/packaging-design/);
 
     await page.goto('/admin/purchases');
     await expect(page.getByText(supplierName).first()).toBeVisible();

@@ -309,6 +309,16 @@ export default function PackagingReportPage(): React.ReactElement {
   }
   const { project, units } = report;
 
+  // 打印 / 另存 PDF 为浏览器行为，先记录“用户触发打印”再调用 window.print；失败不阻塞打印。
+  const recordPrint = (): void => {
+    void api
+      .POST('/api/v1/packaging/projects/{id}/print-events', {
+        params: { path: { id: project.id } },
+        body: { revisionNo },
+      })
+      .catch(() => undefined);
+  };
+
   return (
     <div className="min-h-full bg-muted/30 print:bg-white">
       <style>{`@page { size: A4 portrait; margin: 10mm; }`}</style>
@@ -318,7 +328,12 @@ export default function PackagingReportPage(): React.ReactElement {
             返回编辑器
           </Link>
           <div className="flex flex-wrap gap-2">
-            <Button onClick={() => window.print()}>
+            <Button
+              onClick={() => {
+                recordPrint();
+                window.print();
+              }}
+            >
               <PrinterIcon />
               打印 / 另存 PDF
             </Button>

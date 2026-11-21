@@ -42,6 +42,14 @@ enum PlanStatus {
   @@map("plan_status")
 }
 
+// 租户开通渠道（product/租户.md R-租户-001）：运营开通 / 自助注册；创建后只读。
+enum TenantSource {
+  OPS
+  SELF_REGISTER
+
+  @@map("tenant_source")
+}
+
 model Tenant {
   // 首个租户保留历史主键 default；新租户取 uuid 字符串。
   id        String   @id @default(uuid())
@@ -56,6 +64,8 @@ model Tenant {
   plan   Plan   @relation(fields: [planId], references: [id])
 
   status       TenantStatus @default(ACTIVE)
+  // 开通渠道：存量与运营开通默认 OPS，自助注册写 SELF_REGISTER（R-账号与权限-005）
+  source       TenantSource @default(OPS)
   // 停用时 +1，使旧访问 / 刷新令牌立即失效（design/租户.md §2）
   sessionEpoch Int          @default(0) @map("session_epoch")
   note         String       @default("") @map("note")
@@ -139,12 +149,18 @@ model User {
   updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
   deletedAt DateTime? @map("deleted_at")
 
-  // 账号：按使用人一人一号，无自助注册（MVP 由初始化直接提供，见 design/账号与权限.md）。
-  // 唯一性按租户隔离（ADR-005）：不同租户可重名/重令牌，故用复合唯一而非全局唯一。
+  // 账号：按使用人一人一号，可由管理员创建，或由自助注册创建租户首管理员（R-账号与权限-005）。
+  // 手机号是唯一登录标识，跨租户全局唯一（ADR-015）；username 降为姓名/显示名，
+  // 唯一性按租户隔离（ADR-005）：不同租户可重名，故用复合唯一而非全局唯一。
   username     String     @map("username")
+  phone        String?    @unique @map("phone")
+  // 手机号验证时间：自助注册暂不验证（NULL），未来接入短信验证后回填
+  phoneVerifiedAt DateTime? @map("phone_verified_at")
   passwordHash String     @map("password_hash")
   role         UserRole   @default(SALES)
   status       UserStatus @default(ACTIVE) @map("status")
+  // 管理员新建账号或重置密码后置位；首次登录必须改密（product/账号与权限.md R-账号与权限-001）
+  mustChangePassword Boolean @default(false) @map("must_change_password")
 
   refreshTokens RefreshToken[]
 

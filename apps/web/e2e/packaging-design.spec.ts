@@ -16,11 +16,10 @@ test.use({ viewport: { width: 1280, height: 800 } });
 
 const login = async (page: import('@playwright/test').Page): Promise<void> => {
   await page.goto('/login');
-  await page.getByPlaceholder('如 TN-00001').fill('TN-00001');
-  await page.getByPlaceholder('请输入账号').fill('admin');
+  await page.getByPlaceholder('请输入 11 位手机号').fill('13800000001');
   await page.getByPlaceholder('请输入密码').fill('Mcc@2026');
   await page.getByRole('button', { name: '登录' }).click();
-  await expect(page).toHaveURL(/\/admin$/);
+  await expect(page).toHaveURL(/\/admin\/packaging-design$/);
 };
 
 const expect3DOrFallback = async (page: import('@playwright/test').Page): Promise<void> => {
@@ -114,7 +113,7 @@ test('包装设计：单元目录、顶栏内联方案名、单单元保存、�
 
     // 方案库页面平台侧栏保持平台自身状态（不因工作台路由特例）
     const sidebar = await sidebarState(page);
-    await page.getByRole('link', { name: '新建包装方案' }).click();
+    await page.getByRole('link', { name: '新建包装方案', exact: true }).click();
     await expect(page).toHaveURL(/\/admin\/packaging-design\/new$/);
     await expect(page.getByTestId('packaging-workbench')).toBeVisible();
 
@@ -326,6 +325,8 @@ test('包装设计：单元目录、顶栏内联方案名、单单元保存、�
     await expect(card.getByRole('button', { name: '复制' })).toHaveCount(1);
     await expect(page.getByRole('button', { name: '卡片' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: '列表' })).toHaveCount(0);
+    // 列表末尾常驻新建卡片，入口与顶部按钮同时可见
+    await expect(page.getByRole('link', { name: '新建包装方案（列表末尾）' })).toBeVisible();
   } finally {
     if (projectId) {
       await page.request.delete(`/api/v1/packaging/projects/${projectId}`, {
@@ -398,10 +399,14 @@ test('包装设计：目录切木箱、单单元保存、导出、发布、复�
     await viewbar.getByRole('button', { name: '图纸', exact: true }).click();
     await expect(page.locator('svg[aria-label="图纸集"]')).toBeVisible();
     await page.getByRole('button', { name: '导出' }).click();
+    const dxfAudit = page.waitForRequest(
+      (request) => request.url().includes('/export-events') && request.method() === 'POST',
+    );
     const dxfPromise = page.waitForEvent('download');
     await page.getByRole('menuitem', { name: 'DXF 图纸' }).click();
     const dxfDownload = await dxfPromise;
     expect(dxfDownload.suggestedFilename()).toMatch(/\.dxf$/);
+    expect((await dxfAudit).postDataJSON()).toMatchObject({ format: 'dxf' });
     await expect(page.getByRole('menu')).toBeHidden();
 
     // 料单 CSV 只从顶栏导出
@@ -486,6 +491,14 @@ test('包装设计：目录切木箱、单单元保存、导出、发布、复�
     // 报告页只负责打印，BOM / 开料 CSV 统一从工作台顶栏导出
     await expect(page.getByRole('button', { name: '导出 BOM CSV' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: '打印 / 另存 PDF' })).toBeVisible();
+    await page.evaluate(() => {
+      window.print = () => undefined;
+    });
+    const printAudit = page.waitForRequest(
+      (request) => request.url().includes('/print-events') && request.method() === 'POST',
+    );
+    await page.getByRole('button', { name: '打印 / 另存 PDF' }).click();
+    expect((await printAudit).postDataJSON()).toEqual({ revisionNo: null });
   } finally {
     if (duplicateId) {
       await page.request.delete(`/api/v1/packaging/projects/${duplicateId}`, {
@@ -630,9 +643,9 @@ test('包装设计：方案库、画布内工具卡 / 面板、底部图标卡�
 
   await page.goto('/admin/packaging-design');
   await expect(page.getByText('关键字', { exact: true })).toBeVisible();
-  await expect(page.getByRole('link', { name: '新建包装方案' })).toBeVisible();
+  await expect(page.getByRole('link', { name: '新建包装方案', exact: true })).toBeVisible();
 
-  await page.getByRole('link', { name: '新建包装方案' }).click();
+  await page.getByRole('link', { name: '新建包装方案', exact: true }).click();
   await expect(page).toHaveURL(/\/admin\/packaging-design\/new$/);
   await expect(page.getByTestId('packaging-workbench')).toBeVisible();
   await expect(page.getByRole('complementary', { name: '单元面板' })).toBeVisible();
@@ -800,4 +813,20 @@ test('包装设计：方案库、画布内工具卡 / 面板、底部图标卡�
   // 分屏只保留「复位」，不显示加减缩放
   await expect(viewbar.getByRole('button', { name: '放大' })).toHaveCount(0);
   await expect(viewbar.getByRole('button', { name: '复位视图' })).toBeVisible();
+});
+
+test('包装设计：筛选无结果时展示清空筛选空态', async ({ page }) => {
+  await login(page);
+  await page.goto('/admin/packaging-design');
+
+  await page.getByPlaceholder('方案名称 / 编号 / 客户名称').fill(`e2e-不存在-${Date.now()}`);
+  await page.getByRole('button', { name: '查询', exact: true }).click();
+  await expect(page.getByText('没有符合条件的方案')).toBeVisible();
+  await expect(page.getByRole('button', { name: '清空筛选' })).toBeVisible();
+  // 顶部新建按钮仍在；筛选空态不渲染列表末尾新建卡片
+  await expect(page.getByRole('link', { name: '新建包装方案', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: '新建包装方案（列表末尾）' })).toHaveCount(0);
+
+  await page.getByRole('button', { name: '清空筛选' }).click();
+  await expect(page.getByText('没有符合条件的方案')).toHaveCount(0);
 });

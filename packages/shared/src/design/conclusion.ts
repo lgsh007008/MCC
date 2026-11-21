@@ -1,4 +1,4 @@
-import type { PalletIssue } from '../pallet.validation';
+import type { PalletIssue } from './pallet/validation';
 
 // 筛查结论（product/包装设计.md R-包装设计-017 / design §5.4）：
 // 只做载荷与结构完整性的筛查，不做强度计算；阈值与免责声明是共享常量，

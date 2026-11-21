@@ -3,18 +3,31 @@ import { z } from 'zod';
 // 账号与权限领域的边界校验 schema（design/账号与权限.md §3）：
 // 前后端共用同一份（技术方案 §8.4），服务层以 ZodValidationPipe 落地。
 
+// 手机号是租户用户唯一登录标识（ADR-015）：11 位中国大陆手机号，写入前统一去空格。
+export const phoneSchema = z
+  .string()
+  .trim()
+  .regex(/^1[3-9]\d{9}$/, '请输入 11 位手机号');
+
 export const loginSchema = z.object({
-  // 租户编号：先确定租户，再在该租户内校验账号（design/账号与权限.md §6）
-  tenantCode: z
-    .string()
-    .trim()
-    .regex(/^TN-\d{5,}$/, '请输入租户编号（如 TN-00001）'),
-  username: z.string().trim().min(1).max(64),
+  // 手机号全局唯一，服务端据此反查用户与租户（design/账号与权限.md §6）
+  phone: phoneSchema,
   password: z.string().min(1).max(128),
   // 「记住登录」：勾选 → 刷新令牌 30 天；不勾选 → 会话级（design/账号与权限.md §4）
   rememberMe: z.boolean().default(false),
 });
 export type LoginInput = z.infer<typeof loginSchema>;
+
+// 自助注册（R-账号与权限-005）：企业名称 + 首管理员，即时开通并自动登录。
+// 确认密码只在前端校验，不进入契约；rememberMe 默认 true，与登录页勾选口径一致。
+export const registerSchema = z.object({
+  companyName: z.string().trim().min(1, '请输入企业名称').max(100),
+  username: z.string().trim().min(1, '请输入姓名').max(64),
+  phone: phoneSchema,
+  password: z.string().min(8, '密码至少 8 位').max(128),
+  rememberMe: z.boolean().default(true),
+});
+export type RegisterInput = z.infer<typeof registerSchema>;
 
 // 平台运营登录（/ops/login）：与租户登录互不通用（R-账号与权限-004）
 export const platformLoginSchema = z.object({
@@ -50,10 +63,16 @@ export type PlatformUserListQuery = z.infer<typeof platformUserListQuerySchema>;
 
 // 平台运营在租户详情内补建 / 新增租户管理员（R-账号与权限-004）
 export const tenantAdminCreateSchema = z.object({
-  username: z.string().trim().min(1, '请输入账号').max(64),
+  username: z.string().trim().min(1, '请输入姓名').max(64),
+  phone: phoneSchema,
   password: z.string().min(8, '密码至少 8 位').max(128),
 });
 export type TenantAdminCreateInput = z.infer<typeof tenantAdminCreateSchema>;
+
+export const tenantAdminPhoneInputSchema = z.object({
+  phone: phoneSchema,
+});
+export type TenantAdminPhoneInput = z.infer<typeof tenantAdminPhoneInputSchema>;
 
 export const tenantAdminResetPasswordSchema = z.object({
   password: z.string().min(8, '密码至少 8 位').max(128),
@@ -87,11 +106,17 @@ export const userRoleSchema = z.enum(['ADMIN', 'SALES', 'FINANCE', 'WORKER']);
 export type UserRoleValue = z.infer<typeof userRoleSchema>;
 
 export const userCreateSchema = z.object({
-  username: z.string().trim().min(1, '请输入账号').max(64),
+  username: z.string().trim().min(1, '请输入姓名').max(64),
+  phone: phoneSchema,
   password: z.string().min(8, '密码至少 8 位').max(128),
   role: userRoleSchema,
 });
 export type UserCreateInput = z.infer<typeof userCreateSchema>;
+
+export const userPhoneInputSchema = z.object({
+  phone: phoneSchema,
+});
+export type UserPhoneInput = z.infer<typeof userPhoneInputSchema>;
 
 export const userStatusInputSchema = z.object({
   status: z.enum(['active', 'inactive']),

@@ -3,11 +3,13 @@ import { ApiBody, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiQuery, Api
 import {
   userCreateSchema,
   userListQuerySchema,
+  userPhoneInputSchema,
   userResetPasswordSchema,
   userRoleInputSchema,
   userStatusInputSchema,
   type UserCreateInput,
   type UserListQuery,
+  type UserPhoneInput,
   type UserResetPasswordInput,
   type UserRoleInput,
   type UserStatusInput,
@@ -22,6 +24,7 @@ import {
   UserCreateBodyDto,
   UserDto,
   UserListDto,
+  UserPhoneBodyDto,
   UserResetPasswordBodyDto,
   UserRoleBodyDto,
   UserStatusBodyDto,
@@ -40,7 +43,7 @@ export class UsersController {
 
   @Get()
   @ApiOperation({ summary: '账号列表（不含密码）' })
-  @ApiQuery({ name: 'keyword', required: false, type: String, description: '账号名模糊' })
+  @ApiQuery({ name: 'keyword', required: false, type: String, description: '姓名或手机号模糊' })
   @ApiQuery({ name: 'page', required: false, type: Number, description: '页码，默认 1' })
   @ApiQuery({ name: 'pageSize', required: false, type: Number, description: '每页条数，默认 20（最大 100）' })
   @ApiOkResponse({ type: UserListDto })
@@ -51,7 +54,7 @@ export class UsersController {
   @Post()
   @AuditAction({ domain: 'auth', action: 'create-user', label: '新建账号', objectType: 'user' })
   @HttpCode(201)
-  @ApiOperation({ summary: '新建账号（租户内账号唯一；初始密码至少 8 位）' })
+  @ApiOperation({ summary: '新建账号（手机号全局唯一；初始密码至少 8 位；创建后待改密）' })
   @ApiBody({ type: UserCreateBodyDto })
   @ApiCreatedResponse({ type: UserDto })
   async create(
@@ -63,6 +66,18 @@ export class UsersController {
     return withIdempotency(this.redis, user.userId, 'users', idempotencyKey, () =>
       this.usersService.create(body),
     );
+  }
+
+  @Patch(':id/phone')
+  @AuditAction({ domain: 'auth', action: 'change-user-phone', label: '修改账号手机号', objectType: 'user' })
+  @ApiOperation({ summary: '修改手机号（全局唯一；撤销该账号刷新令牌）' })
+  @ApiBody({ type: UserPhoneBodyDto })
+  @ApiOkResponse({ type: UserDto })
+  updatePhone(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(userPhoneInputSchema)) body: UserPhoneInput,
+  ): Promise<UserDto> {
+    return this.usersService.updatePhone(id, body);
   }
 
   @Patch(':id/status')
@@ -93,7 +108,7 @@ export class UsersController {
   @Post(':id/reset-password')
   @AuditAction({ domain: 'auth', action: 'reset-user-password', label: '重置账号密码', objectType: 'user' })
   @HttpCode(204)
-  @ApiOperation({ summary: '重置账号密码并撤销该账号全部刷新会话' })
+  @ApiOperation({ summary: '重置账号密码（置待改密并撤销该账号全部刷新会话）' })
   @ApiBody({ type: UserResetPasswordBodyDto })
   async resetPassword(
     @Param('id', ParseUUIDPipe) id: string,

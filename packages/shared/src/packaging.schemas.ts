@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { paginationQuerySchema } from './pagination.schemas';
-import type { PalletMaterialLike } from './pallet.schemas';
+import type { PalletMaterialLike } from './design/pallet/schemas';
 
 // 包装设计领域的边界校验（design/包装设计.md §3 / §7）：
 // 方案 → 单元 → 构件三层；前后端共用同一份。
@@ -91,6 +91,52 @@ export const packagingListQuerySchema = paginationQuerySchema.extend({
   sortOrder: z.enum(['asc', 'desc']).optional(),
 });
 export type PackagingListQuery = z.infer<typeof packagingListQuerySchema>;
+
+// 输出审计（product/审计日志.md R-审计-001；design/包装设计.md §7）：
+// 打印 / 导出为客户端行为，由领域专用事件端点记录，只记录用户触发，不保证文件落盘。
+export const packagingExportFormatSchema = z.enum([
+  'svg_view',
+  'svg_sheet',
+  'dxf',
+  'csv_bom',
+  'csv_cutting',
+  'obj',
+  'stl',
+]);
+export type PackagingExportFormat = z.infer<typeof packagingExportFormatSchema>;
+
+export const packagingExportViewSchema = z.enum(['top', 'front', 'side', 'iso']);
+export type PackagingExportView = z.infer<typeof packagingExportViewSchema>;
+
+export const packagingPrintEventSchema = z.object({
+  revisionNo: z.number().int().positive().nullable().optional(),
+});
+export type PackagingPrintEventInput = z.infer<typeof packagingPrintEventSchema>;
+
+export const packagingExportEventSchema = z
+  .object({
+    format: packagingExportFormatSchema,
+    view: packagingExportViewSchema.optional(),
+    revisionNo: z.number().int().positive().nullable().optional(),
+    unitCode: z.string().trim().max(50).optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.format === 'svg_view' && !value.view) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'SVG 视图导出必须指定视图',
+        path: ['view'],
+      });
+    }
+    if (value.format !== 'svg_view' && value.view) {
+      ctx.addIssue({
+        code: 'custom',
+        message: '仅 SVG 视图导出可指定视图',
+        path: ['view'],
+      });
+    }
+  });
+export type PackagingExportEventInput = z.infer<typeof packagingExportEventSchema>;
 
 export interface PackagingMaterialLike extends PalletMaterialLike {
   applicableUnitTypes: string[];

@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from '../src/app.module.js';
 import { API_PREFIX } from '../src/common/api-prefix.js';
 import { PrismaService } from '../src/common/prisma.service.js';
-import { scopedClient } from './helpers.js';
+import { scopedClient, testPhone } from './helpers.js';
 
 // 平台运营与多租户（design/租户.md §10 / design/账号与权限.md §6）：
 // 平台登录 → 开通租户（两步）→ 租户管理员额度 → 功能闸门 → 身份互斥 → 停用即时失效 → 平台审计。
@@ -24,6 +24,7 @@ describe('平台运营与多租户（契约/集成）', () => {
   const platformUsername = `it-ops-${stamp}`;
   const platformPassword = 'Secret#12345';
   const tenantAdminName = 'admin';
+  const tenantAdminPhone = `132${String(stamp).slice(-8)}`;
   const tenantAdminPassword = 'Secret#12345';
   const planName = `it-plan-${stamp}`;
   const tenantName = `it-tenant-${stamp}`;
@@ -108,15 +109,52 @@ describe('平台运营与多租户（契约/集成）', () => {
     expect(admins.body.total).toBe(0);
   });
 
+  it('编号跨 5 位边界：已有 TN-99999 时仍能生成更大编号', async () => {
+    let boundaryCreated = false;
+    const boundary = await prisma.client.tenant.findUnique({ where: { code: 'TN-99999' } });
+    if (!boundary) {
+      await prisma.client.tenant.create({
+        data: { code: 'TN-99999', name: `it-边界-${stamp}`, planId, status: 'ACTIVE' },
+      });
+      boundaryCreated = true;
+    }
+
+    let createdId = '';
+    try {
+      const created = await ops(http().post(`/${API_PREFIX}/ops/tenants`)).send({
+        name: `it-边界新租户-${stamp}`,
+        planId,
+      });
+      expect(created.status).toBe(201);
+      const number = Number.parseInt(String(created.body.code).slice('TN-'.length), 10);
+      expect(number).toBeGreaterThan(99999);
+      createdId = created.body.id as string;
+    } finally {
+      if (createdId) {
+        await prisma.client.tenant.deleteMany({ where: { id: createdId } });
+      }
+      if (boundaryCreated) {
+        await prisma.client.tenant.deleteMany({ where: { code: 'TN-99999' } });
+      }
+    }
+  });
+
   it('补建租户管理员：首建成功，超出套餐额度 409 QUOTA_EXCEEDED', async () => {
     const first = await ops(http().post(`/${API_PREFIX}/ops/tenants/${tenantId}/admins`)).send({
       username: tenantAdminName,
+      phone: tenantAdminPhone,
       password: tenantAdminPassword,
     });
     expect(first.status).toBe(201);
+    // 本用例重点是租户/功能链路，先在库内清掉首登改密标记（改密流程由 auth/user 用例覆盖）
+    await scopedClient(prisma.client, tenantId).user.updateMany({
+      where: { username: tenantAdminName },
+      data: { mustChangePassword: false },
+    });
 
     const second = await ops(http().post(`/${API_PREFIX}/ops/tenants/${tenantId}/admins`)).send({
       username: `it-extra-${stamp}`,
+      phone: testPhone(`it-extra-${stamp}`),
       password: tenantAdminPassword,
     });
     expect(second.status).toBe(409);
@@ -131,8 +169,7 @@ describe('平台运营与多租户（契约/集成）', () => {
 
   it('租户登录：套餐只含订单，客户接口被功能闸门拒绝', async () => {
     const login = await http().post(`/${API_PREFIX}/auth/login`).send({
-      tenantCode,
-      username: tenantAdminName,
+      phone: tenantAdminPhone,
       password: tenantAdminPassword,
       rememberMe: false,
     });
@@ -183,8 +220,7 @@ describe('平台运营与多租户（契约/集成）', () => {
     expect(stale.body.code).toBe('TENANT_SUSPENDED');
 
     const login = await http().post(`/${API_PREFIX}/auth/login`).send({
-      tenantCode,
-      username: tenantAdminName,
+      phone: tenantAdminPhone,
       password: tenantAdminPassword,
       rememberMe: false,
     });

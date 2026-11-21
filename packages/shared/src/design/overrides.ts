@@ -1,4 +1,4 @@
-import type { PalletComponentInput } from '../pallet.schemas';
+import type { PalletComponentInput } from './pallet/schemas';
 
 // 构件来源（product/包装设计.md R-包装设计-013 / design §5.1）：
 // 不单独存储覆盖标记；读取时用「配置派生默认值」与「当前构件」逐字段比较，

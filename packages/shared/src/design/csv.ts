@@ -1,5 +1,5 @@
-import type { PalletBom } from '../pallet.bom';
-import type { PalletComponentInput } from '../pallet.schemas';
+import type { PalletBom } from './pallet/bom';
+import type { PalletComponentInput } from './pallet/schemas';
 
 // CSV 导出（design/包装设计.md §5）：BOM 与开料清单。
 // 纯字符串生成，浏览器下载；首行带 BOM，便于 Excel 正确识别中文。

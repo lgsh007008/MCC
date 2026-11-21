@@ -1,5 +1,5 @@
 import type { PackagingUnitType } from './packaging.schemas';
-import { PALLET_TEMPLATE_OPTIONS } from './pallet.templates';
+import { PALLET_TEMPLATE_OPTIONS } from './design/pallet/templates';
 
 // 包装设计模板与单元类型预置（product/包装设计.md R-包装设计-009）：
 // v1 由服务端首次读取时落库；托盘沿用既有代码构建器，木箱 G 型使用 definition 数据。

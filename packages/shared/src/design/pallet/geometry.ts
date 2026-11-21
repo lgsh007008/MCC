@@ -1,4 +1,4 @@
-import type { PalletComponentInput, PalletComponentRole, PalletTemplateType } from './pallet.schemas';
+import type { PalletComponentInput, PalletComponentRole, PalletTemplateType } from './schemas';
 
 // 托盘几何（design/包装设计.md §4.1 / §4.2）：
 // 构件 → 3D 盒子；2D 视图只做投影映射，不碰 DOM；前端 SVG 与 Three.js 共用本文件。

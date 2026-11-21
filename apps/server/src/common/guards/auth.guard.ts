@@ -4,6 +4,7 @@ import type { Request } from 'express';
 import { AuthService } from '../../modules/auth/index.js';
 import { TenantService } from '../../modules/tenant/index.js';
 import type { AuthUser } from '../decorators/current-user.decorator.js';
+import { ALLOW_PENDING_PASSWORD_KEY } from '../decorators/allow-pending-password.decorator.js';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator.js';
 import { problem } from '../http-problem.js';
 import { isOpsRequest } from '../ops-path.js';
@@ -42,6 +43,15 @@ export class AuthGuard implements CanActivate {
     const tenant = await this.tenantService.assertActiveById(user.tenantId);
     if (tenant.sessionEpoch !== user.tenantEpoch) {
       throw problem(401, 'TOKEN_INVALID', '登录状态已失效，请重新登录');
+    }
+
+    // 待改密账号只允许调用改密接口（ADR-015）；其余业务接口统一拒绝，防止刷新绕过。
+    const allowPending = this.reflector.getAllAndOverride<boolean>(ALLOW_PENDING_PASSWORD_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+    if (user.mustChangePassword && !allowPending) {
+      throw problem(403, 'PASSWORD_CHANGE_REQUIRED', '请先修改初始密码');
     }
 
     // 身份与权限一律来自服务层解析，注入请求上下文供 CurrentUser 使用

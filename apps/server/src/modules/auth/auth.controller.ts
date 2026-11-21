@@ -7,9 +7,15 @@
   Req,
   Res,
 } from '@nestjs/common';
-import { ApiBody, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBody,
+  ApiCreatedResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 import type { Request, Response } from 'express';
-import type { ChangePasswordInput, LoginInput, RefreshInput } from '@mcc/shared';
+import type { ChangePasswordInput, LoginInput, RefreshInput, RegisterInput } from '@mcc/shared';
 import { AuditAction, SkipAudit } from '../../common/decorators/audit-action.decorator.js';
 import { auditRequestMeta } from '../../common/audit.util.js';
 import { RateLimit } from '../../common/decorators/rate-limit.decorator.js';
@@ -19,12 +25,14 @@ import {
   loginSchema,
   logoutSchema,
   refreshSchema,
+  registerSchema,
 } from '@mcc/shared';
 import type { AuthUser } from '../../common/decorators/current-user.decorator.js';
 import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
+import { AllowPendingPassword } from '../../common/decorators/allow-pending-password.decorator.js';
 import { Public } from '../../common/decorators/public.decorator.js';
 import { ZodValidationPipe } from '../../common/zod-validation.pipe.js';
-import { runWithTenant, TenantService } from '../tenant/index.js';
+import { runWithTenant } from '../tenant/index.js';
 import {
   AUTH_COOKIE_NAME,
   AUTH_COOKIE_PATH,
@@ -32,7 +40,13 @@ import {
 } from './auth.constants.js';
 import { AuthService } from './auth.service.js';
 import { ChangePasswordBodyDto } from './dto/change-password.dto.js';
-import { LoginBodyDto, LoginResponseDto, RefreshRequestDto, RefreshResponseDto } from './dto/login.dto.js';
+import {
+  LoginBodyDto,
+  LoginResponseDto,
+  RefreshRequestDto,
+  RefreshResponseDto,
+  RegisterBodyDto,
+} from './dto/login.dto.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const readRefreshCookie = (req: Request): string | undefined =>
@@ -46,7 +60,6 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly audit: AuditService,
-    private readonly tenants: TenantService,
   ) {}
 
   @Public()
@@ -54,7 +67,7 @@ export class AuthController {
   @SkipAudit()
   @Post('login')
   @HttpCode(200)
-  @ApiOperation({ summary: '登录：租户编号 + 账号 + 密码，签发访问令牌 + 刷新令牌', security: [] })
+  @ApiOperation({ summary: '登录：手机号 + 密码，签发访问令牌 + 刷新令牌', security: [] })
   @ApiBody({ type: LoginBodyDto })
   @ApiOkResponse({ type: LoginResponseDto })
   async login(
@@ -86,20 +99,13 @@ export class AuthController {
           payload: { method: req.method, path: req.path },
         }),
       );
-      res.cookie(AUTH_COOKIE_NAME, result.refreshToken, {
-        httpOnly: true,
-        sameSite: 'lax',
-        // 本地开发为 http；生产全站 HTTPS（技术方案 §8.1）后改由环境控制
-        secure: false,
-        path: AUTH_COOKIE_PATH,
-        // 不勾选「记住登录」→ 会话级 cookie（无 maxAge，浏览器关闭即失效）
-        maxAge: result.rememberMe ? REFRESH_REMEMBER_TTL_DAYS * DAY_MS : undefined,
-      });
+      this.setRefreshCookie(res, result.refreshToken, result.rememberMe);
       return {
         accessToken: result.accessToken,
         username: result.username,
         role: result.role,
         features: result.features,
+        mustChangePassword: result.mustChangePassword,
       };
     } catch (error) {
       const requestMeta = auditRequestMeta(req);
@@ -112,13 +118,14 @@ export class AuthController {
         typeof (response as { code?: unknown }).code === 'string'
           ? (response as { code: string }).code
           : null;
-      // 租户不存在时无法归属租户审计（租户审计按 tenant_id 隔离），不落库；
-      // 租户存在但凭证错误 / 停用租户等失败均留痕。
-      const tenant = await this.tenants.findByCode(body.tenantCode).catch(() => null);
-      if (tenant) {
-        void runWithTenant(tenant.id, () =>
+      // 手机号命中时可按其租户归属审计；未命中无法归属租户，不落库。
+      const context = await this.authService
+        .findLoginAuditContext(body.phone)
+        .catch(() => null);
+      if (context) {
+        void runWithTenant(context.tenantId, () =>
           this.audit.write({
-            actorUsername: body.username,
+            actorUsername: context.username,
             domain: 'auth',
             action: 'login',
             actionLabel: '登录',
@@ -137,6 +144,56 @@ export class AuthController {
       }
       throw error;
     }
+  }
+
+  // 自助注册（R-账号与权限-005）：公开接口；不设注册专用 IP 限流，沿用平台默认限流（120 次 / 分钟 / IP）。
+  // 成功后自动登录（种刷新 Cookie）并写租户审计；失败无归属主体，不写审计。
+  @Public()
+  @SkipAudit()
+  @Post('register')
+  @HttpCode(201)
+  @ApiOperation({
+    summary: '自助注册：创建标准版租户 + 首管理员并自动登录',
+    security: [],
+  })
+  @ApiBody({ type: RegisterBodyDto })
+  @ApiCreatedResponse({ type: LoginResponseDto })
+  async register(
+    @Body(new ZodValidationPipe(registerSchema)) body: RegisterInput,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<LoginResponseDto> {
+    const result = await this.authService.register(body);
+    this.setRefreshCookie(res, result.refreshToken, result.rememberMe);
+    const requestMeta = auditRequestMeta(req);
+    void runWithTenant(result.tenantId, () =>
+      this.audit.write({
+        actorId: result.userId,
+        actorUsername: result.username,
+        actorRole: result.role,
+        domain: 'auth',
+        action: 'register',
+        actionLabel: '自助注册',
+        objectType: 'user',
+        objectId: result.userId,
+        objectCode: result.username,
+        result: 'ok',
+        statusCode: 201,
+        method: req.method,
+        path: req.path,
+        ip: requestMeta.ip,
+        userAgent: requestMeta.userAgent,
+        requestId: requestMeta.requestId,
+        payload: { method: req.method, path: req.path },
+      }),
+    );
+    return {
+      accessToken: result.accessToken,
+      username: result.username,
+      role: result.role,
+      features: result.features,
+      mustChangePassword: result.mustChangePassword,
+    };
   }
 
   @Public()
@@ -197,6 +254,7 @@ export class AuthController {
 
   @RateLimit(30, 60_000)
   @AuditAction({ domain: 'auth', action: 'change-password', label: '修改密码', objectType: 'user' })
+  @AllowPendingPassword()
   @Post('change-password')
   @HttpCode(204)
   @ApiOperation({ summary: '登录态下修改密码；成功后撤销该账号全部刷新会话' })
@@ -208,5 +266,18 @@ export class AuthController {
   ): Promise<void> {
     await this.authService.changePassword(user.userId, body);
     res.clearCookie(AUTH_COOKIE_NAME, { path: AUTH_COOKIE_PATH });
+  }
+
+  // 登录与注册共用刷新令牌 Cookie 口径（design/账号与权限.md §4）：
+  // 记住登录 → 30 天；否则会话级（无 maxAge），浏览器关闭即失效。
+  private setRefreshCookie(res: Response, refreshToken: string, rememberMe: boolean): void {
+    res.cookie(AUTH_COOKIE_NAME, refreshToken, {
+      httpOnly: true,
+      sameSite: 'lax',
+      // 本地开发为 http；生产全站 HTTPS（技术方案 §8.1）后改由环境控制
+      secure: false,
+      path: AUTH_COOKIE_PATH,
+      maxAge: rememberMe ? REFRESH_REMEMBER_TTL_DAYS * DAY_MS : undefined,
+    });
   }
 }

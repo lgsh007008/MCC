@@ -4,6 +4,7 @@ import { Test } from '@nestjs/testing';
 import { hash } from '@node-rs/argon2';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { Prisma } from '@mcc/db';
 import type { PackagingProjectInput } from '@mcc/shared';
 import {
   deriveCrateOuter,
@@ -19,7 +20,7 @@ import { AppModule } from '../src/app.module.js';
 import { API_PREFIX } from '../src/common/api-prefix.js';
 import { PrismaService } from '../src/common/prisma.service.js';
 import { TenantService } from '../src/modules/tenant/tenant.service.js';
-import { scopedClient, TEST_TENANT_CODE, TEST_TENANT_ID } from './helpers.js';
+import { scopedClient, TEST_TENANT_ID, testPhone } from './helpers.js';
 
 // 包装设计接口关键路径（契约/集成层，技术方案 §10）：
 // 守卫 401 / 新建（PD 编号、合计重算）/ 列表 / 详情 / 更新 / 复制 / 发布 / 版本 / 软删除。
@@ -300,13 +301,13 @@ describe('包装设计接口（契约/集成）', () => {
       data: {
         tenantId: TEST_TENANT_ID,
         username,
+        phone: testPhone(username),
         passwordHash: await hash(password),
         role: 'SALES',
       },
     });
     const login = await request(app.getHttpServer()).post(`/${API_PREFIX}/auth/login`).send({
-      tenantCode: TEST_TENANT_CODE,
-      username,
+      phone: testPhone(username),
       password,
       rememberMe: false,
     });
@@ -327,6 +328,21 @@ describe('包装设计接口（契约/集成）', () => {
   const auth = (req: request.Test): request.Test =>
     req.set('Authorization', `Bearer ${accessToken}`);
 
+  const waitForAudit = async (
+    where: Prisma.EventLogWhereInput,
+  ): Promise<Prisma.EventLogGetPayload<object>> => {
+    const start = Date.now();
+    while (Date.now() - start < 3_000) {
+      const row = await db.eventLog.findFirst({
+        where,
+        orderBy: { createdAt: 'desc' },
+      });
+      if (row) return row;
+      await new Promise((resolve) => setTimeout(resolve, 30));
+    }
+    throw new Error(`未等到审计记录：${JSON.stringify(where)}`);
+  };
+
   it('未登录访问一律 401', async () => {
     const res = await http().get(`/${API_PREFIX}/packaging/projects`);
     expect(res.status).toBe(401);
@@ -338,13 +354,13 @@ describe('包装设计接口（契约/集成）', () => {
       data: {
         tenantId: TEST_TENANT_ID,
         username: workerName,
+        phone: testPhone(workerName),
         passwordHash: await hash('Secret#12345'),
         role: 'WORKER',
       },
     });
     const login = await http().post(`/${API_PREFIX}/auth/login`).send({
-      tenantCode: TEST_TENANT_CODE,
-      username: workerName,
+      phone: testPhone(workerName),
       password: 'Secret#12345',
       rememberMe: false,
     });
@@ -599,6 +615,69 @@ describe('包装设计接口（契约/集成）', () => {
       http().get(`/${API_PREFIX}/packaging/projects/${projectId}/revisions`),
     );
     expect(revisions.body.total).toBe(1);
+  });
+
+  it('打印报告：记录审计与方案编号', async () => {
+    const detail = await auth(http().get(`/${API_PREFIX}/packaging/projects/${projectId}`));
+    const projectCode = detail.body.code as string;
+
+    const res = await auth(
+      http().post(`/${API_PREFIX}/packaging/projects/${projectId}/print-events`),
+    ).send({ revisionNo: 1 });
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ id: projectId, code: projectCode });
+
+    const row = await waitForAudit({
+      actorUsername: username,
+      domain: 'packaging',
+      action: 'print',
+      result: 'ok',
+      objectId: projectId,
+    });
+    expect(row.objectCode).toBe(projectCode);
+    expect(row.actionLabel).toBe('打印包装方案报告');
+    expect(row.payload).toMatchObject({ revisionNo: 1 });
+  });
+
+  it('导出：记录审计、格式与版本', async () => {
+    const res = await auth(
+      http().post(`/${API_PREFIX}/packaging/projects/${projectId}/export-events`),
+    ).send({
+      format: 'dxf',
+      revisionNo: 1,
+      unitCode: 'PD-00001-U01',
+      secret: 'audit-secret',
+    });
+    expect(res.status).toBe(200);
+
+    const row = await waitForAudit({
+      actorUsername: username,
+      domain: 'packaging',
+      action: 'export',
+      result: 'ok',
+      objectId: projectId,
+    });
+    expect(row.actionLabel).toBe('导出包装方案');
+    expect(row.payload).toMatchObject({
+      format: 'dxf',
+      revisionNo: 1,
+      unitCode: 'PD-00001-U01',
+    });
+    expect(JSON.stringify(row.payload)).not.toContain('audit-secret');
+  });
+
+  it('输出审计：非法格式与不存在的方案被拒绝', async () => {
+    const invalid = await auth(
+      http().post(`/${API_PREFIX}/packaging/projects/${projectId}/export-events`),
+    ).send({ format: 'svg_view' });
+    expect(invalid.status).toBe(400);
+
+    const missing = await auth(
+      http().post(
+        `/${API_PREFIX}/packaging/projects/00000000-0000-4000-8000-000000000000/export-events`,
+      ),
+    ).send({ format: 'dxf' });
+    expect(missing.status).toBe(404);
   });
 
   it('删除：软删除后详情 404，编号不回收', async () => {

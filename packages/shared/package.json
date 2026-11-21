@@ -10,6 +10,7 @@
   "scripts": {
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
+    "test:coverage:packaging": "vitest run --coverage --config vitest.packaging.config.mts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "gen:client": "openapi-typescript ./openapi.json -o ./src/gen/api.d.ts",
     "lint": "eslint ."

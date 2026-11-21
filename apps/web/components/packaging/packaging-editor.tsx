@@ -652,17 +652,38 @@ export function PackagingEditor({ initial }: PackagingEditorProps): React.ReactE
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
-  const exportSvg = (): void =>
+  // 输出审计只记录已保存方案；未保存工作台没有方案编号，无法归属，导出不记录。
+  const recordExport = (body: {
+    format: 'svg_view' | 'svg_sheet' | 'dxf' | 'csv_bom' | 'csv_cutting' | 'obj' | 'stl';
+    view?: 'top' | 'front' | 'side' | 'iso';
+    revisionNo?: number | null;
+  }): void => {
+    if (!initial?.id) return;
+    void api
+      .POST('/api/v1/packaging/projects/{id}/export-events', {
+        params: { path: { id: initial.id } },
+        body,
+      })
+      .catch(() => undefined);
+  };
+
+  const exportSvg = (): void => {
     download(`${sheet.drawingNo}.svg`, drawingToSvg(sheet), 'image/svg+xml');
-  const exportSvgView = (kind: DrawingViewKind, label: string): void =>
+    recordExport({ format: 'svg_sheet' });
+  };
+  const exportSvgView = (kind: DrawingViewKind, label: string): void => {
     download(
       `${sheet.drawingNo}-${label}.svg`,
       drawingToViewSvg(sheet, kind),
       'image/svg+xml',
     );
-  const exportDxf = (): void =>
+    recordExport({ format: 'svg_view', view: kind });
+  };
+  const exportDxf = (): void => {
     download(`${sheet.drawingNo}.dxf`, drawingToDxf(sheet), 'application/dxf');
-  const exportBomCsv = (): void =>
+    recordExport({ format: 'dxf' });
+  };
+  const exportBomCsv = (): void => {
     download(
       `${sheet.drawingNo}-BOM.csv`,
       bomToCsv([
@@ -674,7 +695,9 @@ export function PackagingEditor({ initial }: PackagingEditorProps): React.ReactE
       ]),
       'text/csv;charset=utf-8',
     );
-  const exportCuttingCsv = (): void =>
+    recordExport({ format: 'csv_bom' });
+  };
+  const exportCuttingCsv = (): void => {
     download(
       `${sheet.drawingNo}-开料.csv`,
       cuttingToCsv([
@@ -686,6 +709,8 @@ export function PackagingEditor({ initial }: PackagingEditorProps): React.ReactE
       ]),
       'text/csv;charset=utf-8',
     );
+    recordExport({ format: 'csv_cutting' });
+  };
 
   const persistExisting = async (): Promise<void> => {
     if (!initial || !editable || blocked) return;
@@ -992,13 +1017,19 @@ export function PackagingEditor({ initial }: PackagingEditorProps): React.ReactE
               <DropdownMenuItem onClick={exportCuttingCsv}>开料 CSV</DropdownMenuItem>
               <DropdownMenuItem
                 disabled={mode !== '3d' && mode !== 'split'}
-                onClick={() => viewer3dRef.current?.exportObj()}
+                onClick={() => {
+                  viewer3dRef.current?.exportObj();
+                  recordExport({ format: 'obj' });
+                }}
               >
                 OBJ 模型
               </DropdownMenuItem>
               <DropdownMenuItem
                 disabled={mode !== '3d' && mode !== 'split'}
-                onClick={() => viewer3dRef.current?.exportStl()}
+                onClick={() => {
+                  viewer3dRef.current?.exportStl();
+                  recordExport({ format: 'stl' });
+                }}
               >
                 STL 模型
               </DropdownMenuItem>

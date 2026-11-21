@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { calcPalletBom } from './pallet.bom';
-import type { PalletComponentInput } from './pallet.schemas';
-import { PALLET_DEFAULT_MATERIALS } from './pallet.templates';
+import { calcPalletBom } from './bom';
+import type { PalletComponentInput } from './schemas';
+import { PALLET_DEFAULT_MATERIALS } from './templates';
 
 const component: PalletComponentInput = {
   role: 'topDeck',

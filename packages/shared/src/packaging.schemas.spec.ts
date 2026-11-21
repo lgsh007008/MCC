@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { packagingProjectInputSchema } from './packaging.schemas';
+import {
+  packagingExportEventSchema,
+  packagingPrintEventSchema,
+  packagingProjectInputSchema,
+} from './packaging.schemas';
 import { PACKAGING_DEFAULT_TEMPLATES } from './packaging.templates';
 
 const validBody = () => ({
@@ -58,6 +62,38 @@ describe('packagingProjectInputSchema', () => {
     (body.units[0] as { unitType: string }).unitType = 'UNKNOWN';
     const result = packagingProjectInputSchema.safeParse(body);
     expect(result.success).toBe(false);
+  });
+});
+
+describe('packagingExportEventSchema / packagingPrintEventSchema', () => {
+  it('接受已登记导出格式与可选版本', () => {
+    const parsed = packagingExportEventSchema.parse({
+      format: 'dxf',
+      revisionNo: 2,
+      unitCode: 'PD-00001-U01',
+    });
+    expect(parsed.format).toBe('dxf');
+    expect(parsed.revisionNo).toBe(2);
+  });
+
+  it('SVG 视图导出必须指定视图，其他格式不得带视图', () => {
+    expect(packagingExportEventSchema.safeParse({ format: 'svg_view' }).success).toBe(false);
+    expect(
+      packagingExportEventSchema.safeParse({ format: 'svg_view', view: 'top' }).success,
+    ).toBe(true);
+    expect(
+      packagingExportEventSchema.safeParse({ format: 'dxf', view: 'top' }).success,
+    ).toBe(false);
+  });
+
+  it('拒绝未登记格式', () => {
+    expect(packagingExportEventSchema.safeParse({ format: 'pdf' }).success).toBe(false);
+  });
+
+  it('打印事件允许空 body 或版本号', () => {
+    expect(packagingPrintEventSchema.safeParse({}).success).toBe(true);
+    expect(packagingPrintEventSchema.safeParse({ revisionNo: 1 }).success).toBe(true);
+    expect(packagingPrintEventSchema.safeParse({ revisionNo: 0 }).success).toBe(false);
   });
 });
 

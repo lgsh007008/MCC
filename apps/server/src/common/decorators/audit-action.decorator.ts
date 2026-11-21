@@ -10,6 +10,8 @@ export interface AuditActionMeta {
   action: string;
   label: string;
   objectType?: string;
+  // 允许写入审计 payload 的请求体字段白名单；不配置则不记录任何请求体字段。
+  payloadKeys?: readonly string[];
 }
 
 export const AuditAction = (meta: AuditActionMeta): MethodDecorator & ClassDecorator =>

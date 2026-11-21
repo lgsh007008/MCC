@@ -1,5 +1,6 @@
-# CI 门禁（技术方案 §10：lint + 类型检查 + 构建 + 单测 + 契约校验 + E2E 冒烟）
-# 覆盖：数据库迁移与 Prisma Client 生成、OpenAPI 契约校验、全仓 lint（含 §4.2 模块边界规则）、
+# CI 门禁（技术方案 §10：文档校验 + lint + 类型检查 + 构建 + 单测 + 契约校验 + E2E 冒烟）
+# 覆盖：文档体系校验（配对 / 编号 / 引用 / changelog / 归档）、数据库迁移与 Prisma Client 生成、
+# OpenAPI 契约校验、全仓 lint（含 §4.2 模块边界规则）、
 # 类型检查（server / shared / db）、全仓构建（server 的 NodeNext 编译问题只能由构建暴露）、
 # 单测与集成测试（server / shared）、shared 计算纯函数覆盖率门槛、E2E 冒烟（web + server 由 Playwright 本机拉起）。
 
@@ -37,6 +38,8 @@ jobs:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/mcc?schema=public
       REDIS_URL: redis://localhost:6379
       JWT_SECRET: ci-only-test-secret
+      # seed 不内置手机号（ADR-015），E2E 与本地开发使用同一测试号
+      SEED_ADMIN_PHONE: 13800000001
 
     steps:
       - uses: actions/checkout@v4
@@ -49,6 +52,15 @@ jobs:
         with:
           node-version: 20
           cache: pnpm
+
+      - name: 文档校验（配对 / 编号 / 引用 / changelog / 归档，`0-文档驱动开发机制.md`）
+        env:
+          DOCS_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if [ -n "$DOCS_BASE_REF" ] && [ "$DOCS_BASE_REF" != "0000000000000000000000000000000000000000" ]; then
+            git fetch --no-tags --depth=1 origin "$DOCS_BASE_REF" || echo "基线提交不可用，脚本将跳过 changelog 增量校验"
+          fi
+          node scripts/check-docs.mjs
 
       - name: 安装依赖
         run: pnpm install --frozen-lockfile

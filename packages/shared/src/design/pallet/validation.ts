@@ -1,4 +1,4 @@
-import type { PalletComponentInput, PalletTemplateType } from './pallet.schemas';
+import type { PalletComponentInput, PalletTemplateType } from './schemas';
 
 // 托盘结构基础校验（design/包装设计.md §4）：
 // 只保证图纸与数据可继续使用，不代表承载合格；error 阻止保存，warning 提示确认。

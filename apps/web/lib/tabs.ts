@@ -1,11 +1,14 @@
 // 多标签页状态（product/平台布局.md「多标签页」；design/平台布局.md §1.6）：
 // 纯逻辑集中在此（不依赖 React / 路由），便于单测；壳层只负责渲染与派发。
 
-export const HOME_PATH = '/admin';
-export const HOME_TITLE = '首页';
+// 当前阶段（v20261121）包装设计为默认落地页与首页标签；恢复通用首页时改回 /admin。
+export const HOME_PATH = '/admin/packaging-design';
+export const HOME_TITLE = '包装设计';
 /** 标签上限：超出时淘汰最久未使用的标签（首页不参与淘汰） */
 export const MAX_TABS = 12;
 const STORAGE_KEY = 'mcc.tabs.v1';
+/** 旧首页路径：阶段切换后从已持久化的标签中丢弃，恢复通用首页时自动失效。 */
+const LEGACY_HOME_PATH: string = '/admin';
 
 export interface TabItem {
   path: string;
@@ -60,7 +63,11 @@ function sanitizeTabs(tabs: TabItem[]): TabItem[] {
     { path: HOME_PATH, title: HOME_TITLE, lastActiveAt: 0 },
   ];
   for (const tab of tabs) {
-    if (!tab?.path || seen.has(tab.path)) {
+    if (
+      !tab?.path ||
+      seen.has(tab.path) ||
+      (HOME_PATH !== LEGACY_HOME_PATH && tab.path === LEGACY_HOME_PATH)
+    ) {
       continue;
     }
     seen.add(tab.path);

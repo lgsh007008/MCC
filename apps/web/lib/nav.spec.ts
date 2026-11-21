@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   findNavByPath,
-  homeItem,
   navGroups,
   platformNavItems,
   scopeForMobilePath,
@@ -10,11 +9,10 @@ import {
 } from './nav';
 
 // 菜单配置约定（design/平台布局.md §1.3）：图标全局不重复——
-// 首页、各业务分组、各菜单项之间复用同一图标会让折叠图标栏无法区分，分组与其子项尤其不能同图标。
+// 各业务分组、各菜单项之间复用同一图标会让折叠图标栏无法区分，分组与其子项尤其不能同图标。
 describe('导航图标', () => {
-  it('首页、分组与菜单项的图标互不重复', () => {
+  it('分组与菜单项的图标互不重复', () => {
     const icons = [
-      homeItem.icon,
       ...navGroups.flatMap((group) => [group.icon, ...group.items.map((item) => item.icon)]),
       ...platformNavItems.map((item) => item.icon),
     ];
@@ -34,10 +32,10 @@ describe('菜单可见性', () => {
     expect(groups[0]?.items.map((item) => item.title)).toEqual(['销售单']);
   });
 
-  it('财务看到销售、设计、采购、生产与财务，看不到账号管理（账号管理不在侧边菜单）', () => {
+  it('财务看到设计、销售、采购、生产与财务，看不到账号管理（账号管理不在侧边菜单）', () => {
     expect(visibleNavGroups('FINANCE').map((group) => group.label)).toEqual([
-      '销售',
       '设计',
+      '销售',
       '采购',
       '生产',
       '财务',
@@ -61,6 +59,14 @@ describe('平台机制页', () => {
 // 当前菜单项高亮（design/平台布局.md §1.3）：最长 href 优先，
 // /admin/production/inventory 是 /admin/production/inventory/counts 的前缀，只能点亮最具体一项。
 describe('菜单匹配', () => {
+  it('包装设计是设计分组的菜单项，也是当前阶段默认落地页', () => {
+    expect(findNavByPath('/admin/packaging-design')).toEqual({
+      groupLabel: '设计',
+      itemTitle: '包装设计',
+      itemHref: '/admin/packaging-design',
+    });
+  });
+
   it('父子同前缀时只匹配最具体的菜单项', () => {
     expect(findNavByPath('/admin/production/inventory/counts')?.itemHref).toBe(
       '/admin/production/inventory/counts',

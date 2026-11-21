@@ -11,7 +11,7 @@ import { API_PREFIX } from '../src/common/api-prefix.js';
 import { loginFailKey } from '../src/modules/auth/auth.constants.js';
 import { PrismaService } from '../src/common/prisma.service.js';
 import { RedisService } from '../src/common/redis.service.js';
-import { scopedClient, TEST_TENANT_CODE, TEST_TENANT_ID } from './helpers.js';
+import { scopedClient, TEST_TENANT_ID } from './helpers.js';
 
 // auth 接口关键路径（契约/集成层，技术方案 §10）：
 // 登录成功 / 凭证错误 / 参数校验 / 连续失败锁定 / 刷新与撤销 / 修改密码 / 守卫 401。
@@ -23,6 +23,7 @@ describe('账号与权限接口（契约/集成）', () => {
   let redis: RedisService;
   let db: PrismaService['client'];
   const username = `it-${Date.now()}`;
+  const phone = `139${String(Date.now()).slice(-8)}`;
   const password = 'Secret#12345';
 
   beforeAll(async () => {
@@ -41,7 +42,13 @@ describe('账号与权限接口（契约/集成）', () => {
       await redis.del(...rateKeys);
     }
     await db.user.create({
-      data: { tenantId: TEST_TENANT_ID, username, passwordHash: await hash(password), role: 'SALES' },
+      data: {
+        tenantId: TEST_TENANT_ID,
+        username,
+        phone,
+        passwordHash: await hash(password),
+        role: 'SALES',
+      },
     });
   });
 
@@ -52,11 +59,10 @@ describe('账号与权限接口（契约/集成）', () => {
   });
 
   const login = (agent: request.Agent, body: Record<string, unknown>) =>
-    agent.post(`/${API_PREFIX}/auth/login`).send({ tenantCode: TEST_TENANT_CODE, ...body });
+    agent.post(`/${API_PREFIX}/auth/login`).send({ phone, ...body });
 
   it('登录成功：签发访问令牌并种下刷新令牌 Cookie', async () => {
     const res = await login(request.agent(app.getHttpServer()), {
-      username,
       password,
       rememberMe: false,
     });
@@ -72,16 +78,15 @@ describe('账号与权限接口（契约/集成）', () => {
 
   it('凭证错误返回统一错误体（不泄露存在性）', async () => {
     const res = await login(request.agent(app.getHttpServer()), {
-      username,
       password: 'wrong-password',
     });
     expect(res.status).toBe(401);
     expect(res.body.code).toBe('INVALID_CREDENTIALS');
-    expect(res.body.message).toBe('账号或密码错误');
+    expect(res.body.message).toBe('手机号或密码错误');
   });
 
   it('参数不合法走 zod 边界校验 400', async () => {
-    const res = await login(request.agent(app.getHttpServer()), { username: '', password: '' });
+    const res = await login(request.agent(app.getHttpServer()), { phone: '', password: '' });
     expect(res.status).toBe(400);
     expect(res.body.code).toBe('VALIDATION_FAILED');
   });
@@ -90,22 +95,22 @@ describe('账号与权限接口（契约/集成）', () => {
     const agent = request.agent(app.getHttpServer());
     // 此前已失败 1 次（凭证错误用例），再失败 4 次即达阈值
     for (let i = 0; i < 4; i += 1) {
-      const res = await login(agent, { username, password: `bad-${i}` });
+      const res = await login(agent, { password: `bad-${i}` });
       expect(res.status).toBe(401);
     }
-    const locked = await login(agent, { username, password });
+    const locked = await login(agent, { password });
     expect(locked.status).toBe(429);
     expect(locked.body.code).toBe('AUTH_LOCKED');
 
     // 清理计数（模拟锁定期满）后恢复
-    await redis.del(loginFailKey(TEST_TENANT_CODE, username));
-    const recovered = await login(agent, { username, password });
+    await redis.del(loginFailKey(phone));
+    const recovered = await login(agent, { password });
     expect(recovered.status).toBe(200);
   });
 
   it('刷新令牌换新访问令牌；无效令牌被拒', async () => {
     const agent = request.agent(app.getHttpServer());
-    await login(agent, { username, password });
+    await login(agent, { password });
     const ok = await agent.post(`/${API_PREFIX}/auth/refresh`);
     expect(ok.status).toBe(200);
     expect(ok.body.accessToken).toBeTypeOf('string');
@@ -120,7 +125,7 @@ describe('账号与权限接口（契约/集成）', () => {
 
   it('登出撤销刷新令牌：原 Cookie 不再可用', async () => {
     const agent = request.agent(app.getHttpServer());
-    await login(agent, { username, password });
+    await login(agent, { password });
     const out = await agent.post(`/${API_PREFIX}/auth/logout`);
     expect(out.status).toBe(204);
 
@@ -140,7 +145,7 @@ describe('账号与权限接口（契约/集成）', () => {
     const agent = request.agent(app.getHttpServer());
     const loginRes = await agent
       .post(`/${API_PREFIX}/auth/login`)
-      .send({ tenantCode: TEST_TENANT_CODE, username, password });
+      .send({ phone, password });
     const accessToken = String(loginRes.body.accessToken);
 
     const change = await agent
@@ -150,12 +155,11 @@ describe('账号与权限接口（契约/集成）', () => {
     expect(change.status).toBe(204);
 
     // 旧密码失效
-    const oldLogin = await login(request.agent(app.getHttpServer()), { username, password });
+    const oldLogin = await login(request.agent(app.getHttpServer()), { password });
     expect(oldLogin.status).toBe(401);
 
     // 新密码可登录
     const newLogin = await login(request.agent(app.getHttpServer()), {
-      username,
       password: `${password}New`,
     });
     expect(newLogin.status).toBe(200);
@@ -164,8 +168,8 @@ describe('账号与权限接口（契约/集成）', () => {
 
   it('审计：写操作全部落事件日志（登录成功 / 凭证失败均留痕）', async () => {
     const agent = request.agent(app.getHttpServer());
-    await login(agent, { username, password });
-    await login(agent, { username, password: 'definitely-wrong' });
+    await login(agent, { password });
+    await login(agent, { password: 'definitely-wrong' });
 
     const logs = await db.eventLog.findMany({
       where: { domain: 'auth', action: 'login' },

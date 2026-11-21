@@ -12,6 +12,9 @@ export const tenantCodeSchema = z
 
 export const tenantStatusSchema = z.enum(['active', 'suspended']);
 export const planStatusSchema = z.enum(['active', 'inactive']);
+// 开通渠道（R-租户-001）：运营开通 / 自助注册；创建后只读。
+export const tenantSourceSchema = z.enum(['ops', 'self_register']);
+export type TenantSourceValue = z.infer<typeof tenantSourceSchema>;
 export const sellableFeatureSchema = z.enum(SELLABLE_FEATURES);
 
 export const featureOverrideSchema = z.object({
@@ -55,6 +58,7 @@ export const tenantListQuerySchema = paginationQuerySchema.extend({
   name: z.string().trim().max(100).optional(),
   status: tenantStatusSchema.optional(),
   planId: z.string().uuid().optional(),
+  source: tenantSourceSchema.optional(),
 });
 export type TenantListQuery = z.infer<typeof tenantListQuerySchema>;
 

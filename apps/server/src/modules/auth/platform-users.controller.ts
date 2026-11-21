@@ -24,6 +24,7 @@ import {
   platformUserStatusInputSchema,
   tenantAccountCountsQuerySchema,
   tenantAdminCreateSchema,
+  tenantAdminPhoneInputSchema,
   tenantAdminResetPasswordSchema,
   type PlatformUserCreateInput,
   type PlatformUserListQuery,
@@ -31,6 +32,7 @@ import {
   type PlatformUserStatusInput,
   type TenantAccountCountsQuery,
   type TenantAdminCreateInput,
+  type TenantAdminPhoneInput,
   type TenantAdminResetPasswordInput,
 } from '@mcc/shared';
 import {
@@ -50,6 +52,7 @@ import {
   TenantAdminCreateBodyDto,
   TenantAdminDto,
   TenantAdminListDto,
+  TenantAdminPhoneBodyDto,
   TenantAdminResetPasswordBodyDto,
 } from './dto/platform-user.dto.js';
 import { PlatformUsersService } from './platform-users.service.js';
@@ -157,7 +160,7 @@ export class PlatformUsersController {
     label: '补建租户管理员',
     objectType: 'user',
   })
-  @ApiOperation({ summary: '补建 / 新增租户管理员（校验套餐额度）' })
+  @ApiOperation({ summary: '补建 / 新增租户管理员（姓名 + 手机号 + 初始密码；校验套餐额度）' })
   @ApiBody({ type: TenantAdminCreateBodyDto })
   @ApiCreatedResponse({ type: TenantAdminDto })
   createTenantAdmin(
@@ -165,6 +168,25 @@ export class PlatformUsersController {
     @Body(new ZodValidationPipe(tenantAdminCreateSchema)) body: TenantAdminCreateInput,
   ): Promise<TenantAdminDto> {
     return this.platformUsersService.createTenantAdmin(tenantId, body);
+  }
+
+  @Patch('tenants/:tenantId/admins/:userId/phone')
+  @RequirePlatformScopes('platform:tenant:manage')
+  @PlatformAuditAction({
+    domain: 'tenant',
+    action: 'change-tenant-admin-phone',
+    label: '修改租户管理员手机号',
+    objectType: 'user',
+  })
+  @HttpCode(204)
+  @ApiOperation({ summary: '修改租户管理员手机号（全局唯一；撤销该账号刷新会话）' })
+  @ApiBody({ type: TenantAdminPhoneBodyDto })
+  async updateTenantAdminPhone(
+    @Param('tenantId') tenantId: string,
+    @Param('userId', ParseUUIDPipe) userId: string,
+    @Body(new ZodValidationPipe(tenantAdminPhoneInputSchema)) body: TenantAdminPhoneInput,
+  ): Promise<void> {
+    await this.platformUsersService.updateTenantAdminPhone(tenantId, userId, body);
   }
 
   @Post('tenants/:tenantId/admins/:userId/reset-password')

@@ -1,7 +1,7 @@
 import type { PackagingPartInput } from '../packaging.schemas';
-import type { PalletComponentInput } from '../pallet.schemas';
-import type { PalletGeometry, PalletPiece } from '../pallet.geometry';
-import type { PalletIssue } from '../pallet.validation';
+import type { PalletComponentInput } from './pallet/schemas';
+import type { PalletGeometry, PalletPiece } from './pallet/geometry';
+import type { PalletIssue } from './pallet/validation';
 
 // 框架箱 G 型（product/包装设计.md R-包装设计-020）：
 // 以滑木底座 + 底板 + 四角立柱 + 上下框梁承力，面板与盖板可选；

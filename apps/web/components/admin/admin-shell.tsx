@@ -1,6 +1,7 @@
 ﻿﻿'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { ChevronDownIcon, PanelLeftCloseIcon, PanelLeftOpenIcon } from 'lucide-react';
@@ -46,13 +47,16 @@ import { authSession, currentFeatures, currentRole, currentUsername } from '@/li
 import {
   featureForPath,
   findNavByPath,
-  homeItem,
   scopeForPath,
   visibleNavGroups,
+  type NavGroup,
 } from '@/lib/nav';
 import { RoleProvider } from '@/components/auth/permission-context';
+import { ForcePasswordChangeDialog } from '@/components/auth/force-password-change';
 import { ConfirmProvider } from '@/components/ui/confirm-dialog';
 import { PageBreadcrumbProvider } from './page-breadcrumb';
+import { sidebarItemFocusClass, sidebarItemStateClass } from './sidebar-item-state';
+import { SidebarPeek } from './sidebar-peek';
 import { TabBar, TabsProvider, useTabs } from './tabs';
 
 // 后台布局壳（design/平台布局.md §1）：经典三区——侧边栏 / 顶栏 / 主内容区。
@@ -87,7 +91,7 @@ function SidebarCollapseButton(): React.ReactElement {
     <Button
       type="button"
       variant="ghost"
-      className="w-full justify-start gap-2 text-muted-foreground"
+      className="w-full justify-start gap-2 text-muted-foreground group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-1 group-data-[collapsible=icon]:px-1"
       aria-label={open ? '收起侧边栏' : '展开侧边栏'}
       aria-expanded={open}
       title={open ? '收起侧边栏' : '展开侧边栏'}
@@ -98,8 +102,306 @@ function SidebarCollapseButton(): React.ReactElement {
       ) : (
         <PanelLeftOpenIcon className="size-4 shrink-0" />
       )}
-      <span className="group-data-[collapsible=icon]:hidden">{open ? '收起' : '展开'}</span>
+      <span className="text-xs">{open ? '收起' : '展开'}</span>
     </Button>
+  );
+}
+
+function railButtonClass(selected: boolean, open = false): string {
+  return cn(
+    'flex w-full flex-col items-center gap-1 rounded-md px-1 py-1.5 text-[11px] leading-none transition-colors',
+    sidebarItemStateClass({ selected, open }),
+    sidebarItemFocusClass,
+  );
+}
+
+function RailGroupButton({
+  group,
+  selected,
+  open,
+  buttonRef,
+  onClick,
+  onPointerEnter,
+  onPointerLeave,
+}: {
+  group: NavGroup;
+  selected: boolean;
+  open: boolean;
+  buttonRef: (node: HTMLButtonElement | null) => void;
+  onClick: (event: React.MouseEvent<HTMLButtonElement>) => void;
+  onPointerEnter: () => void;
+  onPointerLeave: () => void;
+}): React.ReactElement {
+  return (
+    <button
+      ref={buttonRef}
+      type="button"
+      data-sidebar-peek-trigger
+      aria-haspopup="true"
+      aria-expanded={open}
+      aria-controls={open ? 'sidebar-peek-panel' : undefined}
+      title={group.label}
+      onClick={onClick}
+      onPointerEnter={onPointerEnter}
+      onPointerLeave={onPointerLeave}
+      className={railButtonClass(selected, open && !selected)}
+    >
+      <span className="flex size-8 items-center justify-center">
+        <group.icon className="size-4" />
+      </span>
+      <span className="w-full truncate text-center">{group.label}</span>
+    </button>
+  );
+}
+
+// 折叠态侧栏 + 当前分组悬浮层（product/平台布局.md R-平台布局-001 /
+// design/平台布局.md §1.3 / §1.5）。展开态仍是原来的完整菜单树。
+function AdminSidebar({
+  groups,
+  currentGroupLabel,
+  currentHref,
+}: {
+  groups: NavGroup[];
+  currentGroupLabel: string | null;
+  currentHref?: string;
+}): React.ReactElement {
+  const pathname = usePathname();
+  const { state, isMobile } = useSidebar();
+  const sidebarCollapsed = state === 'collapsed';
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [peekLabel, setPeekLabel] = useState<string | null>(null);
+  const [peekPinned, setPeekPinned] = useState(false);
+  const closeTimer = useRef<number | null>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const groupButtonRefs = useRef(new Map<string, HTMLButtonElement>());
+  const peekGroup = groups.find((group) => group.label === peekLabel) ?? null;
+  const peekOpen = peekGroup !== null;
+
+  const clearCloseTimer = useCallback((): void => {
+    if (closeTimer.current !== null) {
+      window.clearTimeout(closeTimer.current);
+      closeTimer.current = null;
+    }
+  }, []);
+
+  const closePeek = useCallback((): void => {
+    clearCloseTimer();
+    setPeekLabel(null);
+    setPeekPinned(false);
+  }, [clearCloseTimer]);
+
+  const scheduleClosePeek = useCallback((): void => {
+    if (peekPinned) {
+      return;
+    }
+    clearCloseTimer();
+    closeTimer.current = window.setTimeout(() => {
+      setPeekLabel(null);
+      closeTimer.current = null;
+    }, 180);
+  }, [clearCloseTimer, peekPinned]);
+
+  const openPeek = useCallback(
+    (label: string): void => {
+      clearCloseTimer();
+      setPeekLabel(label);
+    },
+    [clearCloseTimer],
+  );
+
+  const toggleGroup = (label: string): void => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(label)) {
+        next.delete(label);
+      } else {
+        next.add(label);
+      }
+      return next;
+    });
+  };
+
+  const handleGroupClick = (group: NavGroup, event: React.MouseEvent<HTMLButtonElement>): void => {
+    if (!sidebarCollapsed) {
+      toggleGroup(group.label);
+      return;
+    }
+    if (peekPinned && peekLabel === group.label) {
+      closePeek();
+      return;
+    }
+    openPeek(group.label);
+    setPeekPinned(true);
+    if (event.detail === 0) {
+      window.setTimeout(() => {
+        panelRef.current?.querySelector<HTMLAnchorElement>('a')?.focus();
+      }, 0);
+    }
+  };
+
+  useEffect(() => {
+    closePeek();
+  }, [pathname, closePeek]);
+
+  useEffect(() => {
+    if (!sidebarCollapsed || isMobile) {
+      closePeek();
+    }
+  }, [sidebarCollapsed, isMobile, closePeek]);
+
+  useEffect(() => {
+    return () => {
+      clearCloseTimer();
+    };
+  }, [clearCloseTimer]);
+
+  useEffect(() => {
+    if (!peekOpen) {
+      return;
+    }
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key !== 'Escape') {
+        return;
+      }
+      const label = peekLabel;
+      closePeek();
+      if (label) {
+        window.setTimeout(() => {
+          groupButtonRefs.current.get(label)?.focus();
+        }, 0);
+      }
+    };
+    const onPointerDown = (event: PointerEvent): void => {
+      const target = event.target;
+      if (!(target instanceof Element)) {
+        return;
+      }
+      if (panelRef.current?.contains(target) || target.closest('[data-sidebar-peek-trigger]')) {
+        return;
+      }
+      closePeek();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    document.addEventListener('pointerdown', onPointerDown);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      document.removeEventListener('pointerdown', onPointerDown);
+    };
+  }, [peekOpen, peekLabel, closePeek]);
+
+  return (
+    <>
+      <Sidebar collapsible="icon">
+        <SidebarHeader className="h-14 flex-row items-center border-b border-border px-3 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
+          <Link
+            href="/admin/packaging-design"
+            aria-label="梅好木业"
+            title="梅好木业"
+            className="flex size-8 items-center justify-center rounded-md transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-inset"
+          >
+            <Image
+              src="/icon.svg"
+              alt="梅好木业"
+              width={28}
+              height={28}
+              unoptimized
+              className="size-7"
+            />
+          </Link>
+        </SidebarHeader>
+        <SidebarContent>
+          {sidebarCollapsed ? (
+            <SidebarMenu className="gap-0.5 px-1 py-2">
+              {groups.map((group) => (
+                <SidebarMenuItem key={group.label}>
+                  <RailGroupButton
+                    group={group}
+                    selected={currentGroupLabel === group.label}
+                    open={peekLabel === group.label}
+                    buttonRef={(node) => {
+                      if (node) {
+                        groupButtonRefs.current.set(group.label, node);
+                      } else {
+                        groupButtonRefs.current.delete(group.label);
+                      }
+                    }}
+                    onClick={(event) => handleGroupClick(group, event)}
+                    onPointerEnter={() => {
+                      if (!isMobile) {
+                        openPeek(group.label);
+                      }
+                    }}
+                    onPointerLeave={scheduleClosePeek}
+                  />
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          ) : (
+            <>
+              {groups.map((group) => {
+                const collapsed = collapsedGroups.has(group.label);
+                const selectedParent = collapsed && currentGroupLabel === group.label;
+                return (
+                  <SidebarGroup key={group.label}>
+                    <SidebarGroupLabel
+                      render={
+                        <button
+                          type="button"
+                          aria-expanded={!collapsed}
+                          className={cn(
+                            'flex h-8 w-full items-center gap-2 rounded-md px-2 text-xs transition-colors',
+                            sidebarItemStateClass({ selected: selectedParent }),
+                            sidebarItemFocusClass,
+                          )}
+                          onClick={() => toggleGroup(group.label)}
+                        >
+                          <group.icon className="size-4 shrink-0" />
+                          <span className="flex-1 truncate text-left">{group.label}</span>
+                          <ChevronDownIcon
+                            className={cn(
+                              'size-3.5 shrink-0 transition-transform',
+                              collapsed && '-rotate-90',
+                            )}
+                          />
+                        </button>
+                      }
+                    />
+                    {!collapsed ? (
+                      <SidebarMenu>
+                        {group.items.map((item) => (
+                          <SidebarMenuItem key={item.title}>
+                            <SidebarMenuButton
+                              isActive={currentHref === item.href}
+                              className="focus-visible:ring-inset"
+                              title={item.title}
+                              render={<Link href={item.href ?? '#'} aria-label={item.title} />}
+                            >
+                              <item.icon />
+                              <span>{item.title}</span>
+                            </SidebarMenuButton>
+                          </SidebarMenuItem>
+                        ))}
+                      </SidebarMenu>
+                    ) : null}
+                  </SidebarGroup>
+                );
+              })}
+            </>
+          )}
+        </SidebarContent>
+        <SidebarFooter className="border-t border-border p-2">
+          <SidebarCollapseButton />
+        </SidebarFooter>
+      </Sidebar>
+      <SidebarPeek
+        group={peekGroup}
+        currentHref={currentHref}
+        panelRef={panelRef}
+        onPointerEnter={clearCloseTimer}
+        onPointerLeave={scheduleClosePeek}
+        onNavigate={closePeek}
+      />
+    </>
   );
 }
 
@@ -152,6 +454,9 @@ function AdminShellInner({
   const mainRef = useRef<HTMLElement>(null);
   const [role, setRole] = useState<UserRole | null>(currentRole());
   const [features, setFeatures] = useState<FeatureCode[] | null>(currentFeatures());
+  const [mustChangePassword, setMustChangePassword] = useState(
+    authSession.mustChangePassword(),
+  );
   // 每个标签记住主内容区滚动位置，切回时恢复（design/平台布局.md §1.6）
   const scrollPositions = useRef(new Map<string, number>());
   const [pwdOpen, setPwdOpen] = useState(false);
@@ -171,6 +476,7 @@ function AdminShellInner({
       }
       setRole(currentRole());
       setFeatures(currentFeatures());
+      setMustChangePassword(authSession.mustChangePassword());
       if (!ok && window.location.pathname.startsWith('/admin')) {
         window.location.assign('/login');
       }
@@ -250,113 +556,15 @@ function AdminShellInner({
     el.addEventListener('scroll', onScroll, { passive: true });
     return () => el.removeEventListener('scroll', onScroll);
   }, [pathname]);
-  // 分组树状折叠（design/平台布局.md §1.3）：默认全部展开
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
-  const isGroupCollapsed = (label: string): boolean => collapsedGroups.has(label);
-  const toggleGroup = (label: string): void => {
-    setCollapsedGroups((prev) => {
-      const next = new Set(prev);
-      if (next.has(label)) {
-        next.delete(label);
-      } else {
-        next.add(label);
-      }
-      return next;
-    });
-  };
-
   return (
     <RoleProvider role={role}>
       <SidebarProvider defaultOpen={defaultSidebarOpen} className="h-svh overflow-hidden">
       <WorkbenchSidebarAutoCollapse />
-      <Sidebar collapsible="icon">
-        <SidebarHeader className="border-b border-border">
-          <span className="px-2 text-sm font-semibold">
-            <span className="group-data-[collapsible=icon]:hidden">梅好木业</span>
-            <span className="hidden group-data-[collapsible=icon]:inline">木</span>
-          </span>
-        </SidebarHeader>
-        <SidebarContent>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                isActive={pathname === homeItem.href}
-                title={homeItem.title}
-                render={<Link href={homeItem.href ?? '#'} aria-label={homeItem.title} />}
-              >
-                <homeItem.icon />
-                <span className="group-data-[collapsible=icon]:hidden">{homeItem.title}</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-          {groups.map((group) => {
-            const collapsed = isGroupCollapsed(group.label);
-            return (
-              <SidebarGroup key={group.label}>
-                <SidebarGroupLabel
-                  render={
-                    <button
-                      type="button"
-                      aria-expanded={!collapsed}
-                      className="flex h-8 w-full items-center gap-2 rounded-md px-2 text-xs font-medium text-sidebar-foreground/70 transition-colors hover:text-sidebar-foreground group-data-[collapsible=icon]:pointer-events-none"
-                      onClick={() => toggleGroup(group.label)}
-                    >
-                      <group.icon className="size-4 shrink-0" />
-                      <span className="flex-1 truncate text-left">{group.label}</span>
-                      <ChevronDownIcon
-                        className={cn('size-3.5 shrink-0 transition-transform', collapsed && '-rotate-90')}
-                      />
-                    </button>
-                  }
-                />
-                {/* 图标态：组图标按钮（展开态隐藏），点击折叠/展开该组 */}
-                <SidebarMenu className="hidden group-data-[collapsible=icon]:flex">
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      title={group.label}
-                      aria-expanded={!collapsed}
-                      onClick={() => toggleGroup(group.label)}
-                    >
-                      <group.icon />
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                </SidebarMenu>
-                {!collapsed ? (
-                  <SidebarMenu>
-                    {group.items.map((item) => (
-                      <SidebarMenuItem
-                        key={item.title}
-                        className="relative group-data-[collapsible=icon]:pl-2"
-                      >
-                        {/* 折叠为图标栏时的树状结构线：上半竖线 + 横向支线，父级 = 分组图标 */}
-                        <span
-                          aria-hidden
-                          className="pointer-events-none absolute left-0 top-0 hidden h-1/2 w-px bg-sidebar-foreground/30 group-data-[collapsible=icon]:block"
-                        />
-                        <span
-                          aria-hidden
-                          className="pointer-events-none absolute left-0 top-1/2 hidden h-px w-2 bg-sidebar-foreground/30 group-data-[collapsible=icon]:block"
-                        />
-                        <SidebarMenuButton
-                          isActive={Boolean(item.href) && current?.itemHref === item.href}
-                          title={item.title}
-                          render={<Link href={item.href ?? '#'} aria-label={item.title} />}
-                        >
-                          <item.icon />
-                          <span className="group-data-[collapsible=icon]:hidden">{item.title}</span>
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
-                    ))}
-                  </SidebarMenu>
-                ) : null}
-              </SidebarGroup>
-            );
-          })}
-        </SidebarContent>
-        <SidebarFooter className="border-t border-border p-2">
-          <SidebarCollapseButton />
-        </SidebarFooter>
-      </Sidebar>
+      <AdminSidebar
+        groups={groups}
+        currentGroupLabel={current?.groupLabel ?? null}
+        currentHref={current?.itemHref}
+      />
 
       <SidebarInset>
         <header className="min-w-0 w-full shrink-0 overflow-hidden border-b border-border">
@@ -447,6 +655,7 @@ function AdminShellInner({
           </form>
         </DialogContent>
       </Dialog>
+      <ForcePasswordChangeDialog open={mustChangePassword} />
       </SidebarProvider>
     </RoleProvider>
   );

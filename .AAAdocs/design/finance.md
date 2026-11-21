@@ -1,6 +1,6 @@
 # 财务领域实现设计（finance）
 
-> 定位：财务领域的**实现设计**（How）。需求见 `product/finance.md`（R-财务-001 / R-财务-002）。
+> 定位：财务领域的**实现设计**（How）。需求见 `product/finance.md`（R-财务-001 / R-财务-002 / R-财务-004）。
 > 全局约定见技术方案 §4（模块边界）/ §5（数据模型）/ §6（API 契约），本文件只写本领域落点，不重述约定。
 
 ---
@@ -25,11 +25,12 @@ modules/finance/
 - 本域**不建会计科目表、不建凭证表、不建事件表**（需求口径：资金流水单轨制）。
 - 收款挂客户：客户校验与名称快照经 `CustomerService.findById`（customer 模块公开接口），不直读 customer 表；允许停用客户继续收款。
 - 付款挂供应商：供应商校验与名称快照经 `SupplierService.findById`（supplier 模块公开接口），不直读 suppliers 表；允许停用供应商继续付款。
-- 应收的「累计销售」对 order 域 `sale_orders` 做**只读聚合**（不注入 OrderService，避免成环）；不写订单表；现结单按 `received_amount`、赊销单按 `total_amount` 计。
-- 应付的「累计采购」对 purchase 域 `purchase_orders` 做**只读聚合**（不注入 PurchaseService，避免成环）；不写采购表；现结单按 `paid_amount`、赊购单按 `total_amount` 计。
+- 应收的「累计销售」按 ADR-014 的受控跨域只读聚合读取 order 域 `sale_orders`（不注入 OrderService，避免成环；列级契约见技术方案 §4.4）；不写订单表；现结单按 `received_amount`、赊销单按 `total_amount` 计。
+- 应付的「累计采购」按 ADR-014 的受控跨域只读聚合读取 purchase 域 `purchase_orders`（不注入 PurchaseService，避免成环；列级契约见技术方案 §4.4）；不写采购表；现结单按 `paid_amount`、赊购单按 `total_amount` 计。
 - 应收的「期初欠款」经 `CustomerService.findOpeningDebts(ids)` 批量取得；应付的「期初应付」经 `SupplierService.findOpeningPayables(ids)` 批量取得。
 - **源单流水**：销售单现结派生的收款流水、采购单现结派生的付款流水记录 `source_type` + `source_id` + `source_code`；源单流水在财务侧只读，只能回源单修改或删除。
 - **一次录入**：销售单现结与采购单现结分别在其单据事务内调用本模块公开方法生成 / 同步 / 软删流水，不出现两处手工录入。
+- **跨域只读边界**：仅限技术方案 §4.4 清单内的表与列，且只读；新增跨域读取须先登记 ADR-014 与 §4.4，不得扩大读取范围。
 
 ## 2. 数据模型概览
 
@@ -38,7 +39,7 @@ modules/finance/
 | 表 | 字段要点 | 备注 |
 | --- | --- | --- |
 | `finance_accounts` | 账户编号（唯一）、名称、类型（对公/对私）、渠道、期初余额、启用状态 | 编号唯一按租户复合；列表不返回已删除账户（软删 `deletedAt`），历史流水保留账户名、编号不回收；余额不落库、按流水实时计算；类型与渠道级联，服务端校验组合 |
-| `finance_cash_entries` | 流水编号（唯一）、方向（收/付/转账）、发生日期、金额（正数）、账户 id、转入账户 id（转账）、收支分类、客户 id + 客户名快照、供应商 id + 供应商名快照、方式、备注、源单类型 / id / 编号 | 账户 / 转入账户外键（转出 `RESTRICT`、转入 `SET NULL`）；`occurred_date`、`account_id`、`customer_id`、`supplier_id`、`category` 建索引；软删除；源单唯一 `(tenant_id, source_type, source_id)`，手工流水三列 NULL；方式由账户渠道推导 |
+| `finance_cash_entries` | 流水编号（唯一）、方向（进账 / 出账 / 内部转账）、发生日期、金额（正数）、账户 id、转入账户 id（转账）、收支分类、客户 id + 客户名快照、供应商 id + 供应商名快照、方式、备注、源单类型 / id / 编号 | 账户 / 转入账户外键（转出 `RESTRICT`、转入 `SET NULL`）；`occurred_date`、`account_id`、`customer_id`、`supplier_id`、`category` 建索引；软删除；源单唯一 `(tenant_id, source_type, source_id)`，手工流水三列 NULL；方式由账户渠道推导 |
 | `sale_orders` | 结算方式（`CREDIT` / `SETTLED`）、实收金额（`received_amount`）、收款账户 id 快照 | 合计金额仍为原价；现结时实收默认合计、可改 |
 
 - 枚举 `finance_cash_category`：`SALES_RECEIPT` / `OTHER_REVENUE` / `LOAN_IN` / `PURCHASE_PAYMENT` / `LABOR_COST` / `OPERATING_EXPENSE` / `ASSET_PURCHASE` / `LOAN_REPAY`；接口层用小写（`sales_receipt` 等）；内部转账为 NULL
@@ -73,7 +74,7 @@ modules/finance/
 
 | 接口 | 路径 | 用途 |
 | --- | --- | --- |
-| summary | `GET /api/v1/finance/summary?dateFrom&dateTo` | 经营收支汇总：销售收入 / 其他收入 / 采购支出 / 工资 / 费用 / 总收入 / 总支出 / 净额 / 条数 / 分类小计（实时聚合，销售单与采购单只读聚合 + 流水分类） |
+| summary | `GET /api/v1/finance/summary?dateFrom&dateTo` | 经营收支汇总：销售收入 / 其他收入 / 采购支出 / 工资 / 费用 / 总收入 / 总支出 / 净额 / 条数 / 分类小计（实时聚合，销售单与采购单按 ADR-014 受控只读聚合 + 流水分类） |
 | accounts | `GET /api/v1/finance/accounts` | 资金账户列表（不分页，含每个账户实时余额与流水条数 `entryCount`） |
 | account-create | `POST /api/v1/finance/accounts` | 新建账户（类型 / 渠道级联 / 期初余额 / 启用状态） |
 | account-update | `PUT /api/v1/finance/accounts/:id` | 更新账户（名称 / 类型 / 渠道 / 期初 / 启用；状态切换由列表行操作提交整行字段） |
@@ -95,7 +96,7 @@ modules/finance/
 - `update`：按源单定位流水，同步日期、金额、账户、客户 / 供应商、备注；现结改赊销 / 赊购软删流水，赊销 / 赊购改现结补建；源单缺失则补建（容错）
 - `remove` / `batch-delete`：按源单软删流水
 - 源单唯一约束兜底防重复；源单流水在财务侧只读（不可编辑 / 删除）
-- 销售收入由收支汇总对销售单只读聚合、采购支出对采购单只读聚合；工资、费用由流水分类承载，order / purchase 不参与
+- 销售收入由收支汇总按 ADR-014 对销售单受控只读聚合、采购支出对采购单受控只读聚合；工资、费用由流水分类承载，order / purchase 不参与
 
 ## 7. 前端实现节（web）
 
@@ -230,6 +231,13 @@ modules/finance/
 | 3 计算规则 · 账户余额 / 资金汇总 | 修改 | 余额 = 期初 + 收款 − 付款 + 转入 − 转出；期间收款 = Σ`IN`，期间付款 = Σ`OUT`，净流入 = 收款 − 付款 | 余额 = 期初 + 进账 − 出账 + 转入 − 转出；期间进账 = Σ`IN`，期间出账 = Σ`OUT`，净流入 = 进账 − 出账 | 方向标签改为进账 / 出账，计算规则文案同步；字段名与枚举不变 |
 | 5 接口清单 · cash-entries / cash-summary | 修改 | 列表 `summary` 含收款 / 付款 / 净额；cash-summary 描述「期间收款 / 付款」 | 改为进账 / 出账；响应字段 `receipts` / `payments` / `net` 不变 | 仅契约描述随标签同步，不影响数据结构 |
 | 7 前端实现节 · 汇总页 / 流水页 / 表单 / 口径弹窗 | 修改 | 方向选项与指标卡写「收款 / 付款」，合计行「收款 / 付款」，弹窗「收款侧 / 付款侧」 | 全部改为「进账 / 出账」；方向选项统一取 `FINANCE_CASH_DIRECTION_LABELS`，不再硬编码 | 消除同页两套词与硬编码漂移 |
+
+### v20261120
+
+| 位置 | 类型 | 原本 | 现在 | 原因 |
+| --- | --- | --- | --- | --- |
+| 1 模块结构 / 5 接口清单 / 6 联动 | 修改 | 应收 / 应付 / 收支汇总对 `sale_orders` / `purchase_orders` 做只读聚合，未声明边界依据 | 改为按 ADR-014 的受控跨域只读聚合，列级契约见技术方案 §4.4；新增读取须先登记 | 消除与 ADR-001 / 技术方案 §4.2 的直接冲突，把例外收窄到白名单 |
+| 文首需求引用 / 2 数据模型概览 | 修改 | 需求范围写 R-财务-001 / R-财务-002；流水方向写收 / 付 / 转账 | 范围补 R-财务-004；方向改为进账 / 出账 / 内部转账 | 应付已落地，方向标签已统一 |
 
 ---
 

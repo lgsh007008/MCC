@@ -44,7 +44,7 @@ export default function OpsTenantNewPage(): React.ReactElement {
   usePageCrumb([{ title: '新建' }]);
   const router = useRouter();
   const [form, setForm] = useState({ name: '', planId: '', note: '' });
-  const [adminForm, setAdminForm] = useState({ username: 'admin', password: '' });
+  const [adminForm, setAdminForm] = useState({ username: 'admin', phone: '', password: '' });
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -159,17 +159,29 @@ export default function OpsTenantNewPage(): React.ReactElement {
         </section>
 
         <section className="rounded-lg border border-border bg-card p-4">
-          <h2 className="text-sm font-semibold">首管理员账号</h2>
+          <h2 className="text-sm font-semibold">首管理员</h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            开通后以「租户编号 + 账号 + 密码」登录；如创建失败，可在租户详情补建。
+            手机号是登录标识；开通后线下告知初始密码，首次登录必须改密。如创建失败，可在租户详情补建。
           </p>
           <div className="mt-3 grid gap-3 xl:grid-cols-2">
-            <Field label="账号" htmlFor="adminUsername">
+            <Field label="姓名" htmlFor="adminUsername">
               <Input
                 id="adminUsername"
                 className="w-full max-w-72"
                 value={adminForm.username}
                 onChange={(event) => setAdminForm({ ...adminForm, username: event.target.value })}
+                autoComplete="off"
+              />
+            </Field>
+            <Field label="手机号" htmlFor="adminPhone">
+              <Input
+                id="adminPhone"
+                type="tel"
+                inputMode="numeric"
+                className="w-full max-w-72"
+                value={adminForm.phone}
+                onChange={(event) => setAdminForm({ ...adminForm, phone: event.target.value })}
+                placeholder="请输入 11 位手机号"
                 autoComplete="off"
               />
             </Field>

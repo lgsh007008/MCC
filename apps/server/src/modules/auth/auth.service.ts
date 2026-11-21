@@ -1,6 +1,7 @@
-﻿import { Injectable } from '@nestjs/common';
+﻿import { Injectable, Logger } from '@nestjs/common';
 import { createHash, randomBytes } from 'node:crypto';
-import type { ChangePasswordInput, LoginInput, UserRole } from '@mcc/shared';
+import { Prisma } from '@mcc/db';
+import type { ChangePasswordInput, LoginInput, RegisterInput, UserRole } from '@mcc/shared';
 import { isUserRole } from '@mcc/shared';
 import { hash as hashPassword, verify as verifyPassword } from '@node-rs/argon2';
 import jwt, { type JwtPayload } from 'jsonwebtoken';
@@ -28,6 +29,7 @@ export interface LoginResult {
   rememberMe: boolean;
   username: string;
   role: UserRole;
+  mustChangePassword: boolean;
   // 有效功能（套餐 ∪ 覆盖）：前端菜单按 feature ∩ scope 裁剪（design/账号与权限.md §7）
   features: string[];
 }
@@ -44,33 +46,37 @@ const sha256 = (value: string): string => createHash('sha256').update(value).dig
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
     private readonly tenants: TenantService,
   ) {}
 
-  // 登录：租户编号解析租户（不存在 / 停用与凭证错误统一提示）→ 租户作用域内校验账号
-  // → Redis 失败计数锁定（5 次 / 15 分钟）→ 签发带租户与 epoch 的双令牌。
+  // 登录：手机号反查用户与租户（未知手机号 / 停用租户 / 凭证错误统一提示）
+  // → 租户作用域内校验账号 → Redis 失败计数锁定（5 次 / 15 分钟）→ 签发带租户与 epoch 的双令牌。
   async login(input: LoginInput): Promise<LoginResult> {
-    const failKey = loginFailKey(input.tenantCode, input.username);
+    const failKey = loginFailKey(input.phone);
     await this.assertNotLocked(failKey);
 
-    const tenant = await this.tenants.findByCode(input.tenantCode);
-    const active = tenant !== null && tenant.status === 'active';
-    const user = active
-      ? await runWithTenant(tenant.id, async () => {
-          const row = await this.prisma.client.user.findFirst({
-            where: { username: input.username, deletedAt: null },
-          });
-          return row;
-        })
+    const ref = await this.findUserRefByPhone(input.phone);
+    const tenant = ref
+      ? await this.tenants.assertActiveById(ref.tenantId).catch(() => null)
       : null;
+    const user =
+      tenant && ref
+        ? await runWithTenant(tenant.id, async () => {
+            return this.prisma.client.user.findFirst({
+              where: { id: ref.id, deletedAt: null },
+            });
+          })
+        : null;
     const passwordOk = user ? await verifyPassword(user.passwordHash, input.password) : false;
 
-    if (!active || !user || !passwordOk) {
+    if (!tenant || !user || !passwordOk) {
       await this.recordFailure(failKey);
-      throw problem(401, 'INVALID_CREDENTIALS', '账号或密码错误');
+      throw problem(401, 'INVALID_CREDENTIALS', '手机号或密码错误');
     }
     if (user.status !== 'ACTIVE') {
       throw problem(401, 'ACCOUNT_INACTIVE', '账号已停用，请联系管理员');
@@ -78,9 +84,72 @@ export class AuthService {
 
     await this.redis.del(failKey);
 
-    const rememberMe = input.rememberMe;
+    return this.issueSession(user, tenant, input.rememberMe);
+  }
+
+  // 自助注册（R-账号与权限-005 / design/账号与权限.md §9）：
+  // 反枚举 → tenant 开通标准版租户 → 本租户作用域内建首管理员 → 复用登录签发会话。
+  // 首管理员创建失败时把新租户置为停用，避免留下启用但无管理员的租户。
+  async register(input: RegisterInput): Promise<LoginResult> {
+    this.assertRegistrationOpen();
+
+    if (await this.findUserRefByPhone(input.phone)) {
+      throw problem(409, 'PHONE_TAKEN', '该手机号已注册，请直接登录');
+    }
+
+    const passwordHash = await hashPassword(input.password);
+    const tenant = await this.tenants.createSelfRegistered(input.companyName);
+
+    let user: {
+      id: string;
+      username: string;
+      role: UserRole;
+      mustChangePassword: boolean;
+    };
+    try {
+      user = await runWithTenant(tenant.id, async () => {
+        return this.prisma.client.user.create({
+          data: {
+            tenantId: tenant.id,
+            username: input.username,
+            phone: input.phone,
+            phoneVerifiedAt: null,
+            passwordHash,
+            role: 'ADMIN',
+            status: 'ACTIVE',
+            mustChangePassword: false,
+          },
+          select: {
+            id: true,
+            username: true,
+            role: true,
+            mustChangePassword: true,
+          },
+        });
+      });
+    } catch (error) {
+      await this.tenants.setStatus(tenant.id, { status: 'suspended' }).catch((cause: unknown) => {
+        this.logger.error(
+          `自助注册失败后停用租户 ${tenant.id} 失败：${cause instanceof Error ? cause.message : String(cause)}`,
+        );
+      });
+      // 并发下同一手机号被抢先注册：唯一约束兜底，仍按反枚举口径提示
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw problem(409, 'PHONE_TAKEN', '该手机号已注册，请直接登录');
+      }
+      throw error;
+    }
+
+    return this.issueSession(user, tenant, input.rememberMe);
+  }
+
+  // 登录与自助注册共用的会话签发：刷新令牌（前缀带租户 id）+ 有效功能 + 访问令牌。
+  private async issueSession(
+    user: { id: string; username: string; role: UserRole; mustChangePassword: boolean },
+    tenant: TenantSummary,
+    rememberMe: boolean,
+  ): Promise<LoginResult> {
     const ttlDays = rememberMe ? REFRESH_REMEMBER_TTL_DAYS : REFRESH_SESSION_TTL_DAYS;
-    // 刷新令牌前缀携带租户 id，便于刷新 / 登出先定位租户再查表（design/账号与权限.md §4）
     const refreshToken = `${tenant.id}.${randomBytes(32).toString('base64url')}`;
     await runWithTenant(tenant.id, async () => {
       await this.prisma.client.refreshToken.create({
@@ -105,14 +174,23 @@ export class AuthService {
       rememberMe,
       username: user.username,
       role: user.role,
+      mustChangePassword: user.mustChangePassword,
       features,
     };
+  }
+
+  // 登录失败审计需要租户归属：手机号命中时返回租户与显示名，未命中返回 null。
+  async findLoginAuditContext(
+    phone: string,
+  ): Promise<{ tenantId: string; username: string } | null> {
+    const ref = await this.findUserRefByPhone(phone);
+    return ref ? { tenantId: ref.tenantId, username: ref.username } : null;
   }
 
   // 刷新：按令牌前缀定位租户 → 校验租户启用与 epoch → 校验刷新令牌与账号状态 → 签发新访问令牌。
   async refresh(
     refreshToken: string | undefined,
-  ): Promise<{ accessToken: string; features: string[] }> {
+  ): Promise<{ accessToken: string; features: string[]; mustChangePassword: boolean }> {
     if (!refreshToken) {
       throw problem(401, 'TOKEN_MISSING', '缺少刷新令牌');
     }
@@ -145,6 +223,7 @@ export class AuthService {
     return {
       accessToken: this.signAccessToken(record.user, tenant),
       features: await this.tenants.getEffectiveFeatures(tenant.id),
+      mustChangePassword: record.user.mustChangePassword,
     };
   }
 
@@ -193,7 +272,10 @@ export class AuthService {
     // 单数 update 无法附加租户条件（where 为唯一键），统一走 updateMany（数据层自动注入租户条件）
     await this.prisma.client.user.updateMany({
       where: { id: userId },
-      data: { passwordHash: await hashPassword(input.newPassword) },
+      data: {
+        passwordHash: await hashPassword(input.newPassword),
+        mustChangePassword: false,
+      },
     });
     await this.prisma.client.refreshToken.updateMany({
       where: { userId, revokedAt: null },
@@ -215,6 +297,7 @@ export class AuthService {
         role?: string;
         tenantId?: string;
         tenantEpoch?: number;
+        mustChangePassword?: boolean;
       };
       if (
         !payload.sub ||
@@ -231,6 +314,7 @@ export class AuthService {
         role: payload.role,
         tenantId: payload.tenantId,
         tenantEpoch: payload.tenantEpoch,
+        mustChangePassword: payload.mustChangePassword === true,
       };
     } catch {
       throw problem(401, 'TOKEN_INVALID', '访问令牌无效或已过期');
@@ -238,7 +322,7 @@ export class AuthService {
   }
 
   private signAccessToken(
-    user: { id: string; username: string; role: UserRole },
+    user: { id: string; username: string; role: UserRole; mustChangePassword: boolean },
     tenant: TenantSummary,
   ): string {
     return jwt.sign(
@@ -247,6 +331,7 @@ export class AuthService {
         role: user.role,
         tenantId: tenant.id,
         tenantEpoch: tenant.sessionEpoch,
+        mustChangePassword: user.mustChangePassword,
       },
       this.jwtSecret(),
       {
@@ -257,10 +342,36 @@ export class AuthService {
     );
   }
 
+  // 登录前按全局唯一手机号定位用户与租户。User 是租户表，读取受租户扩展约束，
+  // 此处必须先做一次不带租户条件的窄查询（只取 id / tenant_id / username），
+  // 之后所有读写仍在 runWithTenant 内完成（ADR-015）。
+  private async findUserRefByPhone(
+    phone: string,
+  ): Promise<{ id: string; tenantId: string; username: string } | null> {
+    const rows = await this.prisma.client.$queryRaw<
+      Array<{ id: string; tenantId: string; username: string }>
+    >(
+      Prisma.sql`
+        SELECT "id", "tenant_id" AS "tenantId", "username"
+        FROM "users"
+        WHERE "phone" = ${phone} AND "deleted_at" IS NULL
+        LIMIT 1
+      `,
+    );
+    return rows[0] ?? null;
+  }
+
   // 刷新令牌格式 `${tenantId}.${random}`；租户 id 为 uuid 或首个租户的历史值 default
   private tenantIdOf(token: string): string | null {
     const index = token.indexOf('.');
     return index > 0 ? token.slice(0, index) : null;
+  }
+
+  // 开放开关：未设置或非 false 即开放（本地 / 测试默认开启，生产由部署环境显式控制）
+  private assertRegistrationOpen(): void {
+    if (process.env.REGISTRATION_OPEN === 'false') {
+      throw problem(403, 'REGISTRATION_CLOSED', '当前未开放自助注册，请联系平台运营开通');
+    }
   }
 
   private async assertNotLocked(failKey: string): Promise<void> {

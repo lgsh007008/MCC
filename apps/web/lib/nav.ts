@@ -9,7 +9,6 @@ import {
   FactoryIcon,
   FileTextIcon,
   FrameIcon,
-  HomeIcon,
   LayersIcon,
   ListChecksIcon,
   RulerIcon,
@@ -27,7 +26,7 @@ import { hasScope, type FeatureCode, type Scope, type UserRole } from '@mcc/shar
 // 菜单清单集中在此维护，随 `product/平台布局.md` R-平台布局-001 菜单表更新而更新。
 // 菜单只登记已建领域分组；未建领域分组不列入（登记规则见 product/平台布局.md 菜单结构与领域归属）。
 // 每项必须带图标（折叠为图标栏时只显示图标，见 product/平台布局.md 整体布局）。
-// 图标全局不重复：首页、各业务分组、各菜单项之间不得复用同一图标（分组与其子项尤其不能同图标）。
+// 图标全局不重复：各业务分组、各菜单项之间不得复用同一图标（分组与其子项尤其不能同图标）。
 // 菜单项声明 scope 与 feature：壳按「feature ∩ scope」过滤（product/账号与权限.md R-账号与权限-003）。
 
 export interface NavItem {
@@ -50,19 +49,8 @@ export interface NavGroup {
   items: NavItem[];
 }
 
-// 首页（登录后落地页）：独立菜单项置顶，不属业务分组；静态欢迎页归 platform 领域
-export const homeItem: NavItem = { title: '首页', icon: HomeIcon, href: '/admin' };
-
+// 当前阶段（v20261121）不设独立首页菜单项：包装设计为 PC 默认落地页与首页标签，设计分组置顶。
 export const navGroups: NavGroup[] = [
-  {
-    label: '销售',
-    domain: 'order',
-    icon: ShoppingCartIcon,
-    items: [
-      { title: '销售单', icon: FileTextIcon, href: '/admin/sale-orders', scope: 'order:view', feature: 'order' },
-      { title: '客户档案', icon: UsersIcon, href: '/admin/customers', scope: 'customer:view', feature: 'customer' },
-    ],
-  },
   {
     label: '设计',
     domain: 'packaging',
@@ -75,6 +63,15 @@ export const navGroups: NavGroup[] = [
         scope: 'packaging:view',
         feature: 'packaging_design',
       },
+    ],
+  },
+  {
+    label: '销售',
+    domain: 'order',
+    icon: ShoppingCartIcon,
+    items: [
+      { title: '销售单', icon: FileTextIcon, href: '/admin/sale-orders', scope: 'order:view', feature: 'order' },
+      { title: '客户档案', icon: UsersIcon, href: '/admin/customers', scope: 'customer:view', feature: 'customer' },
     ],
   },
   {
@@ -174,9 +171,6 @@ export interface NavMatch {
 /** 按当前路径反查面包屑（分组 / 菜单项标题）；子路径归到所属菜单项。
  *  最长 href 优先：父子路径同前缀时只匹配最具体的一项（design/平台布局.md §1.3）。 */
 export function findNavByPath(pathname: string): NavMatch | null {
-  if (homeItem.href && pathname === homeItem.href) {
-    return { groupLabel: '首页', itemTitle: '', itemHref: homeItem.href };
-  }
   const candidates: Array<{ groupLabel: string; item: NavItem }> = [];
   for (const group of navGroups) {
     for (const item of group.items) {

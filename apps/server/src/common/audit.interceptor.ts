@@ -72,6 +72,29 @@ function resolveObjectCode(
   return meta?.objectType === 'user' && !hasParamId ? request.user?.username ?? null : null;
 }
 
+// 只记录 @AuditAction.payloadKeys 白名单内的标量字段，避免把请求体全文（密码 / 令牌等）写进审计。
+function pickAuditPayload(
+  request: RequestWithUser,
+  keys: readonly string[] | undefined,
+): Record<string, string | number | boolean | null> {
+  const payload: Record<string, string | number | boolean | null> = {};
+  if (!keys?.length || !isRecord(request.body)) {
+    return payload;
+  }
+  for (const key of keys) {
+    const value = request.body[key];
+    if (
+      value === null ||
+      typeof value === 'string' ||
+      typeof value === 'number' ||
+      typeof value === 'boolean'
+    ) {
+      payload[key] = value;
+    }
+  }
+  return payload;
+}
+
 @Injectable()
 export class AuditInterceptor implements NestInterceptor {
   constructor(
@@ -161,7 +184,11 @@ export class AuditInterceptor implements NestInterceptor {
       ip: requestMeta.ip,
       userAgent: requestMeta.userAgent,
       requestId: requestMeta.requestId,
-      payload: { method: request.method, path: request.path },
+      payload: {
+        method: request.method,
+        path: request.path,
+        ...pickAuditPayload(request, input.meta?.payloadKeys),
+      },
     });
   }
 }

@@ -1,7 +1,7 @@
 import type { PackagingPartInput } from '../packaging.schemas';
-import type { PalletComponentInput } from '../pallet.schemas';
-import type { PalletGeometry, PalletPiece } from '../pallet.geometry';
-import type { PalletIssue } from '../pallet.validation';
+import type { PalletComponentInput } from './pallet/schemas';
+import type { PalletGeometry, PalletPiece } from './pallet/geometry';
+import type { PalletIssue } from './pallet/validation';
 
 // 垫木 G 型（product/包装设计.md R-包装设计-022）：
 // 支撑 / 隔离 / 加固用的梁件，没有箱体与围挡；平行或交叉排列，

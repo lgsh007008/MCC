@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from '../src/app.module.js';
 import { API_PREFIX } from '../src/common/api-prefix.js';
 import { PrismaService } from '../src/common/prisma.service.js';
-import { scopedClient, TEST_TENANT_CODE, TEST_TENANT_ID } from './helpers.js';
+import { scopedClient, TEST_TENANT_ID } from './helpers.js';
 
 // 账号管理与 RBAC（product/账号与权限.md R-002 / R-003；技术方案 §8.2）：
 // 账号接口仅管理员可用；工人只读（订单可看、写与客户/财务/账号拒绝）；
@@ -25,11 +25,13 @@ describe('账号管理与 RBAC（契约/集成）', () => {
   const password = 'Secret#12345';
   const adminName = `it-user-admin-${stamp}`;
   const workerName = `it-user-worker-${stamp}`;
+  const adminPhone = `137${String(stamp).slice(-8)}`;
+  const workerPhone = `136${String(stamp).slice(-8)}`;
+  const salesPhone = `135${String(stamp).slice(-8)}`;
 
-  const login = async (username: string, pwd: string) => {
+  const login = async (phone: string, pwd: string) => {
     return request(app.getHttpServer()).post(`/${API_PREFIX}/auth/login`).send({
-      tenantCode: TEST_TENANT_CODE,
-      username,
+      phone,
       password: pwd,
       rememberMe: false,
     });
@@ -47,6 +49,7 @@ describe('账号管理与 RBAC（契约/集成）', () => {
       data: {
         tenantId: TEST_TENANT_ID,
         username: adminName,
+        phone: adminPhone,
         passwordHash: await hash(password),
         role: 'ADMIN',
       },
@@ -56,16 +59,17 @@ describe('账号管理与 RBAC（契约/集成）', () => {
       data: {
         tenantId: TEST_TENANT_ID,
         username: workerName,
+        phone: workerPhone,
         passwordHash: await hash(password),
         role: 'WORKER',
       },
     });
     workerId = worker.id;
 
-    const adminLogin = await login(adminName, password);
+    const adminLogin = await login(adminPhone, password);
     expect(adminLogin.status).toBe(200);
     adminToken = adminLogin.body.accessToken as string;
-    const workerLogin = await login(workerName, password);
+    const workerLogin = await login(workerPhone, password);
     expect(workerLogin.status).toBe(200);
     workerToken = workerLogin.body.accessToken as string;
   });
@@ -109,20 +113,32 @@ describe('账号管理与 RBAC（契约/集成）', () => {
   it('管理员新建账号；重名 409；列表不含密码', async () => {
     const created = await auth(http().post(`/${API_PREFIX}/users`), adminToken).send({
       username: `it-user-sales-${stamp}`,
+      phone: salesPhone,
       password,
       role: 'SALES',
     });
     expect(created.status).toBe(201);
     expect(created.body.role).toBe('SALES');
     expect(created.body.status).toBe('active');
+    expect(created.body.phone).toBe(salesPhone);
 
     const duplicate = await auth(http().post(`/${API_PREFIX}/users`), adminToken).send({
       username: `it-user-sales-${stamp}`,
+      phone: `134${String(stamp).slice(-8)}`,
       password,
       role: 'SALES',
     });
     expect(duplicate.status).toBe(409);
     expect(duplicate.body.code).toBe('USERNAME_TAKEN');
+
+    const phoneTaken = await auth(http().post(`/${API_PREFIX}/users`), adminToken).send({
+      username: `it-user-sales2-${stamp}`,
+      phone: salesPhone,
+      password,
+      role: 'SALES',
+    });
+    expect(phoneTaken.status).toBe(409);
+    expect(phoneTaken.body.code).toBe('PHONE_TAKEN');
 
     const list = await auth(http().get(`/${API_PREFIX}/users`), adminToken).query({
       page: 1,
@@ -149,12 +165,12 @@ describe('账号管理与 RBAC（契约/集成）', () => {
     expect(disabled.status).toBe(200);
     expect(disabled.body.status).toBe('inactive');
 
-    const rejected = await login(workerName, password);
+    const rejected = await login(workerPhone, password);
     expect(rejected.status).toBe(401);
     expect(rejected.body.code).toBe('ACCOUNT_INACTIVE');
   });
 
-  it('重置密码：旧密码失效、新密码可登录；改角色后按新角色授权', async () => {
+  it('重置密码：旧密码失效、新密码首次登录需改密；改角色后按新角色授权', async () => {
     const enabled = await auth(
       http().patch(`/${API_PREFIX}/users/${workerId}/status`),
       adminToken,
@@ -167,9 +183,28 @@ describe('账号管理与 RBAC（契约/集成）', () => {
     ).send({ password: 'NewSecret#123' });
     expect(reset.status).toBe(204);
 
-    expect((await login(workerName, password)).status).toBe(401);
-    const relogin = await login(workerName, 'NewSecret#123');
+    expect((await login(workerPhone, password)).status).toBe(401);
+    const relogin = await login(workerPhone, 'NewSecret#123');
     expect(relogin.status).toBe(200);
+    expect(relogin.body.mustChangePassword).toBe(true);
+
+    // 待改密期间业务接口被拦截
+    const blocked = await auth(
+      http().get(`/${API_PREFIX}/finance/cash-entries`),
+      relogin.body.accessToken as string,
+    );
+    expect(blocked.status).toBe(403);
+    expect(blocked.body.code).toBe('PASSWORD_CHANGE_REQUIRED');
+
+    const change = await auth(
+      http().post(`/${API_PREFIX}/auth/change-password`),
+      relogin.body.accessToken as string,
+    ).send({ oldPassword: 'NewSecret#123', newPassword: 'FinalSecret#123' });
+    expect(change.status).toBe(204);
+
+    const finalLogin = await login(workerPhone, 'FinalSecret#123');
+    expect(finalLogin.status).toBe(200);
+    expect(finalLogin.body.mustChangePassword).toBe(false);
 
     const changed = await auth(
       http().patch(`/${API_PREFIX}/users/${workerId}/role`),
@@ -178,7 +213,8 @@ describe('账号管理与 RBAC（契约/集成）', () => {
     expect(changed.status).toBe(200);
     expect(changed.body.role).toBe('FINANCE');
 
-    const financeToken = (await login(workerName, 'NewSecret#123')).body.accessToken as string;
+    const financeLogin = await login(workerPhone, 'FinalSecret#123');
+    const financeToken = financeLogin.body.accessToken as string;
     expect((await auth(http().get(`/${API_PREFIX}/finance/cash-entries`), financeToken)).status).toBe(200);
     expect((await auth(http().get(`/${API_PREFIX}/customers`), financeToken)).status).toBe(200);
   });

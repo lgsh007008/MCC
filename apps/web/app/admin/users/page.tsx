@@ -7,6 +7,7 @@ import {
   ROLE_LABELS,
   USER_ROLES,
   userCreateSchema,
+  userPhoneInputSchema,
   userResetPasswordSchema,
   type ApiSchemas,
   type UserRoleValue,
@@ -51,6 +52,9 @@ const EMPTY_LIST: ApiSchemas['UserListDto'] = {
 
 const roleOptions = USER_ROLES.map((role) => ({ value: role, label: ROLE_LABELS[role] }));
 
+const maskPhone = (phone: string | null): string =>
+  phone ? `${phone.slice(0, 3)}****${phone.slice(-4)}` : '—';
+
 export default function UsersPage(): React.ReactElement {
   const confirm = useConfirm();
   const queryClient = useQueryClient();
@@ -64,10 +68,17 @@ export default function UsersPage(): React.ReactElement {
 
   const [createOpen, setCreateOpen] = useState(false);
   const [permissionsOpen, setPermissionsOpen] = useState(false);
-  const [createForm, setCreateForm] = useState({ username: '', password: '', role: 'SALES' as UserRoleValue });
+  const [createForm, setCreateForm] = useState({
+    username: '',
+    phone: '',
+    password: '',
+    role: 'SALES' as UserRoleValue,
+  });
 
   const [resetTarget, setResetTarget] = useState<UserRow | null>(null);
   const [resetPassword, setResetPassword] = useState('');
+  const [phoneTarget, setPhoneTarget] = useState<UserRow | null>(null);
+  const [phoneValue, setPhoneValue] = useState('');
   const [roleTarget, setRoleTarget] = useState<UserRow | null>(null);
   const [roleValue, setRoleValue] = useState<UserRoleValue>('SALES');
   const [submitting, setSubmitting] = useState(false);
@@ -136,8 +147,8 @@ export default function UsersPage(): React.ReactElement {
         return;
       }
       setCreateOpen(false);
-      setCreateForm({ username: '', password: '', role: 'SALES' });
-      setNotice('账号已创建');
+      setCreateForm({ username: '', phone: '', password: '', role: 'SALES' });
+      setNotice('账号已创建，首次登录需修改初始密码');
       setPage(1);
       await queryClient.invalidateQueries({ queryKey: ['users'] });
     } finally {
@@ -170,7 +181,39 @@ export default function UsersPage(): React.ReactElement {
       }
       setResetTarget(null);
       setResetPassword('');
-      setNotice('密码已重置，该账号需重新登录');
+      setNotice('密码已重置，该账号需重新登录并修改密码');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleUpdatePhone(event: React.FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
+    if (!phoneTarget) {
+      return;
+    }
+    setNotice(null);
+    setActionError(null);
+    const parsed = userPhoneInputSchema.safeParse({ phone: phoneValue });
+    if (!parsed.success) {
+      setActionError(parsed.error.issues[0]?.message ?? '输入不合法');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const { response } = await api.PATCH('/api/v1/users/{id}/phone', {
+        params: { path: { id: phoneTarget.id } },
+        body: parsed.data,
+      });
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as { message?: string } | null;
+        setActionError(body?.message ?? '修改失败，请稍后重试');
+        return;
+      }
+      setPhoneTarget(null);
+      setPhoneValue('');
+      setNotice('手机号已修改，该账号需用新手机号重新登录');
+      await reload();
     } finally {
       setSubmitting(false);
     }
@@ -236,11 +279,11 @@ export default function UsersPage(): React.ReactElement {
     <div className="flex h-full min-h-0 flex-col gap-4">
       <form className="flex flex-wrap items-center gap-4" onSubmit={handleQuery}>
         <div className="flex items-center gap-2">
-          <span className="shrink-0 whitespace-nowrap text-xs text-muted-foreground">账号</span>
+          <span className="shrink-0 whitespace-nowrap text-xs text-muted-foreground">姓名/手机号</span>
           <Input
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
-            placeholder="账号名模糊"
+            placeholder="姓名或手机号模糊"
             className="h-8 w-48"
           />
         </div>
@@ -276,7 +319,8 @@ export default function UsersPage(): React.ReactElement {
         <Table containerClassName="h-full overflow-y-auto">
           <TableHeader className="sticky top-0 z-10 [&_th]:bg-muted">
             <TableRow>
-              <TableHead>账号</TableHead>
+              <TableHead>姓名</TableHead>
+              <TableHead>手机号</TableHead>
               <TableHead>角色</TableHead>
               <TableHead>状态</TableHead>
               <TableHead>创建日期</TableHead>
@@ -286,13 +330,13 @@ export default function UsersPage(): React.ReactElement {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center text-muted-foreground">
+                <TableCell colSpan={6} className="text-center text-muted-foreground">
                   加载中…
                 </TableCell>
               </TableRow>
             ) : items.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center text-muted-foreground">
+                <TableCell colSpan={6} className="text-center text-muted-foreground">
                   暂无账号
                 </TableCell>
               </TableRow>
@@ -300,6 +344,7 @@ export default function UsersPage(): React.ReactElement {
               items.map((user) => (
                 <TableRow key={user.id}>
                   <TableCell className="tabular-nums">{user.username}</TableCell>
+                  <TableCell className="tabular-nums">{maskPhone(user.phone)}</TableCell>
                   <TableCell>{user.roleLabel}</TableCell>
                   <TableCell>{user.status === 'active' ? '启用' : '停用'}</TableCell>
                   <TableCell className="tabular-nums">{user.createdAt.slice(0, 10)}</TableCell>
@@ -315,6 +360,17 @@ export default function UsersPage(): React.ReactElement {
                         }}
                       >
                         重置密码
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setPhoneTarget(user);
+                          setPhoneValue(user.phone ?? '');
+                        }}
+                      >
+                        修改手机号
                       </Button>
                       <Button
                         type="button"
@@ -372,15 +428,29 @@ export default function UsersPage(): React.ReactElement {
         <DialogContent className="sm:max-w-[520px]">
           <DialogHeader>
             <DialogTitle>新建账号</DialogTitle>
-            <DialogDescription>账号按使用人一人一号；创建后请告知本人并及时修改初始密码。</DialogDescription>
+            <DialogDescription>
+              手机号是登录标识；创建后请线下告知初始密码，首次登录必须改密。
+            </DialogDescription>
           </DialogHeader>
           <form className="space-y-3" onSubmit={handleCreate}>
             <div className="space-y-2">
-              <Label htmlFor="newUsername">账号</Label>
+              <Label htmlFor="newUsername">姓名</Label>
               <Input
                 id="newUsername"
                 value={createForm.username}
                 onChange={(e) => setCreateForm((prev) => ({ ...prev, username: e.target.value }))}
+                autoComplete="off"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="newPhone">手机号</Label>
+              <Input
+                id="newPhone"
+                type="tel"
+                inputMode="numeric"
+                value={createForm.phone}
+                onChange={(e) => setCreateForm((prev) => ({ ...prev, phone: e.target.value }))}
+                placeholder="请输入 11 位手机号"
                 autoComplete="off"
               />
             </div>
@@ -442,6 +512,39 @@ export default function UsersPage(): React.ReactElement {
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setResetTarget(null)}>
+                取消
+              </Button>
+              <Button type="submit" disabled={submitting}>
+                {submitting ? '保存中…' : '保存'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={phoneTarget !== null} onOpenChange={(open) => !open && setPhoneTarget(null)}>
+        <DialogContent className="sm:max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle>修改手机号</DialogTitle>
+            <DialogDescription>
+              修改 {phoneTarget?.username} 的登录手机号；保存后该账号需用新手机号重新登录。
+            </DialogDescription>
+          </DialogHeader>
+          <form className="space-y-3" onSubmit={handleUpdatePhone}>
+            <div className="space-y-2">
+              <Label htmlFor="phoneValue">新手机号</Label>
+              <Input
+                id="phoneValue"
+                type="tel"
+                inputMode="numeric"
+                value={phoneValue}
+                onChange={(event) => setPhoneValue(event.target.value)}
+                placeholder="请输入 11 位手机号"
+                autoComplete="off"
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setPhoneTarget(null)}>
                 取消
               </Button>
               <Button type="submit" disabled={submitting}>

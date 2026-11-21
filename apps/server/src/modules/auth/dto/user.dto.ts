@@ -4,7 +4,9 @@ import { ApiProperty } from '@nestjs/swagger';
 
 export class UserDto {
   @ApiProperty({ type: String, description: '账号 id' }) id!: string;
-  @ApiProperty({ type: String, description: '账号名' }) username!: string;
+  @ApiProperty({ type: String, description: '姓名/显示名' }) username!: string;
+  @ApiProperty({ type: String, nullable: true, description: '手机号（登录标识；停用账号可为空）' })
+  phone!: string | null;
   @ApiProperty({ type: String, enum: ['ADMIN', 'SALES', 'FINANCE', 'WORKER'], description: '角色' })
   role!: string;
   @ApiProperty({ type: String, description: '角色显示名' }) roleLabel!: string;
@@ -25,14 +27,22 @@ export class UserListDto {
 }
 
 export class UserCreateBodyDto {
-  @ApiProperty({ type: String, description: '账号（租户内唯一）', example: 'sales01' })
+  @ApiProperty({ type: String, description: '姓名/显示名（租户内唯一）', example: '张三' })
   username!: string;
+
+  @ApiProperty({ type: String, description: '手机号（全局唯一，登录标识）', example: '13800000002' })
+  phone!: string;
 
   @ApiProperty({ type: String, description: '初始密码（至少 8 位）', example: 'Mcc@2026' })
   password!: string;
 
   @ApiProperty({ type: String, enum: ['ADMIN', 'SALES', 'FINANCE', 'WORKER'], description: '角色' })
   role!: string;
+}
+
+export class UserPhoneBodyDto {
+  @ApiProperty({ type: String, description: '新手机号（全局唯一，登录标识）', example: '13800000002' })
+  phone!: string;
 }
 
 export class UserStatusBodyDto {

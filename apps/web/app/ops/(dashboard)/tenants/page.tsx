@@ -35,13 +35,17 @@ type AccountCounts = ApiSchemas['TenantAccountCountsDto'];
 
 const PAGE_SIZE = 20;
 const EMPTY_LIST: TenantList = { total: 0, items: [] };
+const SOURCE_LABELS: Record<string, string> = {
+  ops: '运营开通',
+  self_register: '自助注册',
+};
 
 export default function OpsTenantsPage(): React.ReactElement {
   const router = useRouter();
   const confirm = useConfirm();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
-  const [filters, setFilters] = useState({ code: '', name: '', status: '', planId: '' });
+  const [filters, setFilters] = useState({ code: '', name: '', status: '', planId: '', source: '' });
   const [applied, setApplied] = useState(filters);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -73,6 +77,10 @@ export default function OpsTenantsPage(): React.ReactElement {
             name: applied.name.trim() || undefined,
             status: applied.status === 'active' || applied.status === 'suspended' ? applied.status : undefined,
             planId: applied.planId || undefined,
+            source:
+              applied.source === 'ops' || applied.source === 'self_register'
+                ? applied.source
+                : undefined,
           },
         },
       });
@@ -116,7 +124,7 @@ export default function OpsTenantsPage(): React.ReactElement {
   };
 
   const reset = (): void => {
-    const next = { code: '', name: '', status: '', planId: '' };
+    const next = { code: '', name: '', status: '', planId: '', source: '' };
     setFilters(next);
     setApplied(next);
     setPage(1);
@@ -227,6 +235,19 @@ export default function OpsTenantsPage(): React.ReactElement {
             className="w-24"
           />
         </div>
+        <div className="flex items-center gap-2">
+          <span className="shrink-0 whitespace-nowrap text-xs text-muted-foreground">来源</span>
+          <Select
+            value={filters.source}
+            onChange={(value) => setFilters({ ...filters, source: value })}
+            options={[
+              { value: '', label: '全部' },
+              { value: 'ops', label: '运营开通' },
+              { value: 'self_register', label: '自助注册' },
+            ]}
+            className="w-28"
+          />
+        </div>
         <Button type="submit" variant="secondary">
           查询
         </Button>
@@ -250,6 +271,7 @@ export default function OpsTenantsPage(): React.ReactElement {
               <TableHead>名称</TableHead>
               <TableHead>套餐</TableHead>
               <TableHead>状态</TableHead>
+              <TableHead>来源</TableHead>
               <TableHead>账号数 / 额度</TableHead>
               <TableHead>创建日期</TableHead>
               <TableHead className="text-right">操作</TableHead>
@@ -258,13 +280,13 @@ export default function OpsTenantsPage(): React.ReactElement {
           <TableBody>
             {listQuery.isPending ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-muted-foreground">
+                <TableCell colSpan={8} className="text-muted-foreground">
                   加载中…
                 </TableCell>
               </TableRow>
             ) : data.items.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-muted-foreground">
+                <TableCell colSpan={8} className="text-muted-foreground">
                   暂无租户
                 </TableCell>
               </TableRow>
@@ -275,6 +297,7 @@ export default function OpsTenantsPage(): React.ReactElement {
                   <TableCell>{row.name}</TableCell>
                   <TableCell>{row.planName}</TableCell>
                   <TableCell>{row.status === 'active' ? '启用' : '停用'}</TableCell>
+                  <TableCell>{SOURCE_LABELS[row.source] ?? row.source}</TableCell>
                   <TableCell className="tabular-nums">
                     {countsQuery.isError ? '--' : `${counts.get(row.id) ?? 0} / ${row.maxAccounts}`}
                   </TableCell>

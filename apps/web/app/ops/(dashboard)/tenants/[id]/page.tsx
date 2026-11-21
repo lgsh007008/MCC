@@ -7,6 +7,7 @@ import {
   FEATURE_LABELS,
   SELLABLE_FEATURES,
   tenantAdminCreateSchema,
+  tenantAdminPhoneInputSchema,
   tenantAdminResetPasswordSchema,
   tenantUpdateSchema,
   type ApiSchemas,
@@ -49,6 +50,14 @@ const FEATURE_OPTIONS = SELLABLE_FEATURES.map((code) => ({
   label: FEATURE_LABELS[code],
 }));
 
+const maskPhone = (phone: string | null): string =>
+  phone ? `${phone.slice(0, 3)}****${phone.slice(-4)}` : '—';
+
+const SOURCE_LABELS: Record<string, string> = {
+  ops: '运营开通',
+  self_register: '自助注册',
+};
+
 export default function OpsTenantDetailPage({
   params,
 }: {
@@ -72,9 +81,11 @@ export default function OpsTenantDetailPage({
   const [featuresOpen, setFeaturesOpen] = useState(false);
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [adminOpen, setAdminOpen] = useState(false);
-  const [adminForm, setAdminForm] = useState({ username: '', password: '' });
+  const [adminForm, setAdminForm] = useState({ username: '', phone: '', password: '' });
   const [resetTarget, setResetTarget] = useState<{ id: string; username: string } | null>(null);
   const [resetPassword, setResetPassword] = useState('');
+  const [phoneTarget, setPhoneTarget] = useState<{ id: string; username: string } | null>(null);
+  const [phoneValue, setPhoneValue] = useState('');
 
   // Next 15 的 params 为 Promise，客户端组件用 use() 解包
   const resolvedId = useMemo(() => id, [id]);
@@ -269,8 +280,8 @@ export default function OpsTenantDetailPage({
         return;
       }
       setAdminOpen(false);
-      setAdminForm({ username: '', password: '' });
-      setNotice('管理员已创建');
+      setAdminForm({ username: '', phone: '', password: '' });
+      setNotice('管理员已创建，首次登录需修改初始密码');
       await invalidate();
     } finally {
       setSubmitting(false);
@@ -303,7 +314,41 @@ export default function OpsTenantDetailPage({
       }
       setResetTarget(null);
       setResetPassword('');
-      setNotice('管理员密码已重置，该账号需重新登录');
+      setNotice('管理员密码已重置，该账号需重新登录并修改密码');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleUpdateAdminPhone(event: React.FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
+    if (!phoneTarget) {
+      return;
+    }
+    setError(null);
+    const parsed = tenantAdminPhoneInputSchema.safeParse({ phone: phoneValue });
+    if (!parsed.success) {
+      setError(parsed.error.issues[0]?.message ?? '输入不合法');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const { response } = await opsApi.PATCH(
+        '/api/v1/ops/tenants/{tenantId}/admins/{userId}/phone',
+        {
+          params: { path: { tenantId: resolvedId, userId: phoneTarget.id } },
+          body: parsed.data,
+        },
+      );
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as { message?: string } | null;
+        setError(body?.message ?? '修改失败，请稍后重试');
+        return;
+      }
+      setPhoneTarget(null);
+      setPhoneValue('');
+      setNotice('管理员手机号已修改，该账号需用新手机号重新登录');
+      await invalidate();
     } finally {
       setSubmitting(false);
     }
@@ -373,6 +418,10 @@ export default function OpsTenantDetailPage({
               <dd>{detail.status === 'active' ? '启用' : '停用'}</dd>
             </div>
             <div>
+              <dt className="text-xs text-muted-foreground">来源</dt>
+              <dd>{SOURCE_LABELS[detail.source] ?? detail.source}</dd>
+            </div>
+            <div>
               <dt className="text-xs text-muted-foreground">账号数 / 额度</dt>
               <dd className="tabular-nums">
                 {countsQuery.data ?? 0} / {detail.maxAccounts}
@@ -419,7 +468,7 @@ export default function OpsTenantDetailPage({
               variant="outline"
               size="sm"
               onClick={() => {
-                setAdminForm({ username: '', password: '' });
+                setAdminForm({ username: '', phone: '', password: '' });
                 setAdminOpen(true);
               }}
             >
@@ -430,7 +479,8 @@ export default function OpsTenantDetailPage({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>账号</TableHead>
+                  <TableHead>姓名</TableHead>
+                  <TableHead>手机号</TableHead>
                   <TableHead>状态</TableHead>
                   <TableHead>创建日期</TableHead>
                   <TableHead className="text-right">操作</TableHead>
@@ -439,7 +489,7 @@ export default function OpsTenantDetailPage({
               <TableBody>
                 {admins.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-muted-foreground">
+                    <TableCell colSpan={5} className="text-muted-foreground">
                       暂无管理员
                     </TableCell>
                   </TableRow>
@@ -447,10 +497,11 @@ export default function OpsTenantDetailPage({
                   admins.map((admin) => (
                     <TableRow key={admin.id}>
                       <TableCell>{admin.username}</TableCell>
+                      <TableCell className="tabular-nums">{maskPhone(admin.phone)}</TableCell>
                       <TableCell>{admin.status === 'active' ? '启用' : '停用'}</TableCell>
                       <TableCell className="tabular-nums">{admin.createdAt.slice(0, 10)}</TableCell>
                       <TableCell>
-                        <div className="flex justify-end">
+                        <div className="flex justify-end gap-2">
                           <Button
                             type="button"
                             variant="outline"
@@ -461,6 +512,17 @@ export default function OpsTenantDetailPage({
                             }}
                           >
                             重置密码
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setPhoneTarget({ id: admin.id, username: admin.username });
+                              setPhoneValue(admin.phone ?? '');
+                            }}
+                          >
+                            修改手机号
                           </Button>
                         </div>
                       </TableCell>
@@ -586,15 +648,27 @@ export default function OpsTenantDetailPage({
         <DialogContent className="sm:max-w-[520px]">
           <DialogHeader>
             <DialogTitle>补建管理员</DialogTitle>
-            <DialogDescription>新账号角色固定为 ADMIN，计入套餐额度。</DialogDescription>
+            <DialogDescription>新账号角色固定为 ADMIN；手机号是登录标识，创建后首次登录需改密。</DialogDescription>
           </DialogHeader>
           <form className="space-y-3" onSubmit={(event) => void handleCreateAdmin(event)}>
             <div className="space-y-2">
-              <Label htmlFor="adminName">账号</Label>
+              <Label htmlFor="adminName">姓名</Label>
               <Input
                 id="adminName"
                 value={adminForm.username}
                 onChange={(event) => setAdminForm({ ...adminForm, username: event.target.value })}
+                autoComplete="off"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="adminPhone">手机号</Label>
+              <Input
+                id="adminPhone"
+                type="tel"
+                inputMode="numeric"
+                value={adminForm.phone}
+                onChange={(event) => setAdminForm({ ...adminForm, phone: event.target.value })}
+                placeholder="请输入 11 位手机号"
                 autoComplete="off"
               />
             </div>
@@ -610,6 +684,39 @@ export default function OpsTenantDetailPage({
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setAdminOpen(false)}>
+                取消
+              </Button>
+              <Button type="submit" disabled={submitting}>
+                {submitting ? '保存中…' : '保存'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={phoneTarget !== null} onOpenChange={(open) => !open && setPhoneTarget(null)}>
+        <DialogContent className="sm:max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle>修改管理员手机号</DialogTitle>
+            <DialogDescription>
+              修改 {phoneTarget?.username} 的登录手机号；保存后该账号需用新手机号重新登录。
+            </DialogDescription>
+          </DialogHeader>
+          <form className="space-y-3" onSubmit={(event) => void handleUpdateAdminPhone(event)}>
+            <div className="space-y-2">
+              <Label htmlFor="adminPhoneValue">新手机号</Label>
+              <Input
+                id="adminPhoneValue"
+                type="tel"
+                inputMode="numeric"
+                value={phoneValue}
+                onChange={(event) => setPhoneValue(event.target.value)}
+                placeholder="请输入 11 位手机号"
+                autoComplete="off"
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setPhoneTarget(null)}>
                 取消
               </Button>
               <Button type="submit" disabled={submitting}>

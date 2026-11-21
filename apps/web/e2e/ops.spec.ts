@@ -21,6 +21,7 @@ test.beforeEach(async ({ page }) => {
 
 test('平台运营：登录 → 租户列表 → 开通租户 → 平台审计', async ({ page }) => {
   const tenantName = `e2e-租户-${Date.now()}`;
+  const adminPhone = `139${String(Date.now()).slice(-8)}`;
 
   await page.goto('/ops/login');
   await expect(page.getByRole('heading', { name: '平台运营登录' })).toBeVisible();
@@ -48,7 +49,8 @@ test('平台运营：登录 → 租户列表 → 开通租户 → 平台审计',
   await page.getByLabel('租户名称').fill(tenantName);
   await page.getByLabel('套餐').click();
   await page.getByRole('option', { name: /标准版/ }).click();
-  await page.getByLabel('账号', { exact: true }).fill('admin');
+  await page.getByLabel('姓名', { exact: true }).fill('admin');
+  await page.getByLabel('手机号', { exact: true }).fill(adminPhone);
   await page.getByLabel('初始密码', { exact: true }).fill('Secret#12345');
   await page.getByRole('button', { name: '开通', exact: true }).click();
 

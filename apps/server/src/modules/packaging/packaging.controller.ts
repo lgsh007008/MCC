@@ -22,9 +22,13 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import {
+  packagingExportEventSchema,
   packagingListQuerySchema,
+  packagingPrintEventSchema,
   packagingProjectInputSchema,
+  type PackagingExportEventInput,
   type PackagingListQuery,
+  type PackagingPrintEventInput,
   type PackagingProjectInput,
 } from '@mcc/shared';
 import { AuditAction } from '../../common/decorators/audit-action.decorator.js';
@@ -35,7 +39,10 @@ import { withIdempotency } from '../../common/idempotency.js';
 import { RedisService } from '../../common/redis.service.js';
 import { ZodValidationPipe } from '../../common/zod-validation.pipe.js';
 import {
+  PackagingExportEventBodyDto,
   PackagingMaterialDto,
+  PackagingOutputEventDto,
+  PackagingPrintEventBodyDto,
   PackagingProjectBodyDto,
   PackagingProjectDto,
   PackagingProjectListDto,
@@ -145,6 +152,48 @@ export class PackagingController {
   @ApiCreatedResponse({ type: PackagingProjectDto })
   nextRevision(@Param('id', ParseUUIDPipe) id: string): Promise<PackagingProjectDto> {
     return this.packagingService.nextRevision(id);
+  }
+
+  @Post('projects/:id/print-events')
+  @RequireScopes('packaging:view')
+  @AuditAction({
+    domain: 'packaging',
+    action: 'print',
+    label: '打印包装方案报告',
+    objectType: 'packaging-project',
+    payloadKeys: ['revisionNo'],
+  })
+  @HttpCode(200)
+  @ApiOperation({ summary: '记录包装方案报告打印审计（无业务副作用）' })
+  @ApiBody({ type: PackagingPrintEventBodyDto })
+  @ApiOkResponse({ type: PackagingOutputEventDto })
+  async recordPrint(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(packagingPrintEventSchema)) _body: PackagingPrintEventInput,
+  ): Promise<PackagingOutputEventDto> {
+    const code = await this.packagingService.codeOf(id);
+    return { id, code };
+  }
+
+  @Post('projects/:id/export-events')
+  @RequireScopes('packaging:view')
+  @AuditAction({
+    domain: 'packaging',
+    action: 'export',
+    label: '导出包装方案',
+    objectType: 'packaging-project',
+    payloadKeys: ['format', 'view', 'revisionNo', 'unitCode'],
+  })
+  @HttpCode(200)
+  @ApiOperation({ summary: '记录包装方案导出审计（无业务副作用）' })
+  @ApiBody({ type: PackagingExportEventBodyDto })
+  @ApiOkResponse({ type: PackagingOutputEventDto })
+  async recordExport(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(packagingExportEventSchema)) _body: PackagingExportEventInput,
+  ): Promise<PackagingOutputEventDto> {
+    const code = await this.packagingService.codeOf(id);
+    return { id, code };
   }
 
   @Get('projects/:id/revisions')

@@ -9,6 +9,8 @@ export interface AuthUser {
   // ADR-012：租户身份平面必须携带租户与签发时 epoch（守卫校验停用与失效）
   tenantId: string;
   tenantEpoch: number;
+  // 待改密：除改密 / 登出外的业务接口由 AuthGuard 拒绝（ADR-015）
+  mustChangePassword: boolean;
 }
 
 // 平台运营身份平面（design/账号与权限.md §6）：与租户四角色互不授予。

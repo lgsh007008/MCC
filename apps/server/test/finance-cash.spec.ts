@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from '../src/app.module.js';
 import { API_PREFIX } from '../src/common/api-prefix.js';
 import { PrismaService } from '../src/common/prisma.service.js';
-import { scopedClient, TEST_TENANT_CODE, TEST_TENANT_ID } from './helpers.js';
+import { scopedClient, TEST_TENANT_ID, testPhone } from './helpers.js';
 
 // 资金收付 / 应收关键路径（product/finance.md R-财务-002）：
 // 账户余额、内部转账不计收支、收款减少欠款、编号前缀。
@@ -35,11 +35,16 @@ describe('资金收付（契约/集成）', () => {
     prisma = app.get(PrismaService);
     db = scopedClient(prisma.client);
     await db.user.create({
-      data: { tenantId: TEST_TENANT_ID, username, passwordHash: await hash(password), role: 'SALES' },
+      data: {
+        tenantId: TEST_TENANT_ID,
+        username,
+        phone: testPhone(username),
+        passwordHash: await hash(password),
+        role: 'SALES',
+      },
     });
     const login = await request(app.getHttpServer()).post(`/${API_PREFIX}/auth/login`).send({
-      tenantCode: TEST_TENANT_CODE,
-      username,
+      phone: testPhone(username),
       password,
       rememberMe: false,
     });

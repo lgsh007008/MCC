@@ -1,7 +1,7 @@
 import type { PackagingPartInput } from '../packaging.schemas';
-import type { PalletComponentInput } from '../pallet.schemas';
-import type { PalletGeometry, PalletPiece } from '../pallet.geometry';
-import type { PalletIssue } from '../pallet.validation';
+import type { PalletComponentInput } from './pallet/schemas';
+import type { PalletGeometry, PalletPiece } from './pallet/geometry';
+import type { PalletIssue } from './pallet/validation';
 
 // 木箱 G 型（product/包装设计.md R-包装设计-007 / R-包装设计-016）：
 // 结构（几何）与配置（参数）分离；外尺寸与构件都由参数派生，手工修改只作为覆盖。

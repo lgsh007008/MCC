@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from '../src/app.module.js';
 import { API_PREFIX } from '../src/common/api-prefix.js';
 import { PrismaService } from '../src/common/prisma.service.js';
-import { scopedClient, TEST_TENANT_CODE, TEST_TENANT_ID } from './helpers.js';
+import { scopedClient, TEST_TENANT_ID, testPhone } from './helpers.js';
 
 // 供应商列表排序（design/supplier.md §5 / §6）：
 // 创建日期表头正 / 倒序，默认倒序；两条档案显式设置不同创建时间以断言相对顺序。
@@ -32,11 +32,16 @@ describe('供应商列表排序（契约/集成）', () => {
     prisma = app.get(PrismaService);
     db = scopedClient(prisma.client);
     await db.user.create({
-      data: { tenantId: TEST_TENANT_ID, username, passwordHash: await hash(password), role: 'SALES' },
+      data: {
+        tenantId: TEST_TENANT_ID,
+        username,
+        phone: testPhone(username),
+        passwordHash: await hash(password),
+        role: 'SALES',
+      },
     });
     const login = await request(app.getHttpServer()).post(`/${API_PREFIX}/auth/login`).send({
-      tenantCode: TEST_TENANT_CODE,
-      username,
+      phone: testPhone(username),
       password,
       rememberMe: false,
     });

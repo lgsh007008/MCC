@@ -28,8 +28,8 @@ import {
 } from './design/dunnage';
 import { resolvePartSources } from './design/overrides';
 import { evaluateExpression } from './design/expression';
-import { applyPalletDeckCounts, PALLET_DECK_MAX, palletDeckDefaults, palletTemplateComponents } from './pallet.templates';
-import type { PalletComponentInput } from './pallet.schemas';
+import { applyPalletDeckCounts, PALLET_DECK_MAX, palletDeckDefaults, palletTemplateComponents } from './design/pallet/templates';
+import type { PalletComponentInput } from './design/pallet/schemas';
 
 const crateParams = {
   innerLengthMm: 1200,

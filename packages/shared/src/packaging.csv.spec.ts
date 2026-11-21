@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { bomToCsv, cuttingToCsv } from './design/csv';
-import { calcPalletBom } from './pallet.bom';
-import { PALLET_DEFAULT_MATERIALS, palletTemplateComponents } from './pallet.templates';
+import { calcPalletBom } from './design/pallet/bom';
+import { PALLET_DEFAULT_MATERIALS, palletTemplateComponents } from './design/pallet/templates';
 
 const parts = palletTemplateComponents('block', 1200, 800);
 const bom = calcPalletBom(parts, PALLET_DEFAULT_MATERIALS);

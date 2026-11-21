@@ -21,6 +21,5 @@ export const PLATFORM_TOKEN_AUDIENCE = 'ops';
 // 失败锁定：连续 5 次锁 15 分钟（product/账号与权限.md R-账号与权限-001）
 export const LOGIN_FAIL_LIMIT = 5;
 export const LOGIN_FAIL_LOCK_SECONDS = 15 * 60;
-export const loginFailKey = (tenantCode: string, username: string): string =>
-  `login:fail:${tenantCode}:${username}`;
+export const loginFailKey = (phone: string): string => `login:fail:phone:${phone}`;
 export const platformLoginFailKey = (username: string): string => `login:fail:ops:${username}`;

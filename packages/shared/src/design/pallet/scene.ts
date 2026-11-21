@@ -1,6 +1,6 @@
-import { isNotchedStringer, type PalletPiece } from './pallet.geometry';
-import type { PalletComponentRole } from './pallet.schemas';
-import { PALLET_ROLE_COLORS } from './pallet.templates';
+import { isNotchedStringer, type PalletPiece } from './geometry';
+import type { PalletComponentRole } from './schemas';
+import { PALLET_ROLE_COLORS } from './templates';
 
 // 3D 场景描述（design/包装设计.md §4.4）：只产出 mesh 数据，不依赖 Three.js。
 // 前端 Three.js 组件按 kind 创建 BoxGeometry 或开槽纵梁的 ExtrudeGeometry，

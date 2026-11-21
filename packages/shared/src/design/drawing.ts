@@ -1,4 +1,4 @@
-import type { PalletGeometry, PalletPiece } from '../pallet.geometry';
+import type { PalletGeometry, PalletPiece } from './pallet/geometry';
 
 // 图纸模型（design/包装设计.md §4.3）：
 // 把几何转成「图幅 + 图框 + 视图 + 图层 + 图元」，SVG / DXF / 打印都消费这份模型。

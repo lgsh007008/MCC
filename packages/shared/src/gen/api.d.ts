@@ -206,8 +206,25 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** 登录：租户编号 + 账号 + 密码，签发访问令牌 + 刷新令牌 */
+        /** 登录：手机号 + 密码，签发访问令牌 + 刷新令牌 */
         post: operations["AuthController_login"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/register": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 自助注册：创建标准版租户 + 首管理员并自动登录 */
+        post: operations["AuthController_register"];
         delete?: never;
         options?: never;
         head?: never;
@@ -275,12 +292,29 @@ export interface paths {
         /** 账号列表（不含密码） */
         get: operations["UsersController_list"];
         put?: never;
-        /** 新建账号（租户内账号唯一；初始密码至少 8 位） */
+        /** 新建账号（手机号全局唯一；初始密码至少 8 位；创建后待改密） */
         post: operations["UsersController_create"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/users/{id}/phone": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** 修改手机号（全局唯一；撤销该账号刷新令牌） */
+        patch: operations["UsersController_updatePhone"];
         trace?: never;
     };
     "/api/v1/users/{id}/status": {
@@ -326,7 +360,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** 重置账号密码并撤销该账号全部刷新会话 */
+        /** 重置账号密码（置待改密并撤销该账号全部刷新会话） */
         post: operations["UsersController_resetPassword"];
         delete?: never;
         options?: never;
@@ -481,12 +515,29 @@ export interface paths {
         /** 租户 ADMIN 账号列表（跨租户受控作用域） */
         get: operations["PlatformUsersController_tenantAdmins"];
         put?: never;
-        /** 补建 / 新增租户管理员（校验套餐额度） */
+        /** 补建 / 新增租户管理员（姓名 + 手机号 + 初始密码；校验套餐额度） */
         post: operations["PlatformUsersController_createTenantAdmin"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ops/tenants/{tenantId}/admins/{userId}/phone": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** 修改租户管理员手机号（全局唯一；撤销该账号刷新会话） */
+        patch: operations["PlatformUsersController_updateTenantAdminPhone"];
         trace?: never;
     };
     "/api/v1/ops/tenants/{tenantId}/admins/{userId}/reset-password": {
@@ -1385,6 +1436,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/packaging/projects/{id}/print-events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 记录包装方案报告打印审计（无业务副作用） */
+        post: operations["PackagingController_recordPrint"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/packaging/projects/{id}/export-events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 记录包装方案导出审计（无业务副作用） */
+        post: operations["PackagingController_recordExport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/packaging/projects/{id}/revisions": {
         parameters: {
             query?: never;
@@ -1530,6 +1615,11 @@ export interface components {
             planName: string;
             /** @enum {string} */
             status: "active" | "suspended";
+            /**
+             * @description 开通渠道：运营开通 / 自助注册
+             * @enum {string}
+             */
+            source: "ops" | "self_register";
             /** @description 套餐账号额度（账号数由 auth 批量接口前端组合） */
             maxAccounts: number;
             note: string;
@@ -1555,6 +1645,11 @@ export interface components {
             planName: string;
             /** @enum {string} */
             status: "active" | "suspended";
+            /**
+             * @description 开通渠道：运营开通 / 自助注册
+             * @enum {string}
+             */
+            source: "ops" | "self_register";
             maxAccounts: number;
             note: string;
             createdAt: string;
@@ -1659,15 +1754,10 @@ export interface components {
         };
         LoginBodyDto: {
             /**
-             * @description 租户编号（登录标识）
-             * @example TN-00001
+             * @description 手机号（唯一登录标识）
+             * @example 13800000001
              */
-            tenantCode: string;
-            /**
-             * @description 账号，一人一号
-             * @example admin
-             */
-            username: string;
+            phone: string;
             /**
              * @description 密码
              * @example Mcc@2026
@@ -1682,12 +1772,41 @@ export interface components {
         LoginResponseDto: {
             /** @description 短期访问令牌，web 端存内存并以 Bearer 请求头携带 */
             accessToken: string;
-            /** @description 账号名 */
+            /** @description 姓名/显示名 */
             username: string;
             /** @description 角色：ADMIN / SALES / FINANCE / WORKER */
             role: string;
             /** @description 租户有效功能（菜单按 feature ∩ scope 裁剪） */
             features: string[];
+            /** @description 首次登录 / 重置密码后为 true，必须先改密 */
+            mustChangePassword: boolean;
+        };
+        RegisterBodyDto: {
+            /**
+             * @description 企业名称
+             * @example 梅好木业
+             */
+            companyName: string;
+            /**
+             * @description 首管理员姓名
+             * @example 张三
+             */
+            username: string;
+            /**
+             * @description 手机号（唯一登录标识）
+             * @example 13800000002
+             */
+            phone: string;
+            /**
+             * @description 密码（至少 8 位）
+             * @example Mcc@2026
+             */
+            password: string;
+            /**
+             * @description 记住登录：注册默认 true，刷新令牌 30 天
+             * @default true
+             */
+            rememberMe: boolean;
         };
         RefreshRequestDto: {
             /** @description 无 Cookie 客户端经请求体传递刷新令牌；web 走 Cookie 时无需此字段 */
@@ -1698,6 +1817,8 @@ export interface components {
             accessToken: string;
             /** @description 租户有效功能（刷新后重新下发，菜单据此裁剪） */
             features: string[];
+            /** @description 待改密标志：为 true 时前端进入强制改密 */
+            mustChangePassword: boolean;
         };
         ChangePasswordBodyDto: {
             /** @description 旧密码 */
@@ -1708,8 +1829,10 @@ export interface components {
         UserDto: {
             /** @description 账号 id */
             id: string;
-            /** @description 账号名 */
+            /** @description 姓名/显示名 */
             username: string;
+            /** @description 手机号（登录标识；停用账号可为空） */
+            phone: string | null;
             /**
              * @description 角色
              * @enum {string}
@@ -1740,10 +1863,15 @@ export interface components {
         };
         UserCreateBodyDto: {
             /**
-             * @description 账号（租户内唯一）
-             * @example sales01
+             * @description 姓名/显示名（租户内唯一）
+             * @example 张三
              */
             username: string;
+            /**
+             * @description 手机号（全局唯一，登录标识）
+             * @example 13800000002
+             */
+            phone: string;
             /**
              * @description 初始密码（至少 8 位）
              * @example Mcc@2026
@@ -1754,6 +1882,13 @@ export interface components {
              * @enum {string}
              */
             role: "ADMIN" | "SALES" | "FINANCE" | "WORKER";
+        };
+        UserPhoneBodyDto: {
+            /**
+             * @description 新手机号（全局唯一，登录标识）
+             * @example 13800000002
+             */
+            phone: string;
         };
         UserStatusBodyDto: {
             /**
@@ -1854,7 +1989,10 @@ export interface components {
         };
         TenantAdminDto: {
             id: string;
+            /** @description 姓名/显示名 */
             username: string;
+            /** @description 手机号（登录标识；停用账号可为空） */
+            phone: string | null;
             /** @enum {string} */
             status: "active" | "inactive";
             createdAt: string;
@@ -1864,10 +2002,16 @@ export interface components {
             items: components["schemas"]["TenantAdminDto"][];
         };
         TenantAdminCreateBodyDto: {
-            /** @description 账号（租户内唯一） */
+            /** @description 姓名/显示名（租户内唯一） */
             username: string;
+            /** @description 手机号（全局唯一，登录标识） */
+            phone: string;
             /** @description 初始密码（至少 8 位） */
             password: string;
+        };
+        TenantAdminPhoneBodyDto: {
+            /** @description 新手机号（全局唯一，登录标识） */
+            phone: string;
         };
         TenantAdminResetPasswordBodyDto: {
             /** @description 新密码（至少 8 位） */
@@ -3426,6 +3570,32 @@ export interface components {
             /** @description 加工费（元） */
             processingCost: string;
         };
+        PackagingPrintEventBodyDto: {
+            /** @description 打印的版本号；当前版本不传 */
+            revisionNo?: number | null;
+        };
+        PackagingOutputEventDto: {
+            /** @description 方案 id */
+            id: string;
+            /** @description 方案编号（PD-#####） */
+            code: string;
+        };
+        PackagingExportEventBodyDto: {
+            /**
+             * @description 导出格式
+             * @enum {string}
+             */
+            format: "svg_view" | "svg_sheet" | "dxf" | "csv_bom" | "csv_cutting" | "obj" | "stl";
+            /**
+             * @description SVG 视图；仅 format = svg_view 时必填
+             * @enum {string}
+             */
+            view?: "top" | "front" | "side" | "iso";
+            /** @description 导出的版本号；当前版本不传 */
+            revisionNo?: number | null;
+            /** @description 单元图号，如 PD-00001-U01 */
+            unitCode?: string;
+        };
         PackagingRevisionListDto: {
             /** @description 总数 */
             total: number;
@@ -3589,6 +3759,8 @@ export interface operations {
                 pageSize?: number;
                 /** @description 页码，默认 1 */
                 page?: number;
+                /** @description 开通渠道：运营开通 / 自助注册 */
+                source?: "ops" | "self_register";
                 /** @description 套餐 id */
                 planId?: string;
                 /** @description 状态 */
@@ -3873,6 +4045,29 @@ export interface operations {
             };
         };
     };
+    AuthController_register: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegisterBodyDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoginResponseDto"];
+                };
+            };
+        };
+    };
     AuthController_refresh: {
         parameters: {
             query?: never;
@@ -3941,7 +4136,7 @@ export interface operations {
                 pageSize?: number;
                 /** @description 页码，默认 1 */
                 page?: number;
-                /** @description 账号名模糊 */
+                /** @description 姓名或手机号模糊 */
                 keyword?: string;
             };
             header?: never;
@@ -3974,6 +4169,31 @@ export interface operations {
         };
         responses: {
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserDto"];
+                };
+            };
+        };
+    };
+    UsersController_updatePhone: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserPhoneBodyDto"];
+            };
+        };
+        responses: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4302,6 +4522,30 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["TenantAdminDto"];
                 };
+            };
+        };
+    };
+    PlatformUsersController_updateTenantAdminPhone: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenantId: string;
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TenantAdminPhoneBodyDto"];
+            };
+        };
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -6173,6 +6417,56 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PackagingProjectDto"];
+                };
+            };
+        };
+    };
+    PackagingController_recordPrint: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PackagingPrintEventBodyDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PackagingOutputEventDto"];
+                };
+            };
+        };
+    };
+    PackagingController_recordExport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PackagingExportEventBodyDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PackagingOutputEventDto"];
                 };
             };
         };

@@ -6,6 +6,7 @@ import { isFeatureCode, isUserRole, type FeatureCode, type UserRole } from '@mcc
 // 有效功能随登录 / 刷新响应下发，用于菜单 feature ∩ scope 裁剪；不在 JWT 中冗余。
 let accessToken: string | null = null;
 let features: FeatureCode[] | null = null;
+let mustChangePassword = false;
 
 const readPayload = (): { username?: string; role?: string } | null => {
   if (!accessToken) {
@@ -28,8 +29,9 @@ export const authSession = {
   get(): string | null {
     return accessToken;
   },
-  set(token: string, nextFeatures?: readonly string[]): void {
+  set(token: string, nextFeatures?: readonly string[], pendingPasswordChange = false): void {
     accessToken = token;
+    mustChangePassword = pendingPasswordChange;
     if (nextFeatures) {
       features = toFeatures(nextFeatures);
     }
@@ -37,9 +39,13 @@ export const authSession = {
   features(): FeatureCode[] | null {
     return features;
   },
+  mustChangePassword(): boolean {
+    return mustChangePassword;
+  },
   clear(): void {
     accessToken = null;
     features = null;
+    mustChangePassword = false;
   },
 };
 

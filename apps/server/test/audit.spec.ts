@@ -9,7 +9,7 @@ import { AppModule } from '../src/app.module.js';
 import { API_PREFIX } from '../src/common/api-prefix.js';
 import { PrismaService } from '../src/common/prisma.service.js';
 import { RedisService } from '../src/common/redis.service.js';
-import { scopedClient, TEST_TENANT_CODE, TEST_TENANT_ID } from './helpers.js';
+import { scopedClient, TEST_TENANT_ID, testPhone } from './helpers.js';
 
 // 审计日志（product/审计日志.md R-审计-001；design/审计日志.md §8）：
 // 写操作成功 / 失败、登录成功 / 失败、权限拒绝、打印均落库；非管理员查询 403；响应不含敏感 payload。
@@ -23,6 +23,8 @@ describe('审计日志（契约/集成）', () => {
   const stamp = Date.now();
   const adminUsername = `it-audit-admin-${stamp}`;
   const salesUsername = `it-audit-sales-${stamp}`;
+  const adminPhone = testPhone(adminUsername);
+  const salesPhone = testPhone(salesUsername);
   const customerName = `it-audit-customer-${stamp}`;
   const password = 'Secret#12345';
   let adminToken = '';
@@ -62,12 +64,14 @@ describe('审计日志（契约/集成）', () => {
         {
           tenantId: TEST_TENANT_ID,
           username: adminUsername,
+          phone: adminPhone,
           passwordHash: await hash(password),
           role: 'ADMIN',
         },
         {
           tenantId: TEST_TENANT_ID,
           username: salesUsername,
+          phone: salesPhone,
           passwordHash: await hash(password),
           role: 'SALES',
         },
@@ -75,11 +79,11 @@ describe('审计日志（契约/集成）', () => {
     });
     const adminLogin = await request(app.getHttpServer())
       .post(`/${API_PREFIX}/auth/login`)
-      .send({ tenantCode: TEST_TENANT_CODE, username: adminUsername, password, rememberMe: false });
+      .send({ phone: adminPhone, password, rememberMe: false });
     adminToken = adminLogin.body.accessToken as string;
     const salesLogin = await request(app.getHttpServer())
       .post(`/${API_PREFIX}/auth/login`)
-      .send({ tenantCode: TEST_TENANT_CODE, username: salesUsername, password, rememberMe: false });
+      .send({ phone: salesPhone, password, rememberMe: false });
     salesToken = salesLogin.body.accessToken as string;
   });
 
@@ -115,13 +119,12 @@ describe('审计日志（契约/集成）', () => {
   });
 
   it('登录失败落审计，不记录密码', async () => {
-    const ghost = `it-audit-ghost-${stamp}`;
     const res = await http()
       .post(`/${API_PREFIX}/auth/login`)
-      .send({ tenantCode: TEST_TENANT_CODE, username: ghost, password: 'wrong-password', rememberMe: false });
+      .send({ phone: salesPhone, password: 'wrong-password', rememberMe: false });
     expect(res.status).toBe(401);
     const row = await waitForLog({
-      actorUsername: ghost,
+      actorUsername: salesUsername,
       domain: 'auth',
       action: 'login',
       result: 'failed',

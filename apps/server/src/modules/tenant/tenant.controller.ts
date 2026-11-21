@@ -70,6 +70,12 @@ export class TenantController {
   @ApiQuery({ name: 'name', required: false, type: String, description: '租户名称模糊' })
   @ApiQuery({ name: 'status', required: false, enum: ['active', 'suspended'], description: '状态' })
   @ApiQuery({ name: 'planId', required: false, type: String, description: '套餐 id' })
+  @ApiQuery({
+    name: 'source',
+    required: false,
+    enum: ['ops', 'self_register'],
+    description: '开通渠道：运营开通 / 自助注册',
+  })
   @ApiQuery({ name: 'page', required: false, type: Number, description: '页码，默认 1' })
   @ApiQuery({ name: 'pageSize', required: false, type: Number, description: '每页条数，默认 20（最大 100）' })
   @ApiOkResponse({ type: TenantListDto })

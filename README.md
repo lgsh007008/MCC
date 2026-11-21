@@ -40,7 +40,7 @@ pnpm dev
 
 | 入口 | 地址 |
 | --- | --- |
-| 对客端 | http://localhost:3000 |
+| 登录页 | http://localhost:3000/login（根路径 `/` 自动跳转） |
 | 管理后台 | http://localhost:3000/admin |
 | 后端 API | http://localhost:3001/api/v1 |
 
@@ -61,7 +61,7 @@ docker compose up -d
 pnpm dev
 ```
 
-浏览器访问 http://localhost:3000（管理后台 http://localhost:3000/admin）。
+浏览器访问 http://localhost:3000/login（管理后台 http://localhost:3000/admin）。
 
 > `pnpm install` 与复制 `.env` 只在初次 / 新机器上需要，日常启动不用。停止开发服务按 `Ctrl+C`；停数据库用 `docker compose down`（一般不用停）。
 
