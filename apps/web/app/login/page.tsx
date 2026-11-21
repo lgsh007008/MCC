@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import * as React from 'react';
 import Link from 'next/link';
 import { loginSchema } from '@mcc/shared';
 import { Eye, EyeOff } from 'lucide-react';
+import { AuthShell } from '@/components/auth/auth-shell';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -11,15 +12,16 @@ import { Label } from '@/components/ui/label';
 import { authSession } from '@/lib/auth/session';
 import { api } from '@/lib/api';
 
-// 登录页（product/账号与权限.md R-账号与权限-001）：手机号、密码（显示/隐藏切换）、登录按钮、记住登录。
-// 纯组件拼装，不单列页面设计；页面归属账号与权限领域。
+// 登录页（product/账号与权限.md R-账号与权限-001 / design/账号与权限.md §7）：
+// 与注册页共用 AuthShell；桌面左表单、右 3D 画布，手机表单优先。
+// 字段、校验、记住登录与成功后分流保持不变。
 export default function LoginPage(): React.ReactElement {
-  const [phone, setPhone] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+  const [phone, setPhone] = React.useState('');
+  const [password, setPassword] = React.useState('');
+  const [showPassword, setShowPassword] = React.useState(false);
+  const [rememberMe, setRememberMe] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const [submitting, setSubmitting] = React.useState(false);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -52,77 +54,90 @@ export default function LoginPage(): React.ReactElement {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-muted/40 p-6">
-      <div className="w-full max-w-sm rounded-lg border border-border bg-card p-8">
-        <h1 className="text-xl font-semibold">登录</h1>
-        <p className="mt-1 text-sm text-muted-foreground">梅好木业数字化系统</p>
-
-        <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
-          <div className="space-y-2">
-            <Label htmlFor="phone">手机号</Label>
-            <Input
-              id="phone"
-              type="tel"
-              inputMode="numeric"
-              autoComplete="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="请输入 11 位手机号"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="password">密码</Label>
-            <div className="relative">
-              <Input
-                id="password"
-                type={showPassword ? 'text' : 'password'}
-                autoComplete="current-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="请输入密码"
-                className="pr-10"
-              />
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                className="absolute inset-y-0 right-1 my-auto text-muted-foreground"
-                aria-label={showPassword ? '隐藏密码' : '显示密码'}
-                aria-pressed={showPassword}
-                title={showPassword ? '隐藏密码' : '显示密码'}
-                onClick={() => setShowPassword((v) => !v)}
-              >
-                {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-              </Button>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id="rememberMe"
-              checked={rememberMe}
-              onCheckedChange={(checked) => setRememberMe(checked === true)}
-            />
-            <Label htmlFor="rememberMe" className="text-sm">
-              记住登录
-            </Label>
-          </div>
-
-          <p className="text-xs text-muted-foreground">忘记密码请联系管理员重置。</p>
-
-          {error ? <p className="text-sm text-destructive">{error}</p> : null}
-
-          <Button type="submit" className="w-full" disabled={submitting}>
-            {submitting ? '登录中…' : '登录'}
-          </Button>
-        </form>
-
-        <p className="mt-4 text-center text-sm text-muted-foreground">
+    <AuthShell
+      title="登录"
+      subtitle="梅好木业数字化系统"
+      asideTitle="登录后，继续把方案做完。"
+      asideDescription="右侧是托盘结构演示。登录后进入包装设计工作台，尺寸、视图、构件与料单都可以保存和出图。"
+      stageLabel="托盘演示 · 登录页"
+      stageTestId="login-stage"
+      footer={
+        <p>
           还没有企业账号？{' '}
-          <Link href="/register" className="text-primary underline-offset-4 hover:underline">
+          <Link href="/register" className="font-medium text-primary underline-offset-4 hover:underline">
             注册企业
           </Link>
         </p>
-      </div>
-    </main>
+      }
+      features={[
+        '参数化 2D / 3D，改尺寸即时重算',
+        '构件与料单同源，减少手工统计',
+        '方案保存、版本与出图，一个工作台完成',
+      ]}
+    >
+      <form className="space-y-4" onSubmit={handleSubmit}>
+        <div className="space-y-2">
+          <Label htmlFor="phone">手机号</Label>
+          <Input
+            id="phone"
+            type="tel"
+            inputMode="numeric"
+            autoComplete="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder="请输入 11 位手机号"
+            className="h-11"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="password">密码</Label>
+          <div className="relative">
+            <Input
+              id="password"
+              type={showPassword ? 'text' : 'password'}
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="请输入密码"
+              className="h-11 pr-10"
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className="absolute inset-y-0 right-1 my-auto text-muted-foreground"
+              aria-label={showPassword ? '隐藏密码' : '显示密码'}
+              aria-pressed={showPassword}
+              title={showPassword ? '隐藏密码' : '显示密码'}
+              onClick={() => setShowPassword((v) => !v)}
+            >
+              {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+            </Button>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="rememberMe"
+            checked={rememberMe}
+            onCheckedChange={(checked) => setRememberMe(checked === true)}
+          />
+          <Label htmlFor="rememberMe" className="text-sm">
+            记住登录
+          </Label>
+        </div>
+
+        <p className="text-xs text-muted-foreground">忘记密码请联系管理员重置。</p>
+
+        {error ? <p className="text-sm text-destructive">{error}</p> : null}
+
+        <Button
+          type="submit"
+          className="h-11 w-full bg-primary text-primary-foreground hover:bg-primary/90"
+          disabled={submitting}
+        >
+          {submitting ? '登录中…' : '登录'}
+        </Button>
+      </form>
+    </AuthShell>
   );
 }

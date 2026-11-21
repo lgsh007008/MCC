@@ -72,21 +72,27 @@ body.chrome .fake-tabs{display:flex}
 .workbench{flex:1;display:flex;min-height:0;min-width:0;background:var(--surface)}
 .left-panel{
   width:300px;flex:0 0 300px;background:var(--surface);border-right:1px solid var(--line);
-  display:flex;flex-direction:column;min-height:0;overflow:hidden;transition:width .18s ease,flex-basis .18s ease;
+  display:flex;flex-direction:column;min-height:0;overflow:hidden;transition:width .18s ease,flex-basis .18s ease;position:relative;
 }
-.left-panel.collapsed{width:44px;flex-basis:44px}
+.left-panel.collapsed{width:48px;flex-basis:48px}
 .lp-expanded{display:flex;flex-direction:column;flex:1;min-height:0;min-width:0}
 .left-panel.collapsed .lp-expanded{display:none}
-.lp-head{height:50px;flex:0 0 50px;display:flex;align-items:center;gap:8px;padding:0 8px 0 12px;border-bottom:1px solid var(--line);min-width:0}
+.lp-head{height:52px;flex:0 0 52px;display:flex;align-items:center;gap:6px;padding:0 8px 0 8px;border-bottom:1px solid var(--line);min-width:0}
 .lp-title{min-width:0;flex:1;display:flex;align-items:center;gap:8px}
 .lp-title b{display:block;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.25}
-.lp-title .sub{display:block;font-size:11px;color:var(--ink-3);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lp-type-ic{display:none;flex:0 0 auto;color:var(--ink-3)}
+.lp-type-ic .ic{width:15px;height:15px}
 .lp-body{flex:1;overflow-y:auto;padding:14px 14px 28px;min-height:0}
 .lp-mini{display:none;flex-direction:column;align-items:center;gap:10px;padding-top:12px;cursor:pointer;height:100%}
 .left-panel.collapsed .lp-mini{display:flex}
 .vertical{writing-mode:vertical-rl;letter-spacing:2px;font-size:11px;color:var(--ink-3)}
 .lp-mini .ic{width:14px;height:14px;color:var(--ink-3)}
+.lp-handle{position:absolute;right:0;top:50%;transform:translateY(-50%);z-index:25;width:16px;height:40px;display:grid;place-items:center;border:1px solid var(--line);border-right:0;border-radius:6px 0 0 6px;background:var(--surface);color:var(--ink-3);box-shadow:0 1px 2px rgba(40,35,25,.08);transition:background .12s,color .12s}
+.lp-handle:hover{background:var(--table-head);color:var(--ink)}
+.lp-handle .ic{width:13px;height:13px}
+.left-panel.collapsed .lp-handle{display:none}
 .main-area{flex:1;min-width:0;display:flex;flex-direction:column;min-height:0;background:var(--surface)}
+.work-row{flex:1;min-width:0;min-height:0;display:flex;background:var(--surface)}
 .topbar{
   height:52px;flex:0 0 52px;display:flex;align-items:center;justify-content:space-between;gap:12px;
   padding:0 14px;background:var(--surface);border-bottom:1px solid var(--line);position:relative;z-index:30;
@@ -166,11 +172,17 @@ body.chrome .fake-tabs{display:flex}
 .link-btn{font-size:12px;color:var(--primary);display:inline-flex;align-items:center;gap:4px;padding:4px 0}
 .link-btn:hover{text-decoration:underline}
 .lp-note{font-size:11px;color:var(--ink-3);line-height:1.65;margin-top:12px;padding:9px 10px;background:var(--table-head);border-radius:6px}
+@keyframes lpInLeft{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:none}}
+@keyframes lpInRight{from{opacity:0;transform:translateX(8px)}to{opacity:1;transform:none}}
+.lp-anim-list{animation:lpInLeft .17s ease}
+.lp-anim-params{animation:lpInRight .17s ease}
 
 /* 目录树 */
 .cat-group{margin-bottom:12px}
 .cat-row{display:flex;align-items:center;gap:7px;padding:6px 8px;border-radius:6px;font-size:12px;font-weight:700;color:var(--ink-2);letter-spacing:.2px;cursor:pointer;user-select:none}
 .cat-row:hover{background:var(--table-head)}
+.cat-row .cat-type{display:grid;place-items:center;flex:0 0 auto;color:var(--ink-3)}
+.cat-row .cat-type .ic{width:14px;height:14px}
 .cat-row .cat-arrow{width:12px;height:12px;color:var(--ink-3);transition:transform .15s}
 .cat-row.collapsed .cat-arrow{transform:rotate(-90deg)}
 .cat-row .count{margin-left:auto;font-size:10.5px;color:var(--ink-3);font-weight:400}
@@ -186,8 +198,9 @@ body.chrome .fake-tabs{display:flex}
 
 /* ===== 视图栏 / 画布 ===== */
 .canvas-wrap{flex:1;min-height:0;display:flex;flex-direction:column;min-width:0;position:relative}
-.viewbar{height:42px;flex:0 0 42px;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0 12px;border-bottom:1px solid var(--line);background:var(--surface);position:relative;z-index:10}
-.viewbar-left,.viewbar-right{display:flex;align-items:center;gap:6px;min-width:0}
+.viewbar{height:42px;flex:0 0 42px;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0 12px;border-bottom:1px solid var(--line);background:var(--surface);position:relative;z-index:10;overflow-x:auto;overflow-y:hidden;scrollbar-width:none}
+.viewbar::-webkit-scrollbar{display:none}
+.viewbar-left,.viewbar-right{display:flex;align-items:center;gap:6px;flex:0 0 auto}
 .view-tabs{display:inline-flex;align-items:center;gap:2px;padding:2px;border:1px solid var(--line);border-radius:7px;background:var(--table-head)}
 .view-tabs button{height:24px;padding:0 9px;border-radius:5px;font-size:11.5px;color:var(--ink-2);display:inline-flex;align-items:center;gap:4px}
 .view-tabs button.on{background:var(--surface);color:var(--ink);font-weight:600;box-shadow:0 1px 2px rgba(40,35,25,.08)}
@@ -199,9 +212,22 @@ body.chrome .fake-tabs{display:flex}
 #canvas3d canvas{display:block;width:100%;height:100%;outline:none}
 #canvas2d{position:absolute;inset:0;overflow:hidden;display:none;background:#fff}
 #canvas2d svg{width:100%;height:100%;display:block}
-.canvas-hint{position:absolute;right:18px;bottom:14px;font-size:11px;color:var(--ink-3);background:rgba(255,255,255,.86);border:1px solid var(--line);border-radius:5px;padding:3px 7px;pointer-events:none}
+.canvas-hint{position:absolute;right:18px;bottom:14px;font-size:11px;color:var(--ink-3);background:rgba(255,255,255,.86);border:1px solid var(--line);border-radius:5px;padding:3px 7px;pointer-events:none;transition:right .18s ease}
+.canvas-hint.with-rail{right:70px}
 .canvas-badge{position:absolute;left:14px;top:12px;display:flex;align-items:center;gap:6px;pointer-events:none}
 .canvas-badge .tag{font-size:10.5px;background:rgba(255,255,255,.9);border:1px solid var(--line);border-radius:5px;padding:2px 6px;color:var(--ink-2)}
+
+/* 关闭态浮卡：右栏竖向工具条 / 底栏横向图标卡 */
+.tool-rail{position:absolute;right:12px;top:50%;transform:translateY(-50%);z-index:20;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .2s ease,visibility .2s ease}
+.tool-rail.show{opacity:1;visibility:visible;pointer-events:auto}
+.tool-rail.show.disabled,.bottom-launcher.show.disabled{opacity:.4;pointer-events:none}
+.rail-card{display:flex;align-items:center;gap:2px;border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:4px;box-shadow:0 2px 8px rgba(40,35,25,.10),0 8px 20px rgba(40,35,25,.08)}
+.tool-rail .rail-card{flex-direction:column;width:46px}
+.rail-card button{width:36px;height:36px;border-radius:6px;display:grid;place-items:center;color:var(--ink-3);transition:background .12s,color .12s}
+.rail-card button:hover{background:var(--table-head);color:var(--ink)}
+.rail-card button .ic{width:16px;height:16px}
+.bottom-launcher{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);z-index:20;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .2s ease,visibility .2s ease}
+.bottom-launcher.show{opacity:1;visibility:visible;pointer-events:auto}
 .empty-state{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:28px 24px;overflow:auto;background:var(--surface);z-index:5}
 .empty-head{text-align:center;margin:8px 0 18px}
 .empty-head h2{font-size:18px;margin:0 0 6px;font-weight:700}
@@ -216,17 +242,27 @@ body.chrome .fake-tabs{display:flex}
 .tpl-card .tpl-tag{position:absolute;right:8px;top:8px;font-size:9.5px;padding:2px 5px;border-radius:4px;background:var(--primary-soft);color:var(--primary);font-weight:600}
 
 /* ===== 右栏 ===== */
-.right-panel{width:320px;flex:0 0 320px;border-left:1px solid var(--line);background:var(--surface);display:flex;flex-direction:column;min-height:0;overflow:hidden;transition:width .18s ease,flex-basis .18s ease}
-.right-panel.collapsed{width:44px;flex-basis:44px}
+.right-panel{width:320px;flex:0 0 320px;border-left:1px solid var(--line);background:var(--surface);display:flex;flex-direction:column;min-height:0;overflow:hidden;transition:width .18s ease,flex-basis .18s ease;position:relative}
+.right-panel.collapsed{width:0;flex-basis:0;border-left:0}
+.rp-resize{position:absolute;left:0;top:0;bottom:0;width:5px;cursor:col-resize;z-index:20}
+.rp-resize:hover,.rp-resize.dragging{background:color-mix(in oklab,var(--primary) 28%,transparent)}
+.right-panel.collapsed .rp-resize{display:none}
+.rp-handle{position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:25;width:16px;height:40px;display:grid;place-items:center;border:1px solid var(--line);border-left:0;border-radius:0 6px 6px 0;background:var(--surface);color:var(--ink-3);box-shadow:0 1px 2px rgba(40,35,25,.08);transition:background .12s,color .12s}
+.rp-handle:hover{background:var(--table-head);color:var(--ink)}
+.rp-handle .ic{width:13px;height:13px}
+.right-panel.collapsed .rp-handle{display:none}
 .rp-expanded{display:flex;flex-direction:column;flex:1;min-height:0;min-width:0}
 .right-panel.collapsed .rp-expanded{display:none}
-.rp-mini{display:none;flex-direction:column;align-items:center;gap:12px;padding-top:12px;cursor:pointer;height:100%}
-.right-panel.collapsed .rp-mini{display:flex}
-.rp-tabs{height:44px;flex:0 0 44px;display:flex;align-items:stretch;border-bottom:1px solid var(--line);overflow-x:auto;overflow-y:hidden;scrollbar-width:none}
+.rp-tabs{height:42px;flex:0 0 42px;display:flex;align-items:stretch;border-bottom:1px solid var(--line);overflow-x:auto;overflow-y:hidden;scrollbar-width:none}
 .rp-tabs::-webkit-scrollbar{display:none}
 .rp-tab{flex:0 0 auto;padding:0 9px;font-size:11.5px;color:var(--ink-3);display:flex;align-items:center;gap:4px;border-bottom:2px solid transparent;white-space:nowrap}
+.rp-tab .ic{width:13px;height:13px}
 .rp-tab:hover{color:var(--ink)}
 .rp-tab.on{color:var(--primary);border-bottom-color:var(--primary);font-weight:600}
+.rp-subtabs{flex:0 0 auto;display:flex;align-items:center;gap:2px;padding:4px 8px;border-bottom:1px solid var(--line);background:var(--table-head)}
+.rp-subtab{height:22px;padding:0 8px;border-radius:4px;font-size:11px;color:var(--ink-2);display:inline-flex;align-items:center;white-space:nowrap}
+.rp-subtab:hover{background:var(--surface);color:var(--ink)}
+.rp-subtab.on{background:var(--surface);color:var(--primary);font-weight:600;box-shadow:0 1px 2px rgba(40,35,25,.08)}
 .rp-body{flex:1;overflow-y:auto;padding:12px 12px 24px;min-height:0}
 .panel-title{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;font-weight:700;color:var(--ink-2);margin:2px 0 8px}
 .panel-title .sub{font-size:10.5px;color:var(--ink-3);font-weight:400}
@@ -251,18 +287,19 @@ body.chrome .fake-tabs{display:flex}
 .btn-row .btn{flex:1;min-width:0}
 
 /* ===== 底部面板 ===== */
-.bottom-panel{flex:0 0 254px;min-height:0;border-top:1px solid var(--line);background:var(--surface);display:flex;flex-direction:column;position:relative}
-.bottom-panel.collapsed{flex-basis:36px}
-.bp-tabs{height:36px;flex:0 0 36px;display:flex;align-items:center;gap:2px;padding:0 8px;border-bottom:1px solid var(--line);background:var(--surface);overflow-x:auto;scrollbar-width:none}
+.bottom-panel{flex:0 0 320px;min-height:0;border-top:1px solid var(--line);background:var(--surface);display:flex;flex-direction:column;position:relative;overflow:hidden}
+.bottom-panel.collapsed{flex-basis:0;height:0;border-top:0}
+.bp-tabs{height:40px;flex:0 0 40px;display:flex;align-items:stretch;gap:2px;padding:0 8px;border-bottom:1px solid var(--line);background:var(--surface);overflow-x:auto;scrollbar-width:none}
 .bp-tabs::-webkit-scrollbar{display:none}
-.bp-tab{height:28px;padding:0 9px;border-radius:5px;font-size:11.5px;color:var(--ink-3);display:flex;align-items:center;gap:5px;white-space:nowrap}
-.bp-tab:hover{color:var(--ink);background:var(--table-head)}
-.bp-tab.on{color:var(--ink);background:var(--table-head);font-weight:600}
+.bp-tab{height:40px;padding:0 10px;border-radius:0;font-size:11.5px;color:var(--ink-3);display:flex;align-items:center;gap:5px;white-space:nowrap;border-bottom:2px solid transparent}
+.bp-tab .ic{width:13px;height:13px}
+.bp-tab:hover{color:var(--ink)}
+.bp-tab.on{color:var(--ink);background:none;font-weight:600;border-bottom-color:var(--primary)}
 .bp-sp{flex:1}
 .bp-body{flex:1;min-height:0;overflow:auto;padding:0}
 .bottom-panel.collapsed .bp-body{display:none}
-.bp-handle{position:absolute;left:50%;top:-5px;transform:translateX(-50%);width:42px;height:10px;border-radius:6px;background:var(--surface);border:1px solid var(--line);display:grid;place-items:center;cursor:ns-resize;z-index:5;color:var(--ink-3)}
-.bp-handle:hover{background:var(--table-head)}
+.bp-handle{position:absolute;left:50%;top:0;transform:translateX(-50%);width:40px;height:16px;border-radius:0 0 6px 6px;background:var(--surface);border:1px solid var(--line);border-top:0;display:grid;place-items:center;cursor:ns-resize;z-index:6;color:var(--ink-3);box-shadow:0 1px 2px rgba(40,35,25,.08);transition:background .12s,color .12s}
+.bp-handle:hover{background:var(--table-head);color:var(--ink)}
 .bp-handle .ic{width:12px;height:12px}
 .table-wrap{width:100%;height:100%;overflow:auto;scrollbar-gutter:stable}
 table.grid{width:100%;border-collapse:separate;border-spacing:0;font-size:11.5px;min-width:920px}
@@ -328,6 +365,13 @@ table.grid .row-actions button:hover{background:var(--danger-soft);color:var(--d
 .rule-diff{font-size:11px;line-height:1.7;color:var(--ink-2)}
 .rule-diff b{color:var(--ink)}
 .rule-empty{color:var(--ink-3);font-size:11px;line-height:1.7;padding:8px 0}
+.free-steps{display:flex;align-items:center;gap:4px;margin-bottom:10px}
+.free-step{flex:1;min-width:0;height:26px;border:1px solid var(--line);border-radius:6px;background:var(--surface);font-size:11px;color:var(--ink-3);display:flex;align-items:center;justify-content:center;gap:4px;white-space:nowrap}
+.free-step i{font-style:normal;font-family:var(--mono);font-size:9.5px;width:14px;height:14px;border-radius:50%;background:var(--table-head);color:var(--ink-3);display:grid;place-items:center}
+.free-step.done{color:var(--ink-2);border-color:#d6d0c4}
+.free-step.done i{background:var(--primary-soft);color:var(--primary)}
+.free-step.on{background:var(--primary-soft);border-color:#b7d3c3;color:var(--primary);font-weight:600}
+.free-step.on i{background:var(--primary);color:#fff}
 .free-zones{display:grid;grid-template-columns:1fr 1fr;gap:4px}
 .free-zone{height:30px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink-2);font-size:11px;display:flex;align-items:center;justify-content:space-between;padding:0 8px;cursor:pointer}
 .free-zone span{font-family:var(--mono);font-size:10px;color:var(--ink-3)}
@@ -401,6 +445,7 @@ table.grid .row-actions button:hover{background:var(--danger-soft);color:var(--d
 @media(max-width:1100px){
   .left-panel{width:260px;flex-basis:260px}
   .right-panel{width:280px;flex-basis:280px}
+  .rp-resize{display:none}
   .doc-title-input{width:170px}
   .tb-right .btn{padding:0 9px}
   .rp-tab{padding:0 6px;font-size:11px}
@@ -415,9 +460,6 @@ table.grid .row-actions button:hover{background:var(--danger-soft);color:var(--d
   .left-panel{width:44px;flex-basis:44px}
   .left-panel .lp-expanded{display:none}
   .left-panel .lp-mini{display:flex}
-  .right-panel{width:44px;flex-basis:44px}
-  .right-panel .rp-expanded{display:none}
-  .right-panel .rp-mini{display:flex}
   .topbar{padding:0 8px;gap:6px}
   .doc-title-input{width:140px}
   #modeSeg{display:none}
@@ -465,13 +507,15 @@ table.grid .row-actions button:hover{background:var(--danger-soft);color:var(--d
         <div class="lp-expanded">
           <div class="lp-head">
             <button class="icon-btn sm" id="leftBackBtn" title="返回目录" style="display:none"></button>
-            <div class="lp-title"><div class="tx"><b id="lpTitle">结构目录</b><span class="sub" id="lpSub">选择模板开始设计</span></div></div>
-            <button class="icon-btn sm" id="leftCollapseBtn" title="收起左栏"></button>
+            <span class="lp-type-ic" id="lpTypeIcon"></span>
+            <div class="lp-title"><b id="lpTitle">目录</b></div>
+            <button class="lp-handle" id="leftCollapseBtn" title="收起左栏" aria-label="收起左栏"></button>
           </div>
           <div class="lp-body scroll-area" id="leftBody"></div>
         </div>
         <div class="lp-mini" id="leftMini">
-          <div class="vertical">结构目录 / 参数</div>
+          <span id="leftMiniIcon"></span>
+          <div class="vertical">单元参数</div>
         </div>
       </aside>
       <div class="main-area">
@@ -495,6 +539,7 @@ table.grid .row-actions button:hover{background:var(--danger-soft);color:var(--d
             <button class="icon-btn" id="moreBtn" title="更多"></button>
           </div>
         </header>
+        <div class="work-row">
         <div class="canvas-wrap">
           <div class="viewbar">
             <div class="viewbar-left">
@@ -528,37 +573,38 @@ table.grid .row-actions button:hover{background:var(--danger-soft);color:var(--d
               <div class="canvas-hint" id="canvasHint">左键拖拽旋转 · 滚轮缩放 · 点击构件选中</div>
               <div class="empty-state" id="emptyState"></div>
             </div>
+            <aside class="tool-rail" id="rightRail" aria-label="工具条"></aside>
+            <div class="bottom-launcher" id="bottomLauncher" aria-label="底部明细入口"></div>
           </div>
           <div class="bottom-panel" id="bottomPanel">
-            <div class="bp-handle" id="bottomHandle"></div>
+            <button class="bp-handle" id="bottomHandle" title="收起底栏" aria-label="收起底栏"></button>
             <div class="bp-tabs" id="bottomTabs">
               <button class="bp-tab on" data-bp="parts">构件表</button>
               <button class="bp-tab" data-bp="bom">BOM</button>
               <button class="bp-tab" data-bp="cut">开料</button>
-              <button class="bp-tab" data-bp="basis">规则明细</button>
+              <button class="bp-tab bp-more" id="bottomMoreBtn">更多</button>
               <span class="bp-sp"></span>
-              <button class="icon-btn sm" id="bottomCollapseBtn" title="收起底部面板"></button>
             </div>
             <div class="bp-body" id="bottomBody"></div>
           </div>
         </div>
-      </div>
-      <aside id="rightPanel" class="right-panel">
+        <aside id="rightPanel" class="right-panel">
+        <button class="rp-handle" id="rightCollapseBtn" title="收起右栏" aria-label="收起右栏"></button>
+        <div class="rp-resize" id="rightResize" title="拖拽调整右栏宽度，双击收起"></div>
         <div class="rp-expanded">
           <div class="rp-tabs" id="rightTabs">
             <button class="rp-tab on" data-rp="scheme">方案</button>
-            <button class="rp-tab" data-rp="part">属性</button>
-            <button class="rp-tab" data-rp="rules">规则</button>
+            <button class="rp-tab" data-rp="part">构件</button>
             <button class="rp-tab" data-rp="check">校验</button>
-            <button class="rp-tab" data-rp="assembly">装配</button>
-            <button class="rp-tab" data-rp="report">报告</button>
-            <button class="rp-tab" data-rp="material">材料</button>
-            <button class="icon-btn sm" id="rightCollapseBtn" title="收起右栏" style="margin-left:auto;flex:0 0 auto"></button>
+            <button class="rp-tab" data-rp="version">版本</button>
+            <button class="rp-tab rp-more" id="rightMoreBtn">更多</button>
           </div>
+          <div class="rp-subtabs" id="rightSubTabs" hidden></div>
           <div class="rp-body scroll-area" id="rightBody"></div>
         </div>
-        <div class="rp-mini" id="rightMini"><div class="vertical">方案 / 属性 / 规则 / 校验 / 装配 / 报告 / 材料</div></div>
-      </aside>
+        </aside>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -1691,6 +1737,14 @@ function icon(name, cls = 'ic') {
     help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 4.2 1.8c-.8.7-1.7 1.2-1.7 2.7M12 17h.01"/>',
     bolt: '<path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z"/>',
     inspect: '<path d="M5 4h14v16H5z"/><path d="M8 8h8M8 12h5"/><path d="M14 16l2 2 4-5"/>',
+    history: '<path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"/><path d="M12 8v4l3 2"/>',
+    chevronsRight: '<path d="M13 17l5-5-5-5M6 17l5-5-5-5"/>',
+    chevronsLeft: '<path d="M11 17l-5-5 5-5M18 17l-5-5 5-5"/>',
+    chevronsDown: '<path d="M7 6l5 5 5-5M7 13l5 5 5-5"/>',
+    arrowLeft: '<path d="M19 12H5M11 6l-6 6 6 6"/>',
+    shield: '<path d="M12 3l7 3v6c0 4-3 7-7 9-4-2-7-5-7-9V6l7-3z"/><path d="M9 12l2 2 4-4"/>',
+    sheet: '<path d="M6 3h12v18H6z"/><path d="M9 8h6M9 12h6M9 16h4"/>',
+    scissors: '<circle cx="6" cy="7" r="2"/><circle cx="6" cy="17" r="2"/><path d="M8 8l12 8M8 16L20 8"/>',
     spark: '<path d="M12 3l1.2 4.2L17 9l-3.8 1.8L12 15l-1.2-4.2L7 9l3.8-1.8L12 3z"/>'
   }[name] || '';
   return `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true">${p}</svg>`;
@@ -1751,6 +1805,7 @@ const ATTACH_OPTIONS = ['', '底座', '底板上', '盖板下', '侧板', '端�
 const LAYOUT_OPTIONS = ['full', 'distribute-x', 'distribute-z', 'grid', 'sides', 'ends', 'corners', 'side-battens', 'end-battens', 'stack'];
 const ORIENTATION_OPTIONS = ['X', 'Y', 'Z'];
 const RULE_STORE = 'songlin_param_rules_v1';
+const LAYOUT_STORE = 'songlin_param_layout_v1';
 
 function parseSpec(text) {
   const m = String(text || '').match(/(\d+(?:\.\d+)?)\s*[×xX*]\s*(\d+(?:\.\d+)?)/);
@@ -2706,6 +2761,9 @@ const state = {
   templateRuleVersions: {},
   freeBuild: false,
   freeZone: 'bottom',
+  freeStep: null,
+  rightWidth: 320,
+  bottomHeight: 320,
   zoom: 1
 };
 let lastUndoAt = 0;
@@ -2745,6 +2803,27 @@ function loadRuleSets() {
 }
 function saveRuleSets() {
   try { localStorage.setItem(RULE_STORE, JSON.stringify(state.ruleSets)); } catch (e) {}
+}
+function loadLayout() {
+  try {
+    const raw = localStorage.getItem(LAYOUT_STORE);
+    if (!raw) return;
+    const l = JSON.parse(raw);
+    if (typeof l.rightOpen === 'boolean') state.panel.right = l.rightOpen;
+    if (typeof l.bottomOpen === 'boolean') state.panel.bottom = l.bottomOpen;
+    state.rightWidth = clamp(num(l.rightWidth, 320), 280, 520);
+    state.bottomHeight = clamp(num(l.bottomHeight, 320), 160, 520);
+  } catch (e) {}
+}
+function saveLayout() {
+  try {
+    localStorage.setItem(LAYOUT_STORE, JSON.stringify({
+      rightOpen: state.panel.right,
+      bottomOpen: state.panel.bottom,
+      rightWidth: state.rightWidth,
+      bottomHeight: state.bottomHeight
+    }));
+  } catch (e) {}
 }
 function getRuleSet(id) {
   return state.ruleSets.find(r => r.id === (id || state.activeRuleSetId)) || state.ruleSets[0] || null;
@@ -2859,9 +2938,28 @@ function scheduleDerive() {
 /* ================= 图标初始化 / 通用选择器 ================= */
 function initStaticIcons() {
   const set = (id, name) => { const el = document.getElementById(id); if (el) el.innerHTML = icon(name); };
-  set('chromeBtn', 'panelLeft'); set('leftCollapseBtn', 'chevronLeft'); set('leftBackBtn', 'chevronLeft');
+  set('chromeBtn', 'panelLeft'); set('leftCollapseBtn', 'chevronsLeft'); set('leftBackBtn', 'arrowLeft');
+  set('leftMiniIcon', 'chevronsRight');
   set('undoBtn', 'undo'); set('redoBtn', 'redo'); set('moreBtn', 'more');
-  set('bottomCollapseBtn', 'chevronDown'); set('rightCollapseBtn', 'chevronRight');
+  set('bottomHandle', 'chevronsDown'); set('rightCollapseBtn', 'chevronsRight');
+  const rpIcons = { scheme: 'file', part: 'cube', check: 'shield', version: 'history' };
+  $$('#rightTabs .rp-tab[data-rp]').forEach(b => {
+    if (!b.querySelector('.ic')) b.insertAdjacentHTML('afterbegin', icon(rpIcons[b.dataset.rp] || 'file'));
+  });
+  const bpIcons = { parts: 'table', bom: 'sheet', cut: 'scissors' };
+  $$('#bottomTabs .bp-tab[data-bp]').forEach(b => {
+    if (!b.querySelector('.ic')) b.insertAdjacentHTML('afterbegin', icon(bpIcons[b.dataset.bp] || 'table'));
+  });
+  const rail = $('#rightRail');
+  if (rail) {
+    const tools = [['scheme', '方案', 'file'], ['part', '构件', 'cube'], ['check', '校验', 'shield'], ['version', '版本', 'history']];
+    rail.innerHTML = `<div class="rail-card">${tools.map(([k, l, i]) => `<button data-rail="${k}" aria-label="${l}" title="${l}">${icon(i)}</button>`).join('')}</div>`;
+  }
+  const launcher = $('#bottomLauncher');
+  if (launcher) {
+    const tabs = [['parts', '构件表', 'table'], ['bom', 'BOM', 'sheet'], ['cut', '开料', 'scissors']];
+    launcher.innerHTML = `<div class="rail-card">${tabs.map(([k, l, i]) => `<button data-rail-bottom="${k}" aria-label="打开${l}" title="${l}">${icon(i)}</button>`).join('')}</div>`;
+  }
 }
 let activeSelectMenu = null;
 function closeSelectMenu() {
@@ -2927,8 +3025,13 @@ function renderTopbar() {
   const badge = $('#docTemplateBadge');
   if (badge) {
     const t = getTemplate();
-    badge.textContent = t ? (t.category === 'pallet' ? '托盘' : '木箱') + ' · ' + t.name : '未选择模板';
-    badge.className = 'badge ' + (t ? (t.category === 'pallet' ? 'blue' : 'green') : 'gray');
+    if (state.instance && state.freeBuild) {
+      badge.textContent = '自由搭建 · ' + (state.instance.category === 'pallet' ? '托盘' : '木箱');
+      badge.className = 'badge amber';
+    } else {
+      badge.textContent = t ? (t.category === 'pallet' ? '托盘' : '木箱') + ' · ' + t.name : '未选择模板';
+      badge.className = 'badge ' + (t ? (t.category === 'pallet' ? 'blue' : 'green') : 'gray');
+    }
   }
   const ss = $('#saveState');
   if (ss) {
@@ -2945,6 +3048,7 @@ function renderTopbar() {
 }
 
 /* ================= 左栏 ================= */
+let lastLeftKey = null;
 function renderLeft() {
   const lp = $('#leftPanel');
   if (!lp) return;
@@ -2954,14 +3058,29 @@ function renderLeft() {
   const showParams = hasInstance && state.leftView === 'params';
   const back = $('#leftBackBtn');
   if (back) back.style.display = (showParams || showFree) ? 'grid' : 'none';
-  $('#lpTitle').textContent = showFree ? '自由搭建' : (showParams ? '结构参数' : '结构目录');
-  $('#lpSub').textContent = showFree ? '从基本构件开始搭' : (showParams ? (getTemplate()?.standard || '参数化结构') : '选择模板开始设计');
+  const typeIc = $('#lpTypeIcon');
+  if (typeIc) {
+    if (showParams || showFree) {
+      typeIc.style.display = 'grid';
+      typeIc.innerHTML = icon(state.instance && state.instance.category === 'pallet' ? 'pallet' : 'box');
+    } else {
+      typeIc.style.display = 'none';
+      typeIc.innerHTML = '';
+    }
+  }
+  $('#lpTitle').textContent = showFree
+    ? (state.instance.name || '自由搭建')
+    : (showParams ? (getTemplate()?.name || state.instance.name || '参数') : '目录');
   const body = $('#leftBody');
   if (!body) return;
+  const key = showFree ? 'free' : showParams ? 'params' : 'list';
   body.innerHTML = showFree ? freeBuildHtml() : (showParams ? leftParamsHtml() : leftTreeHtml());
-  if (showParams) {
-    const dc = $('#leftBody .lp-note');
-    if (dc) dc.scrollTop = 0;
+  if (key !== lastLeftKey) {
+    body.classList.remove('lp-anim-list', 'lp-anim-params');
+    void body.offsetWidth;
+    body.classList.add(key === 'list' ? 'lp-anim-list' : 'lp-anim-params');
+    body.scrollTop = 0;
+    lastLeftKey = key;
   }
 }
 function thumbSvg(t) {
@@ -3001,8 +3120,9 @@ function leftTreeHtml() {
   </div><div class="section">`;
   groups.forEach(g => {
     const collapsed = state.collapsedCats[g.key];
+    const groupIcon = { box: 'box', pallet: 'pallet', mine: 'star' }[g.key] || 'box';
     h += `<div class="cat-group">
-      <div class="cat-row ${collapsed ? 'collapsed' : ''}" data-cat="${g.key}">${icon('chevronDown', 'cat-arrow')}<span>${g.label}</span><span class="count">${g.items.length}</span></div>
+      <div class="cat-row ${collapsed ? 'collapsed' : ''}" data-cat="${g.key}"><span class="cat-type">${icon(groupIcon)}</span><span>${g.label}</span><span class="count">${g.items.length}</span>${icon('chevronDown', 'cat-arrow')}</div>
       <div class="cat-children ${collapsed ? 'hidden' : ''}">`;
     if (!g.items.length) {
       h += `<div class="cat-item" style="cursor:default;color:var(--ink-3);font-size:11.5px;">暂无模板</div>`;
@@ -3020,6 +3140,15 @@ function leftTreeHtml() {
     h += `</div></div>`;
   });
   h += `</div>
+  <div class="section">
+    <div class="section-head">基础数据</div>
+    <button class="cat-item" data-act="open-rule-library">
+      <span class="tiny-dot" style="background:#b7d3c3"></span>
+      <span class="cat-name">规则库</span>
+      <span class="cat-meta">v${getRuleSet() ? getRuleSet().published.version : 1}</span>
+    </button>
+    <div class="hint">按货重与装配策略推荐滑木、板厚、墩块规格；发布后新方案按新版本冻结。</div>
+  </div>
   <div class="lp-note">系统模板来自木箱 / 托盘工程工具与 ERP 结构种子；选中后进入参数工作台。我的模板由“存为模板”生成。</div>
   <div class="btn-row"><button class="btn sm" data-act="import">导入结构 JSON</button><button class="btn sm" data-act="help">使用说明</button></div>`;
   return h;
@@ -3036,10 +3165,10 @@ function leftParamsHtml() {
   return `
   <div class="section">
     <div class="section-head">基本参数</div>
-    <div class="fld"><label>结构名称</label><input data-inst="name" value="${esc(inst.name)}"></div>
+    <div class="fld"><label>方案名称</label><input data-inst="name" value="${esc(inst.name)}"></div>
     <div class="fld"><label>客户公司名</label><input data-inst="customer" value="${esc(inst.customer || '')}" placeholder="可留空"></div>
     <div class="fld"><label>模板</label><input value="${esc(t ? t.name : '')}" readonly></div>
-    <div class="fld"><label>结构类型</label><input value="${t ? (t.category === 'pallet' ? '参数化托盘' : '参数化木箱') : ''}" readonly></div>
+    <div class="fld"><label>单元类型</label><input value="${t ? (t.category === 'pallet' ? '参数化托盘' : '参数化木箱') : ''}" readonly></div>
     <div class="fld"><label>尺寸口径</label>${cselectHtml('psel', 'basis', p.basis, [{ v: 'outer', label: '外尺寸' }, { v: 'inner', label: '内尺寸' }])}</div>
   </div>
   <div class="section">
@@ -3131,14 +3260,44 @@ function getSchemes() {
 function renderRight() {
   const host = $('#rightBody');
   if (!host) return;
-  $$('#rightTabs .rp-tab').forEach(b => b.classList.toggle('on', b.dataset.rp === state.rightTab));
+  const EXT = ['rules', 'assembly', 'report', 'material'];
+  const extLabel = { rules: '规则', assembly: '装配', report: '报告', material: '材料' };
+  const isExt = EXT.includes(state.rightTab);
+  $$('#rightTabs .rp-tab[data-rp]').forEach(b => b.classList.toggle('on', b.dataset.rp === state.rightTab));
+  const mb = $('#rightMoreBtn');
+  if (mb) {
+    mb.classList.toggle('on', isExt);
+    mb.textContent = isExt ? '更多 · ' + (extLabel[state.rightTab] || '') : '更多';
+  }
   const rp = $('#rightPanel');
-  if (rp) rp.classList.toggle('collapsed', !state.panel.right);
+  if (rp) {
+    const narrow = window.innerWidth <= 1100;
+    rp.classList.toggle('collapsed', !state.panel.right);
+    if (state.panel.right && !narrow) { rp.style.width = state.rightWidth + 'px'; rp.style.flexBasis = state.rightWidth + 'px'; }
+    else { rp.style.width = ''; rp.style.flexBasis = ''; }
+  }
+  const rail = $('#rightRail');
+  if (rail) {
+    rail.classList.toggle('show', !state.panel.right);
+    rail.classList.toggle('disabled', !state.instance);
+  }
+  const hint = $('#canvasHint');
+  if (hint) hint.classList.toggle('with-rail', !state.panel.right);
+  const sub = $('#rightSubTabs');
+  if (sub) {
+    if (isExt) {
+      sub.hidden = false;
+      sub.innerHTML = EXT.map(k => `<button class="rp-subtab ${state.rightTab === k ? 'on' : ''}" data-ext="${k}">${extLabel[k]}</button>`).join('');
+    } else {
+      sub.hidden = true;
+      sub.innerHTML = '';
+    }
+  }
   if (!state.instance || !state.derived) {
     host.innerHTML = `<div class="empty-mini">还没有打开结构。<br>请在左侧目录选择模板，或从画布模板卡片开始。</div>`;
     return;
   }
-  const map = { scheme: rightScheme, part: rightPart, rules: rightRules, check: rightCheck, assembly: rightAssembly, report: rightReport, material: rightMaterial };
+  const map = { scheme: rightScheme, part: rightPart, rules: rightRules, check: rightCheck, assembly: rightAssembly, report: rightReport, material: rightMaterial, version: rightVersion };
   host.innerHTML = (map[state.rightTab] || rightScheme)();
 }
 function rightScheme() {
@@ -3146,14 +3305,14 @@ function rightScheme() {
   const ok = d.validation.filter(v => v.level !== 'err').length;
   const warn = d.validation.filter(v => v.level === 'warn').length;
   const err = d.validation.filter(v => v.level === 'err').length;
-  return `<div class="panel-title">当前结构 <span class="sub">${esc(t ? t.standard : '')}</span></div>
+  return `<div class="panel-title">当前方案 <span class="sub">${esc(t ? t.standard : '')}</span></div>
   <div class="kpi-grid">
     <div class="kpi"><div class="lab">外尺寸</div><div class="num">${fmt(d.env.outerL)}×${fmt(d.env.outerW)}</div><div class="unit">×${fmt(d.env.outerH)} mm</div></div>
     <div class="kpi"><div class="lab">材积</div><div class="num">${fmt(d.bom.volume, 3)}</div><div class="unit">m³</div></div>
     <div class="kpi"><div class="lab">重量</div><div class="num">${fmt(d.bom.weight, 1)}</div><div class="unit">kg</div></div>
     <div class="kpi"><div class="lab">材料费</div><div class="num">${fmt(d.bom.cost, 0)}</div><div class="unit">元</div></div>
   </div>
-  <div class="card"><div class="card-title">结构摘要</div>
+  <div class="card"><div class="card-title">方案摘要</div>
     <div class="kv"><span class="k">模板</span><span class="v">${esc(t ? t.name : '—')}</span></div>
     <div class="kv"><span class="k">客户</span><span class="v">${esc(inst.customer || '—')}</span></div>
     <div class="kv"><span class="k">尺寸口径</span><span class="v">${inst.params.basis === 'inner' ? '内尺寸' : '外尺寸'}</span></div>
@@ -3180,20 +3339,20 @@ function rightPart() {
   const raw = state.instance.parts.find(p => p.id === state.selectedPartId);
   if (!raw) {
     const inst = state.instance;
-    return `<div class="panel-title">属性 <span class="sub">未选择构件</span></div>
+    return `<div class="panel-title">构件 <span class="sub">未选择构件</span></div>
     <div class="status-row ok">${icon('info')}<span>在 3D 中点击构件，或在底部构件表选择一行。新增构件请用底部工具栏（专家模式）。</span></div>
-    <div class="card"><div class="card-title">当前结构</div>
+    <div class="card"><div class="card-title">当前方案</div>
       <div class="kv"><span class="k">名称</span><span class="v">${esc(inst.name)}</span></div>
       <div class="kv"><span class="k">类型</span><span class="v">${inst.category === 'pallet' ? '托盘' : '木箱'}${inst.templateId ? '' : ' · 自由搭建'}</span></div>
       <div class="kv"><span class="k">外尺寸</span><span class="v">${fmt(inst.params.length)}×${fmt(inst.params.width)}×${fmt(inst.params.height)}</span></div>
       <div class="kv"><span class="k">构件</span><span class="v">${d.parts.length} 行 / ${d.pieces.length} 件</span></div>
     </div>
-    <div class="hint">结构参数在左侧；右侧只显示当前选中对象的属性。</div>`;
+    <div class="hint">参数在左侧；右侧只显示当前选中对象的属性。</div>`;
   }
   if (state.mode === 'standard') {
     const p = d.parts.find(x => x.id === raw.id) || raw;
     const rm = p.roleMeta || ROLE_META[p.role] || ROLE_META.CUSTOM;
-    return `<div class="panel-title">属性 <span class="sub">只读</span></div>
+    return `<div class="panel-title">构件 <span class="sub">只读</span></div>
     <div class="card">
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
         <span class="role-chip ${p.role === 'CUSTOM' ? 'custom' : ''}">${rm.label}</span>
@@ -3220,7 +3379,7 @@ function rightPart() {
     { v: 'end-battens', label: '端板横档' }, { v: 'stack', label: '上下叠放' }
   ];
   const attachOpts = [{ v: '', label: '自动 / 不指定' }, { v: '底座', label: '底座' }, { v: '底板上', label: '底板上方' }, { v: '盖板下', label: '盖板下方' }, { v: '侧板', label: '侧板' }, { v: '端板', label: '端板' }];
-  return `<div class="panel-title">属性 <span class="sub">第 ${raw.idx + 1} 行</span></div>
+  return `<div class="panel-title">构件 <span class="sub">第 ${raw.idx + 1} 行</span></div>
   <div class="card">
     <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
       <span class="role-chip ${p.role === 'CUSTOM' ? 'custom' : ''}">${p.roleMeta.label}</span>
@@ -3363,6 +3522,26 @@ function rightAssembly() {
   ${list('不合法', dg.invalid, 'red', '没有超出外轮廓或干涉的构件')}
   <div class="lp-note" style="margin-top:10px;">诊断顺序：先看未放置（缺装配契约/尺寸非法），再看悬空（贴面不对），最后看不合法（超轮廓/干涉）。点击条目可直接定位构件。</div>`;
 }
+function rightVersion() {
+  const d = state.derived, inst = state.instance, t = getTemplate(), rs = getRuleSet();
+  const created = inst.createdAt ? new Date(inst.createdAt).toLocaleString('zh-CN') : '—';
+  const history = (rs && rs.history ? rs.history.slice().reverse() : []).slice(0, 6);
+  return `<div class="panel-title">版本 <span class="sub">结构 / 规则</span></div>
+  <div class="card"><div class="card-title">当前方案</div>
+    <div class="kv"><span class="k">名称</span><span class="v">${esc(inst.name)}</span></div>
+    <div class="kv"><span class="k">模板</span><span class="v">${esc(t ? t.name : '自由搭建')}</span></div>
+    <div class="kv"><span class="k">规则集</span><span class="v">${esc(rs ? rs.name : '公司默认规则')} · v${inst.ruleSetVersion || (rs ? rs.published.version : 1)}</span></div>
+    <div class="kv"><span class="k">构件</span><span class="v">${d.parts.length} 行 / ${d.pieces.length} 件</span></div>
+    <div class="kv"><span class="k">创建时间</span><span class="v">${created}</span></div>
+  </div>
+  <div class="card"><div class="card-title">规则版本历史 <span class="sub">${history.length} 条</span></div>
+    ${history.length ? history.map(h => `<div class="status-row ok">${icon('check')}<span><b>v${h.version}</b> · ${new Date(h.at).toLocaleDateString('zh-CN')}<br><span style="font-size:10.5px;color:var(--ink-3);">${esc(h.note || '')}</span></span></div>`).join('') : '<div class="empty-mini">暂无版本记录</div>'}
+    <div class="hint">演示版版本页展示规则集版本；结构版本快照将在后续接入。</div>
+  </div>
+  <div class="card"><div class="card-title">操作</div>
+    <div class="btn-row"><button class="btn sm primary" data-act="save-template">${icon('star')}存为我的模板</button><button class="btn sm" data-act="open-rule-library">${icon('inspect')}打开规则库</button></div>
+  </div>`;
+}
 function rightReport() {
   const d = state.derived;
   const schemes = getSchemes();
@@ -3487,8 +3666,21 @@ function cellAddress(partId, field) {
 }
 function renderBottom() {
   const bp = $('#bottomPanel');
-  if (bp) bp.classList.toggle('collapsed', !state.panel.bottom);
-  $$('#bottomTabs .bp-tab').forEach(b => b.classList.toggle('on', b.dataset.bp === state.bottomTab));
+  if (bp) {
+    bp.classList.toggle('collapsed', !state.panel.bottom);
+    bp.style.flexBasis = state.panel.bottom ? state.bottomHeight + 'px' : '';
+  }
+  $$('#bottomTabs .bp-tab[data-bp]').forEach(b => b.classList.toggle('on', b.dataset.bp === state.bottomTab));
+  const bm = $('#bottomMoreBtn');
+  if (bm) {
+    bm.classList.toggle('on', state.bottomTab === 'basis');
+    bm.textContent = state.bottomTab === 'basis' ? '更多 · 规则明细' : '更多';
+  }
+  const launcher = $('#bottomLauncher');
+  if (launcher) {
+    launcher.classList.toggle('show', !state.panel.bottom);
+    launcher.classList.toggle('disabled', !state.instance);
+  }
   const body = $('#bottomBody');
   if (!body) return;
   if (!state.instance || !state.derived) {
@@ -3703,6 +3895,7 @@ function createInstance(templateId) {
   inst.parts.forEach(p => { if (!p.id) p.id = uid('part'); });
   state.instance = inst;
   state.freeBuild = false;
+  state.freeStep = null;
   state.selectedTemplateId = t.id;
   state.selectedPartId = null;
   state.leftView = 'params';
@@ -4132,13 +4325,13 @@ function toggleChrome() {
   setTimeout(() => { if (typeof resize3D === 'function') resize3D(); }, 220);
 }
 function toggleLeft() { state.panel.left = !state.panel.left; renderLeft(); setTimeout(() => typeof resize3D === 'function' && resize3D(), 220); }
-function toggleRight() { state.panel.right = !state.panel.right; renderRight(); setTimeout(() => typeof resize3D === 'function' && resize3D(), 220); }
-function toggleBottom() { state.panel.bottom = !state.panel.bottom; renderBottom(); setTimeout(() => typeof resize3D === 'function' && resize3D(), 80); }
+function toggleRight() { state.panel.right = !state.panel.right; renderRight(); saveLayout(); setTimeout(() => typeof resize3D === 'function' && resize3D(), 220); }
+function toggleBottom() { state.panel.bottom = !state.panel.bottom; renderBottom(); saveLayout(); setTimeout(() => typeof resize3D === 'function' && resize3D(), 80); }
 function toggleFocus() {
   const anyOpen = state.panel.left || state.panel.right;
   state.panel.left = !anyOpen;
   state.panel.right = !anyOpen;
-  renderLeft(); renderRight();
+  renderLeft(); renderRight(); saveLayout();
   setTimeout(() => { if (typeof resize3D === 'function') resize3D(); if (state.view === '2d' || state.view === 'split' || state.view === 'drawing') renderCanvas(); }, 240);
 }
 function toggleGhost() {
@@ -4191,19 +4384,56 @@ function initBottomResize() {
   const handle = $('#bottomHandle');
   const panel = $('#bottomPanel');
   if (!handle || !panel) return;
-  let startY = 0, startH = 0, dragging = false;
+  let startY = 0, startH = 0, dragging = false, moved = false;
   handle.addEventListener('pointerdown', (e) => {
-    dragging = true; startY = e.clientY; startH = panel.getBoundingClientRect().height;
+    dragging = true; moved = false; startY = e.clientY; startH = panel.getBoundingClientRect().height;
     handle.setPointerCapture(e.pointerId);
     e.preventDefault();
   });
   handle.addEventListener('pointermove', (e) => {
     if (!dragging) return;
-    const h = clamp(startH - (e.clientY - startY), 120, 480);
+    if (Math.abs(e.clientY - startY) > 4) moved = true;
+    const h = clamp(startH - (e.clientY - startY), 160, 520);
+    state.bottomHeight = h;
     panel.style.flexBasis = h + 'px';
   });
-  handle.addEventListener('pointerup', () => { dragging = false; if (typeof resize3D === 'function') resize3D(); });
-  handle.addEventListener('dblclick', toggleBottom);
+  handle.addEventListener('pointerup', () => {
+    dragging = false;
+    if (!moved) { toggleBottom(); return; }
+    saveLayout();
+    if (typeof resize3D === 'function') resize3D();
+  });
+}
+function initRightResize() {
+  const handle = $('#rightResize');
+  const panel = $('#rightPanel');
+  if (!handle || !panel) return;
+  let startX = 0, startW = 0, dragging = false;
+  handle.addEventListener('pointerdown', (e) => {
+    dragging = true; startX = e.clientX; startW = panel.getBoundingClientRect().width;
+    handle.setPointerCapture(e.pointerId);
+    handle.classList.add('dragging');
+    panel.style.transition = 'none';
+    e.preventDefault();
+  });
+  handle.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    const w = clamp(startW - (e.clientX - startX), 280, 520);
+    state.rightWidth = w;
+    panel.style.width = w + 'px';
+    panel.style.flexBasis = w + 'px';
+  });
+  const end = () => {
+    if (!dragging) return;
+    dragging = false;
+    handle.classList.remove('dragging');
+    panel.style.transition = '';
+    saveLayout();
+    if (typeof resize3D === 'function') resize3D();
+  };
+  handle.addEventListener('pointerup', end);
+  handle.addEventListener('pointercancel', end);
+  handle.addEventListener('dblclick', toggleRight);
 }
 function initEvents() {
   $('#docTitle').addEventListener('input', (e) => { if (state.instance) { state.instance.name = e.target.value; state.dirty = true; renderTopbar(); } });
@@ -4218,8 +4448,6 @@ function initEvents() {
   $('#leftCollapseBtn').onclick = toggleLeft;
   $('#leftMini').onclick = toggleLeft;
   $('#rightCollapseBtn').onclick = toggleRight;
-  $('#rightMini').onclick = toggleRight;
-  $('#bottomCollapseBtn').onclick = toggleBottom;
   $('#leftBackBtn').onclick = () => { state.leftView = 'tree'; renderLeft(); };
   $('#focusBtn').onclick = toggleFocus;
   $('#explodeBtn').onclick = toggleExplode;
@@ -4228,8 +4456,44 @@ function initEvents() {
   $('#zoomResetBtn').onclick = zoomReset;
   $$('#viewTabs button').forEach(b => b.onclick = () => setView(b.dataset.view));
   $$('#view2dTabs button').forEach(b => b.onclick = () => setView2d(b.dataset.v2));
-  $$('#rightTabs .rp-tab').forEach(b => b.onclick = () => setRightTab(b.dataset.rp));
-  $$('#bottomTabs .bp-tab').forEach(b => b.onclick = () => setBottomTab(b.dataset.bp));
+  $$('#rightTabs .rp-tab[data-rp]').forEach(b => b.onclick = () => setRightTab(b.dataset.rp));
+  const rightSub = $('#rightSubTabs');
+  if (rightSub) rightSub.onclick = (e) => {
+    const b = e.target.closest('[data-ext]');
+    if (b) setRightTab(b.getAttribute('data-ext'));
+  };
+  const rightRail = $('#rightRail');
+  if (rightRail) rightRail.onclick = (e) => {
+    const b = e.target.closest('[data-rail]');
+    if (!b) return;
+    state.rightTab = b.getAttribute('data-rail');
+    state.panel.right = true;
+    renderRight();
+    saveLayout();
+    setTimeout(() => { if (typeof resize3D === 'function') resize3D(); }, 220);
+  };
+  const bottomLauncher = $('#bottomLauncher');
+  if (bottomLauncher) bottomLauncher.onclick = (e) => {
+    const b = e.target.closest('[data-rail-bottom]');
+    if (!b) return;
+    state.bottomTab = b.getAttribute('data-rail-bottom');
+    state.panel.bottom = true;
+    renderBottom();
+    saveLayout();
+    setTimeout(() => { if (typeof resize3D === 'function') resize3D(); }, 80);
+  };
+  const rightMore = $('#rightMoreBtn');
+  if (rightMore) rightMore.onclick = () => openMenu(rightMore, [
+    { label: '规则', icon: 'inspect', onClick: () => setRightTab('rules') },
+    { label: '装配诊断', icon: 'cube', onClick: () => setRightTab('assembly') },
+    { label: '工程报告', icon: 'chart', onClick: () => setRightTab('report') },
+    { label: '材料对比', icon: 'layers', onClick: () => setRightTab('material') }
+  ]);
+  $$('#bottomTabs .bp-tab[data-bp]').forEach(b => b.onclick = () => setBottomTab(b.dataset.bp));
+  const bottomMore = $('#bottomMoreBtn');
+  if (bottomMore) bottomMore.onclick = () => openMenu(bottomMore, [
+    { label: '规则明细', icon: 'table', onClick: () => setBottomTab('basis') }
+  ]);
 
   $('#leftBody').addEventListener('click', onLeftClick);
   $('#leftBody').addEventListener('input', onLeftInput);
@@ -4251,16 +4515,37 @@ function initEvents() {
     if (!typing && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); if (e.shiftKey) redo(); else undo(); return; }
     if (e.key === 'Escape') closeSelectMenu();
   });
-  window.addEventListener('resize', () => { if (typeof resize3D === 'function') resize3D(); });
+  let wasNarrow = window.innerWidth <= 1100;
+  window.addEventListener('resize', () => {
+    const narrow = window.innerWidth <= 1100;
+    if (narrow !== wasNarrow) { wasNarrow = narrow; renderRight(); }
+    if (typeof resize3D === 'function') resize3D();
+  });
   initBottomResize();
+  initRightResize();
 }
 function onLeftClick(e) {
   const free = e.target.closest('[data-free]');
   if (free) { startFreeBuild(free.getAttribute('data-free')); return; }
   const fzone = e.target.closest('[data-free-zone]');
-  if (fzone) { state.freeZone = fzone.getAttribute('data-free-zone'); renderLeft(); return; }
+  if (fzone) {
+    const z = fzone.getAttribute('data-free-zone');
+    state.freeZone = z;
+    state.freeStep = freeStepOfZone(z);
+    renderLeft();
+    return;
+  }
   const fadd = e.target.closest('[data-free-add]');
   if (fadd) { addFreePart(fadd.getAttribute('data-free-add')); return; }
+  const fstep = e.target.closest('[data-free-step]');
+  if (fstep) {
+    const s = fstep.getAttribute('data-free-step');
+    if (s === 'size') { state.freeStep = 'size'; const b = $('#leftBody'); if (b) b.scrollTop = 0; return; }
+    state.freeStep = s;
+    state.freeZone = s === 'sides' ? 'side' : s;
+    renderLeft();
+    return;
+  }
   const tpl = e.target.closest('[data-tpl]');
   if (tpl) { createInstance(tpl.getAttribute('data-tpl')); return; }
   const cat = e.target.closest('[data-cat]');
@@ -4274,6 +4559,7 @@ function onLeftClick(e) {
     else if (a === 'formula-help') showFormulaHelp();
     else if (a === 'free-finish') saveAsTemplate();
     else if (a === 'free-exit') exitFreeBuild();
+    else if (a === 'open-rule-library') openRuleLibrary();
     return;
   }
   const psel = e.target.closest('[data-psel]');
@@ -4388,6 +4674,7 @@ function init() {
   loadRuleSets();
   loadStore();
   ensureTemplateRuleRefs();
+  loadLayout();
   initStaticIcons();
   initEvents();
   recompute();
@@ -4738,6 +5025,11 @@ const FREE_ZONES = [
   { id: 'top', label: '顶部结构' },
   { id: 'other', label: '其他构件' }
 ];
+function freeStepOfZone(zone) {
+  if (zone === 'top') return 'top';
+  if (zone === 'side' || zone === 'end') return 'sides';
+  return 'bottom';
+}
 function startFreeBuild(category) {
   const pallet = category === 'pallet';
   const params = baseParams({
@@ -4769,6 +5061,7 @@ function startFreeBuild(category) {
   state.instance = inst;
   state.freeBuild = true;
   state.freeZone = 'bottom';
+  state.freeStep = 'size';
   state.leftView = 'params';
   state.selectedTemplateId = null;
   state.selectedPartId = null;
@@ -4830,6 +5123,7 @@ function addFreePart(kind) {
   const part = freePart(kind);
   part.zone = state.freeZone;
   part.group = kind;
+  if (!state.freeStep || state.freeStep === 'size') state.freeStep = freeStepOfZone(state.freeZone);
   state.instance.parts.push(part);
   state.instance.partSources = state.instance.partSources || {};
   state.instance.partSources[part.id] = part.role === 'CUSTOM' ? 'custom' : 'manual';
@@ -4876,7 +5170,21 @@ function freeBuildHtml() {
           : zone === 'top' ? add('top_cover', '盖板') + add('top_batten', '顶部加强') + add('custom', '自定义')
             : add('bottom_deck', '木板') + add('runner', '木方') + add('block', '墩块') + add('custom', '自定义');
   const dg = state.derived ? state.derived.diagnostics : null;
+  const steps = [
+    { id: 'size', label: '尺寸' },
+    { id: 'bottom', label: '底部' },
+    { id: 'sides', label: '侧/端' },
+    { id: 'top', label: '顶部' }
+  ];
+  const activeStep = state.freeStep || (!inst.parts.length ? 'size' : freeStepOfZone(zone));
+  const stepIdx = steps.findIndex(s => s.id === activeStep);
+  const stepsHtml = steps.map((s, i) => `<button class="free-step ${i === stepIdx ? 'on' : (i < stepIdx ? 'done' : '')}" data-free-step="${s.id}"><i>${i + 1}</i>${s.label}</button>`).join('');
   return `<div class="section">
+    <div class="section-head">搭建顺序</div>
+    <div class="free-steps">${stepsHtml}</div>
+    <div class="hint">先定目标尺寸，再从底部往上搭；步骤可直接切换分区。</div>
+  </div>
+  <div class="section">
     <div class="section-head">目标尺寸</div>
     <div class="fld"><label>结构名称</label><input data-inst="name" value="${esc(inst.name)}"></div>
     <div class="fld-row">
@@ -4915,6 +5223,7 @@ function exitFreeBuild() {
   const doExit = () => {
     state.instance = null;
     state.freeBuild = false;
+    state.freeStep = null;
     state.leftView = 'tree';
     state.selectedPartId = null;
     state.derived = null;

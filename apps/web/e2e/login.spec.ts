@@ -25,7 +25,10 @@ test.beforeEach(async ({ page }) => {
 
 test('登录 → 包装设计 → 订单菜单 → 销售单列表 → 退出 → 未登录守卫', async ({ page }) => {
   await page.goto('/login');
-  await expect(page.getByRole('heading', { name: '登录' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '登录', exact: true })).toBeVisible();
+  // 桌面左右分栏：右侧复用落地页托盘舞台（design/落地页.md §8）
+  await expect(page.getByTestId('login-stage')).toBeVisible();
+  await expect(page.getByRole('heading', { name: '登录后，继续把方案做完。' })).toBeVisible();
 
   await page.getByPlaceholder('请输入 11 位手机号').fill('13800000001');
   await page.getByPlaceholder('请输入密码').fill('Mcc@2026');
@@ -167,7 +170,7 @@ test('登录 → 包装设计 → 订单菜单 → 销售单列表 → 退出 �
   }
 
   // 管理员头像菜单：账号管理入口可见；账号页可访问（R-账号与权限-002）
-  await page.getByText('销', { exact: true }).click();
+  await page.getByRole('button', { name: '账号菜单' }).click();
   await page.getByText('账号管理', { exact: true }).click();
   await expect(page).toHaveURL(/\/admin\/users$/);
   await expect(page.getByRole('columnheader', { name: '姓名' })).toBeVisible();
@@ -190,11 +193,25 @@ test('登录 → 包装设计 → 订单菜单 → 销售单列表 → 退出 �
   await expect(permissionsDialog).toHaveCount(0);
 
   // 退出登录 → 回登录页
-  await page.getByText('销', { exact: true }).click();
+  await page.getByRole('button', { name: '账号菜单' }).click();
   await page.getByText('退出登录', { exact: true }).click();
   await expect(page).toHaveURL(/\/login$/);
 
   // 未登录直接访问后台 → 弹回登录页
   await page.goto('/admin/sale-orders');
   await expect(page).toHaveURL(/\/login$/);
+});
+
+test('登录页：手机表单优先，不展示桌面演示舞台', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/login');
+
+  await expect(page.getByRole('heading', { name: '登录', exact: true })).toBeVisible();
+  await expect(page.getByPlaceholder('请输入 11 位手机号')).toBeVisible();
+  await expect(page.getByTestId('login-stage')).toBeHidden();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+    ),
+  ).toBe(true);
 });

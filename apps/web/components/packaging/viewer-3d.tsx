@@ -15,6 +15,10 @@ interface PalletViewer3DProps {
   resetToken?: number;
   /** 由外层统一画布框提供边框与圆角时，去掉自身卡片样式 */
   frameless?: boolean;
+  /** 自动缓慢旋转（公开落地页演示用）；默认关闭，工作台行为不变 */
+  autoRotate?: boolean;
+  /** 底部操作提示；传 null 隐藏 */
+  hint?: string | null;
 }
 
 interface ViewerApi {
@@ -22,6 +26,7 @@ interface ViewerApi {
   zoom: (factor: number) => void;
   exportObj: () => void;
   exportStl: () => void;
+  setAutoRotate: (enabled: boolean) => void;
 }
 
 export interface Viewer3DHandle {
@@ -40,6 +45,8 @@ export const Viewer3D = React.forwardRef<Viewer3DHandle, PalletViewer3DProps>(fu
   className,
   resetToken,
   frameless = false,
+  autoRotate = false,
+  hint = '左键旋转 · 滚轮缩放 · 右键平移 · 点击构件选中',
 }, ref): React.ReactElement {
   const containerRef = React.useRef<HTMLDivElement>(null);
   const meshesRef = React.useRef<Array<import('three').Mesh>>([]);
@@ -50,8 +57,10 @@ export const Viewer3D = React.forwardRef<Viewer3DHandle, PalletViewer3DProps>(fu
   const apiRef = React.useRef<ViewerApi | null>(null);
   const onSelectRef = React.useRef(onSelect);
   const onFallbackRef = React.useRef(onFallback);
+  const autoRotateRef = React.useRef(autoRotate);
   onSelectRef.current = onSelect;
   onFallbackRef.current = onFallback;
+  autoRotateRef.current = autoRotate;
   const [error, setError] = React.useState<string | null>(null);
   const [ready, setReady] = React.useState(false);
 
@@ -257,8 +266,34 @@ export const Viewer3D = React.forwardRef<Viewer3DHandle, PalletViewer3DProps>(fu
       const controls = new OrbitControls(camera, renderer.domElement);
       controls.target.copy(center);
       controls.enableDamping = false;
+      controls.autoRotateSpeed = 0.8;
       controls.update();
       controls.addEventListener('change', () => renderer.render(scene, camera));
+
+      // 自动旋转需要持续渲染；默认关闭，工作台仍只在交互时渲染。
+      // 只切换 OrbitControls 与渲染循环，不重建场景：落地页按视口进出时高频开关。
+      let autoRotateFrame = 0;
+      const autoRotateTick = (): void => {
+        autoRotateFrame = requestAnimationFrame(autoRotateTick);
+        controls.update();
+        renderer.render(scene, camera);
+      };
+      const setAutoRotate = (enabled: boolean): void => {
+        if (enabled) {
+          if (autoRotateFrame) return;
+          controls.autoRotate = true;
+          controls.update();
+          autoRotateTick();
+          return;
+        }
+        controls.autoRotate = false;
+        if (autoRotateFrame) {
+          cancelAnimationFrame(autoRotateFrame);
+          autoRotateFrame = 0;
+        }
+        renderer.render(scene, camera);
+      };
+      setAutoRotate(autoRotateRef.current);
 
       const raycaster = new THREE.Raycaster();
       const pointer = new THREE.Vector2();
@@ -333,10 +368,12 @@ export const Viewer3D = React.forwardRef<Viewer3DHandle, PalletViewer3DProps>(fu
             download(`${geometry.L}x${geometry.W}-pallet.stl`, content, 'application/octet-stream');
           });
         },
+        setAutoRotate,
       };
 
       cleanup = () => {
         observer.disconnect();
+        cancelAnimationFrame(autoRotateFrame);
         renderer.domElement.removeEventListener('pointerdown', handlePointerDown);
         if (pendingPointerUp) window.removeEventListener('pointerup', pendingPointerUp);
         controls.dispose();
@@ -359,6 +396,11 @@ export const Viewer3D = React.forwardRef<Viewer3DHandle, PalletViewer3DProps>(fu
       cleanup();
     };
   }, [geometry]);
+
+  // 视口进出 / 减弱动效只切换旋转，不重建 three 场景
+  React.useEffect(() => {
+    apiRef.current?.setAutoRotate(autoRotate);
+  }, [autoRotate]);
 
   React.useEffect(() => {
     if (resetToken) {
@@ -415,9 +457,11 @@ export const Viewer3D = React.forwardRef<Viewer3DHandle, PalletViewer3DProps>(fu
       {!ready && !error ? (
         <div className="absolute inset-0 grid place-items-center text-sm text-muted-foreground">正在加载 3D 视图…</div>
       ) : null}
-      <p className="pointer-events-none absolute bottom-2 left-3 right-3 text-right text-wb-meta text-muted-foreground">
-        左键旋转 · 滚轮缩放 · 右键平移 · 点击构件选中
-      </p>
+      {hint ? (
+        <p className="pointer-events-none absolute bottom-2 left-3 right-3 text-right text-wb-meta text-muted-foreground">
+          {hint}
+        </p>
+      ) : null}
     </div>
   );
 });

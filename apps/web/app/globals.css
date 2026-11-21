@@ -109,3 +109,105 @@
   background-image: linear-gradient(to left, var(--muted) 0 10px, transparent 10px);
   background-repeat: no-repeat;
 }
+
+/*
+ * 落地页视觉（design/落地页.md §5）：
+ * 全浅色，颜色一律引用平台令牌；这里只保留与主题无关的网格与动效工具类。
+ * 唯一的深色是舞台内的 3D 画布（bg-foreground + text-background）。
+ */
+html:has([data-landing]) {
+  scroll-behavior: smooth;
+}
+
+.landing-stage-grid {
+  background-image:
+    linear-gradient(
+      to right,
+      color-mix(in oklab, var(--background) 7%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      to bottom,
+      color-mix(in oklab, var(--background) 7%, transparent) 1px,
+      transparent 1px
+    );
+  background-size: 32px 32px;
+  background-position: center;
+  mask-image: linear-gradient(to bottom, #000 0%, #000 72%, transparent 100%);
+}
+
+.landing-reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition:
+    opacity 0.7s ease,
+    transform 0.7s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.landing-reveal.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+.landing-pulse {
+  animation: landing-pulse 2.4s ease-in-out infinite;
+}
+
+.landing-float {
+  animation: landing-float 7s ease-in-out infinite alternate;
+}
+
+.landing-swap {
+  animation: landing-swap 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+@keyframes landing-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: scale(0.85);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes landing-float {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes landing-swap {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html:has([data-landing]) {
+    scroll-behavior: auto;
+  }
+
+  .landing-reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  .landing-pulse,
+  .landing-float,
+  .landing-swap {
+    animation: none;
+  }
+}
+

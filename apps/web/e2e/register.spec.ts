@@ -14,12 +14,15 @@ test('注册企业 → 自动进入后台 → 退出 → 新手机号登录', as
   await page.goto('/login');
   await page.getByRole('link', { name: '注册企业' }).click();
   await expect(page).toHaveURL(/\/register$/);
+  // 与登录页共用 AuthShell：桌面右侧舞台可见（design/账号与权限.md §7）
+  await expect(page.getByTestId('register-stage')).toBeVisible();
+  await expect(page.getByRole('heading', { name: '注册后，直接开始设计。' })).toBeVisible();
 
   await page.getByLabel('企业名称').fill(companyName);
   await page.getByLabel('管理员姓名').fill(adminName);
   await page.getByLabel('手机号').fill(phone);
   await page.getByLabel('密码', { exact: true }).fill(password);
-  await page.getByLabel('确认密码').fill(password);
+  await page.getByLabel('确认密码', { exact: true }).fill(password);
   await page.getByRole('button', { name: '注册并进入' }).click();
 
   // 注册即开通并自动登录，宽屏进包装设计（当前阶段默认落地页）
@@ -45,4 +48,19 @@ test('注册企业 → 自动进入后台 → 退出 → 新手机号登录', as
   await page.getByRole('button', { name: '登录', exact: true }).click();
   await expect(page).toHaveURL(/\/admin\/packaging-design$/);
   await expect(page.getByPlaceholder('方案名称 / 编号 / 客户名称')).toBeVisible();
+});
+
+test('注册页：手机表单优先，不展示桌面演示舞台', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/register');
+
+  await expect(page.getByRole('heading', { name: '注册企业', exact: true })).toBeVisible();
+  await expect(page.getByLabel('企业名称')).toBeVisible();
+  await expect(page.getByLabel('确认密码', { exact: true })).toBeVisible();
+  await expect(page.getByTestId('register-stage')).toBeHidden();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+    ),
+  ).toBe(true);
 });

@@ -109,7 +109,7 @@ test('多标签页：生成 / 切换 / 关闭 / 刷新保留 / 登出清空', as
     .toBe(true);
 
   // 退出登录后标签存储被清空
-  await page.getByText('销', { exact: true }).click();
+  await page.getByRole('button', { name: '账号菜单' }).click();
   await page.getByText('退出登录', { exact: true }).click();
   await expect(page).toHaveURL(/\/login$/);
   expect(await page.evaluate(() => window.sessionStorage.getItem('mcc.tabs.v1'))).toBeNull();

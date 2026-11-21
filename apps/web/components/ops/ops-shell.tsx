@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { LogOutIcon } from 'lucide-react';
 import { hasPlatformScope, type PlatformRole } from '@mcc/shared';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { UserSilhouetteIcon } from '@/components/ui/user-silhouette-icon';
 import { Button } from '@/components/ui/button';
 import { ConfirmProvider } from '@/components/ui/confirm-dialog';
 import {
@@ -102,8 +103,10 @@ export function OpsShell({ children }: { children: React.ReactNode }): React.Rea
             <div className="shrink-0">
               <DropdownMenu>
                 <DropdownMenuTrigger aria-label="平台账号菜单">
-                  <Avatar className="size-8">
-                    <AvatarFallback>平</AvatarFallback>
+                  <Avatar className="size-8 after:border-primary/20">
+                    <AvatarFallback className="bg-primary/10 text-primary">
+                      <UserSilhouetteIcon className="size-[18px]" />
+                    </AvatarFallback>
                   </Avatar>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">

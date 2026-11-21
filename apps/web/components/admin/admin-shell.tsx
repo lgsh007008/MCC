@@ -8,6 +8,7 @@ import { ChevronDownIcon, PanelLeftCloseIcon, PanelLeftOpenIcon } from 'lucide-r
 import { ROLE_LABELS, changePasswordSchema, hasScope, type FeatureCode, type UserRole } from '@mcc/shared';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { UserSilhouetteIcon } from '@/components/ui/user-silhouette-icon';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -574,8 +575,10 @@ function AdminShellInner({
             <div className="shrink-0">
               <DropdownMenu>
                 <DropdownMenuTrigger aria-label="账号菜单">
-                  <Avatar className="size-8">
-                    <AvatarFallback>销</AvatarFallback>
+                  <Avatar className="size-8 after:border-primary/20">
+                    <AvatarFallback className="bg-primary/10 text-primary">
+                      <UserSilhouetteIcon className="size-[18px]" />
+                    </AvatarFallback>
                   </Avatar>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">

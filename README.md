@@ -40,7 +40,8 @@ pnpm dev
 
 | 入口 | 地址 |
 | --- | --- |
-| 登录页 | http://localhost:3000/login（根路径 `/` 自动跳转） |
+| 落地页 | http://localhost:3000/ |
+| 登录页 | http://localhost:3000/login |
 | 管理后台 | http://localhost:3000/admin |
 | 后端 API | http://localhost:3001/api/v1 |
 

@@ -65,7 +65,7 @@ test('平台运营：登录 → 租户列表 → 开通租户 → 平台审计',
   await expect(page.getByText(tenantName, { exact: false }).first()).toBeVisible();
 
   // 退出登录 → 回平台登录页
-  await page.getByText('平', { exact: true }).click();
+  await page.getByRole('button', { name: '平台账号菜单' }).click();
   await page.getByText('退出登录', { exact: true }).click();
   await expect(page).toHaveURL(/\/ops\/login$/);
 });
